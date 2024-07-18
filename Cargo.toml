@@ -20,3 +20,8 @@ name = "zero2prod_axum"
 [dependencies]
 axum = { version = "0.7", features = ["http2"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+
+# `dev-dependencies`는 테스트나 예시를 실행할 때만 사용된다.
+# 최종 애플리케이션 바이너리에는 포함되지 않는다.
+[dev-dependencies]
+reqwest = "0.12"

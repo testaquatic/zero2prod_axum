@@ -1,4 +1,7 @@
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    future::{Future, IntoFuture},
+};
 
 use axum::{
     extract::Path,
@@ -6,6 +9,7 @@ use axum::{
     response::{IntoResponse, Response},
     routing, Router,
 };
+use tokio::net::TcpListener;
 
 // curl -v http://127.0.0.1:8000 => Hello World!
 // curl -v http://127.0.0.1:8000/wow => Hello wow!
@@ -23,10 +27,9 @@ async fn health_check() -> Response {
 
 // `run`을 `public`으로 마크해야 한다.
 // `run`은 더 이상 바이너리 엔트리 포인트가 아니므로, proc-macro 주문 없이 async로 마크할 수 있다.
-pub async fn run() -> Result<(), std::io::Error> {
+pub fn run(tcp_listener: TcpListener) -> impl Future<Output = Result<(), std::io::Error>> {
     let app = Router::new()
         .route("/", routing::get(greet))
         .route("/health_check", routing::get(health_check));
-    let tcp_listener = tokio::net::TcpListener::bind("127.0.0.1:8000").await?;
-    axum::serve(tcp_listener, app).await
+    axum::serve(tcp_listener, app).into_future()
 }
