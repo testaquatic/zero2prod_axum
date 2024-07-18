@@ -24,6 +24,9 @@ tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 # 이 피처는 기본으로 활성화되어 있지 않다.
 # 프로젝트에 불필요한 의존성을 사용하지 않기 위해서다.
 serde = { version = "1", features = ["derive"] }
+config = { version = "0.14" }
+trait-variant = { version = "0.1" }
+uuid = { version = "1", features = ["v4"] }
 
 # 테이블과 유사한 toml 구문을 사용해서 긴 코드 행을 줄이자.
 [dependencies.sqlx]
@@ -37,8 +40,12 @@ features = [
     "chrono",
     "migrate",
 ]
+[dependencies.chrono]
+version = "0.4"
+default-features = false
+features = ["clock"]
 
 # `dev-dependencies`는 테스트나 예시를 실행할 때만 사용된다.
 # 최종 애플리케이션 바이너리에는 포함되지 않는다.
 [dev-dependencies]
-reqwest = "0.12"
+reqwest = { version = "0.12" }

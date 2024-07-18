@@ -7,8 +7,9 @@ use axum::{
 
 // curl -v http://127.0.0.1:8000 => Hello World!
 pub async fn root(Path(map): Path<HashMap<String, String>>) -> Response {
-    let world = "World".to_string();
-    let name = map.get("name").unwrap_or(&world);
-
+    let name = match map.get("name") {
+        Some(name) => name,
+        None => "World!",
+    };
     format!("Hello {}!", name).into_response()
 }
