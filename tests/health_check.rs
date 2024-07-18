@@ -24,6 +24,68 @@ async fn health_check_works() {
     assert_eq!(Some(0), response.content_length());
 }
 
+#[tokio::test]
+async fn subscribe_returns_a_200_for_valid_form_data() {
+    // 테스트 데이터
+    let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
+
+    // 준비
+    let app_address = spawn_app().await.expect("Failed to spawn our app.");
+    let client = reqwest::Client::new();
+
+    // 실행
+    let response = client
+        .post(format!("{}/subscriptions", &app_address))
+        .header(
+            reqwest::header::CONTENT_TYPE,
+            "application/x-www-form-urlencoded",
+        )
+        .body(body)
+        .send()
+        .await
+        .expect("Failed to execute request.");
+
+    // 확인
+    assert_eq!(response.status(), reqwest::StatusCode::OK);
+}
+
+#[tokio::test]
+async fn subscribe_returns_a_400_when_data_is_missing() {
+    // 테스트 데이터
+    let test_cases = vec![
+        ("name=le%20guin", "missing the email"),
+        ("email=ursula_le_guin%40gmail.com", "missing the name"),
+        ("", "missing both name and email"),
+    ];
+    // 준비
+    let app_address = spawn_app().await.unwrap();
+    let client = reqwest::Client::new();
+
+    for (invalid_body, error_messages) in test_cases {
+        // 실행
+        let response = client
+            .post(format!("{}/subscriptions", &app_address))
+            .header(
+                reqwest::header::CONTENT_TYPE,
+                "application/x-www-form-urlencoded",
+            )
+            .body(invalid_body)
+            .send()
+            .await
+            .expect("Failed to execute request.");
+
+        // 확인
+        assert_eq!(
+            response.status(),
+            reqwest::StatusCode::UNPROCESSABLE_ENTITY,
+            // 테스트 실패시 출력할 커스터마이즈된 추가 오류 메세지
+            "The API did not fail with 400 Bad Request when the payload was {},",
+            error_messages,
+        );
+    }
+}
+
+/// 애플리케이션 인스턴스를 새로 실행하고 그 주소를 반환한다.
 // 백그라운드에서 애플리케이션을 구동한다.
 async fn spawn_app() -> Result<String, std::io::Error> {
     let tcp_listener = TcpListener::bind("127.0.0.1:0").await?;
