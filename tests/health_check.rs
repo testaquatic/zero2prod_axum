@@ -91,7 +91,7 @@ async fn spawn_app() -> Result<String, std::io::Error> {
     let tcp_listener = TcpListener::bind("127.0.0.1:0").await?;
     // OS가 할당한 포트 번호를 추출한다.
     let port = tcp_listener.local_addr().unwrap().port();
-    let server = zero2prod_axum::run(tcp_listener);
+    let server = zero2prod_axum::startup::run(tcp_listener);
     // 서버를 백그라운드로 구동한다.
     // tokio::spawn은 생성된 퓨처에 대한 핸들을 반환한다.
     // 하지만 여기에서는 사용하지 않으므로 let을 바인딩하지 않는다.

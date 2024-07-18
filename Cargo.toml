@@ -25,6 +25,19 @@ tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 # 프로젝트에 불필요한 의존성을 사용하지 않기 위해서다.
 serde = { version = "1", features = ["derive"] }
 
+# 테이블과 유사한 toml 구문을 사용해서 긴 코드 행을 줄이자.
+[dependencies.sqlx]
+version = "0.7"
+default-features = false
+features = [
+    "runtime-tokio-rustls",
+    "postgres",
+    "macros",
+    "uuid",
+    "chrono",
+    "migrate",
+]
+
 # `dev-dependencies`는 테스트나 예시를 실행할 때만 사용된다.
 # 최종 애플리케이션 바이너리에는 포함되지 않는다.
 [dev-dependencies]
