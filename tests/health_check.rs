@@ -1,9 +1,61 @@
-use sqlx::FromRow;
+use sqlx::{postgres::PgQueryResult, Database, Executor, FromRow};
 use tokio::net::TcpListener;
+use uuid::Uuid;
 use zero2prod_axum::{
-    database::basic::Zero2ProdAxumDatabase,
-    settings::{DefaultDBPool, Settings},
+    database::{basic::Zero2ProdAxumDatabase, postgres::postgrespool::DatabaseSettingsExt},
+    settings::{DatabaseSettings, DefaultDBPool, Settings},
 };
+
+trait DefaultDBPoolExt: Zero2ProdAxumDatabase {
+    async fn connect_without_db(database_settings: &DatabaseSettings) -> Result<Self, sqlx::Error>;
+
+    async fn create_db(
+        &self,
+        database_settings: &DatabaseSettings,
+    ) -> Result<<Self::DB as Database>::QueryResult, sqlx::Error>;
+
+    async fn fetch_one(&self, query: &str) -> Result<<Self::DB as Database>::Row, sqlx::Error>;
+    async fn execute(
+        &self,
+        query: &str,
+    ) -> Result<<Self::DB as Database>::QueryResult, sqlx::Error>;
+    async fn migrate(&self) -> Result<(), sqlx::Error>;
+}
+
+impl DefaultDBPoolExt for DefaultDBPool {
+    async fn connect_without_db(database_settings: &DatabaseSettings) -> Result<Self, sqlx::Error> {
+        let connect_options = database_settings.connect_options_without_db();
+        let pool = sqlx::PgPool::connect_with(connect_options).await?;
+        Ok(Self::new(pool))
+    }
+    async fn create_db(
+        &self,
+        database_settings: &DatabaseSettings,
+    ) -> Result<PgQueryResult, sqlx::Error> {
+        let pool = Self::connect_without_db(database_settings).await?;
+
+        pool.execute(format!(r#"CREATE DATABASE "{}""#, database_settings.database_name).as_str())
+            .await
+    }
+    async fn fetch_one(
+        &self,
+        query: &str,
+    ) -> Result<<<Self as Zero2ProdAxumDatabase>::DB as Database>::Row, sqlx::Error> {
+        self.as_ref().fetch_one(query).await
+    }
+
+    async fn execute(&self, query: &str) -> Result<PgQueryResult, sqlx::Error> {
+        self.as_ref().execute(query).await
+    }
+
+    async fn migrate(&self) -> Result<(), sqlx::Error> {
+        sqlx::migrate!("./migrations")
+            .run(self.as_ref())
+            .await
+            .expect("Failed to migrate database.");
+        Ok(())
+    }
+}
 
 pub struct TestApp {
     pub settings: Settings,
@@ -12,21 +64,19 @@ pub struct TestApp {
 /// 애플리케이션 인스턴스를 새로 실행하고 그 주소를 반환한다.
 // 백그라운드에서 애플리케이션을 구동한다.
 async fn spawn_app() -> TestApp {
-    let mut settings = Settings::get_settings().expect("Failed to read settings");
-    let tcp_listener = TcpListener::bind("127.0.0.1:0")
-        .await
-        .expect("Failed to bind address to listener.");
-    // OS가 할당한 포트 번호를 추출한다.
-    // 임의의 포트가 할당되므로 설정을 변경한다.
-    settings.application_port = tcp_listener.local_addr().unwrap().port();
-    let pool = DefaultDBPool::connect(&settings.database).expect("Failed to connect to database.");
+    let settings = Settings::get_settings().expect("Failed to read settings");
+    let mut test_app = TestApp { settings };
+    let tcp_listener = test_app.get_tcp_listener().await;
+    let pool = test_app.get_db_pool().await;
+
     let server = zero2prod_axum::startup::run(tcp_listener, pool);
     // 서버를 백그라운드로 구동한다.
     // tokio::spawn은 생성된 퓨처에 대한 핸들을 반환한다.
     // 하지만 여기에서는 사용하지 않으므로 let을 바인딩하지 않는다.
     let _ = tokio::spawn(server);
     // 애플리케이션 주소를 호출자에게 반환한다.
-    TestApp { settings }
+
+    test_app
 }
 
 impl TestApp {
@@ -35,6 +85,37 @@ impl TestApp {
     }
     fn subscriptions_uri(&self) -> String {
         format!("http://{}/subscriptions", self.address())
+    }
+
+    // TCP 설정
+    async fn get_tcp_listener(&mut self) -> TcpListener {
+        let tcp_listener = TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("Failed to bind address to listener.");
+        // OS가 할당한 포트 번호를 추출한다.
+        // 임의의 포트가 할당되므로 설정을 변경한다.
+        self.settings.application_port = tcp_listener.local_addr().unwrap().port();
+
+        tcp_listener
+    }
+
+    // DB 설정
+    async fn get_db_pool(&mut self) -> DefaultDBPool {
+        // 임의의 DB 이름을 생성한다.
+        self.settings.database.database_name = Uuid::new_v4().to_string();
+        // 데이터베이스를 생성한다.
+        let pool = DefaultDBPool::connect_without_db(&self.settings.database)
+            .await
+            .expect("Failed to connect to database.");
+        pool.create_db(&self.settings.database)
+            .await
+            .expect("Failed to create database.");
+        // 데이터베이스를 마이그레이션 한다.
+        let pool =
+            DefaultDBPool::connect(&self.settings.database).expect("Failed to connect Database.");
+        pool.migrate().await.expect("Failed to migrate database.");
+
+        pool
     }
 }
 
