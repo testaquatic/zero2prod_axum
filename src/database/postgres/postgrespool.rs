@@ -20,8 +20,21 @@ impl Zero2ProdAxumDatabase for PostgresPool {
         Ok(PostgresPool { pool })
     }
 
-    async fn save_subscriber(&self, email: &str, name: &str) -> Result<PgQueryResult, sqlx::Error> {
-        pg_save_subscriber(&self.pool, email, name).await
+    #[tracing::instrument(
+        name = "Saving new subscriber details in the database."
+        skip_all,
+    )]
+    async fn insert_subscriber(
+        &self,
+        email: &str,
+        name: &str,
+    ) -> Result<PgQueryResult, sqlx::Error> {
+        pg_save_subscriber(&self.pool, email, name)
+            .await
+            .map_err(|e| {
+                tracing::error!("Failed to execute query: {:?}", &e);
+                e
+            })
     }
 }
 

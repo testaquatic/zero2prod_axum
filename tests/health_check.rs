@@ -1,5 +1,8 @@
+use std::sync::Once;
+
 use sqlx::{postgres::PgQueryResult, Database, Executor, FromRow};
 use tokio::net::TcpListener;
+use tracing::{level_filters::LevelFilter, Subscriber};
 use uuid::Uuid;
 use zero2prod_axum::{
     database::{
@@ -7,6 +10,7 @@ use zero2prod_axum::{
         postgres::postgrespool::{DatabaseSettingsExt, PostgresPool},
     },
     settings::{DatabaseSettings, DefaultDBPool, Settings},
+    telemetry::{get_tracing_subscriber, init_tracing_subscriber},
 };
 
 trait DefaultDBPoolExt: Zero2ProdAxumDatabase {
@@ -72,6 +76,7 @@ impl TestApp {
     /// 애플리케이션 인스턴스를 새로 실행하고 그 주소를 반환한다.
     // 백그라운드에서 애플리케이션을 구동한다.
     async fn spawn_app() -> Self {
+        Self::set_tracing();
         let settings = Settings::get_settings().expect("Failed to read settings");
         let mut test_app = TestApp { settings };
         let tcp_listener = test_app.get_tcp_listener().await;
@@ -124,6 +129,19 @@ impl TestApp {
         pool.migrate().await.expect("Failed to migrate database.");
 
         pool
+    }
+
+    fn set_tracing() {
+        static ONCE: Once = Once::new();
+        ONCE.call_once(|| {
+            // 트레이트 객체를 사용해서 타입 문제를 해결했다.
+            let tracing_subscriber: Box<dyn Subscriber + Send + Sync> = std::env::var("TEST_LOG")
+                .map_or(
+                    Box::new(get_tracing_subscriber(LevelFilter::DEBUG, std::io::sink)),
+                    |_| Box::new(get_tracing_subscriber(LevelFilter::DEBUG, std::io::stdout)),
+                );
+            init_tracing_subscriber(tracing_subscriber);
+        });
     }
 }
 
@@ -191,7 +209,7 @@ async fn subscribe_returns_a_200_for_valid_form_data() {
 }
 
 #[tokio::test]
-async fn subscribe_returns_a_400_when_data_is_missing() {
+async fn subscribe_returns_a_422_when_data_is_missing() {
     // 테스트 데이터
     let test_cases = vec![
         ("name=le%20guin", "missing the email"),

@@ -1,5 +1,5 @@
 use tokio::net::TcpListener;
-use tracing::{level_filters::LevelFilter, Instrument};
+use tracing::level_filters::LevelFilter;
 use zero2prod_axum::{
     database::{basic::Zero2ProdAxumDatabase, postgres::postgrespool::PostgresPool},
     settings::Settings,
@@ -8,7 +8,7 @@ use zero2prod_axum::{
 
 #[tokio::main]
 async fn main() -> Result<(), std::io::Error> {
-    let tracing_subscriber = get_tracing_subscriber(LevelFilter::INFO);
+    let tracing_subscriber = get_tracing_subscriber(LevelFilter::INFO, std::io::stdout);
     init_tracing_subscriber(tracing_subscriber);
     // 구성을 읽을 수 없으면 패닉에 빠진다.
     let settings = Settings::get_settings().expect("Failed to read configuration.");

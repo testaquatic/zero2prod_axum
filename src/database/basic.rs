@@ -8,7 +8,7 @@ pub trait Zero2ProdAxumDatabase: AsRef<Pool<Self::DB>> + Sized {
     type DB: Database;
     fn connect(database_settings: &DatabaseSettings) -> Result<Self::Z2PADBPool, sqlx::Error>;
 
-    async fn save_subscriber(
+    async fn insert_subscriber(
         &self,
         email: &str,
         name: &str,

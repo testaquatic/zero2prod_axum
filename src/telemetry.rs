@@ -2,7 +2,7 @@ use std::sync::Once;
 
 use tracing::{dispatcher::set_global_default, level_filters::LevelFilter, Subscriber};
 use tracing_log::LogTracer;
-use tracing_subscriber::{layer::SubscriberExt, EnvFilter, Registry};
+use tracing_subscriber::{fmt::MakeWriter, layer::SubscriberExt, EnvFilter, Registry};
 
 /// 여러 레이어들을 하나의 `tracing`와 subscriber로 구성한다.
 ///
@@ -10,11 +10,19 @@ use tracing_subscriber::{layer::SubscriberExt, EnvFilter, Registry};
 ///
 /// 'impl Subscriber`를 반환 타입으로 사용해서 반환된 subscriber의 실제 타입에 관할 설명을 피한다.
 /// 반환된 subscriber를 `init_subscriber`로 나중에 전달하기 위해 명시적으로 `Send`이고 `Sync`임을 알려야 한다.
-pub fn get_tracing_subscriber(env_filter: LevelFilter) -> impl Subscriber + Send + Sync {
+pub fn get_tracing_subscriber<Sink>(
+    env_filter: LevelFilter,
+    sink: Sink,
+) -> impl Subscriber + Send + Sync
+where
+    // 이 이상한 구문은 higher-ranked trait bound이다.
+    // 기본적으로 Sink가 모든 라이프타임 파라미터 `'a`에 대해 'MakeWrtier' 트레이트를 구현한다는 것을 의미한다.
+    Sink: for<'a> MakeWriter<'a> + Send + Sync + 'static,
+{
     // RUST_LOG 환경 변수가 설정되어 있지 않으면 info 레벨 및 그 이상의 모든 span을 출력한다.
     let env_filter = EnvFilter::try_from_default_env()
         .unwrap_or(EnvFilter::default().add_directive(env_filter.into()));
-    let formatting_layer = tracing_subscriber::fmt::layer().pretty();
+    let formatting_layer = tracing_subscriber::fmt::layer().pretty().with_writer(sink);
     Registry::default().with(env_filter).with(formatting_layer)
 }
 

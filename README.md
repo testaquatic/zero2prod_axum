@@ -14,8 +14,15 @@ actix-web 대신 axum ( https://docs.rs/axum/latest/axum/ )으로 작성했다.
 
 ### /scripts
 
-- `./scripts/init_db.sh`
-  테스트를 위한 Postgres 컨테이너 생성 및 마이그레이션
-  - 환경변수
-    - `SKIP_DOCKER=true`  
-      도커 생성을 건너 뛴다.
+- 테스트를 위한 Postgres 컨테이너 생성 및 마이그레이션  
+  `./scripts/init_db.sh`
+
+  - 환경변수:
+    - `SKIP_DOCKER`
+      도커 생성을 건너 뛴다.  
+       `SKIP_DOCKER=true ./scripts/init_db.sh`
+
+- 환경변수:
+  - `TEST_LOG`
+    테스트 할 때 로그를 볼 수 있다.  
+     `TEST_LOG=true cargo test health_check_works`
