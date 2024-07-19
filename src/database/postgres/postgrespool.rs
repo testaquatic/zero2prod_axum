@@ -1,6 +1,6 @@
 use sqlx::{
     postgres::{PgConnectOptions, PgQueryResult},
-    ConnectOptions, Database, PgPool, Postgres,
+    PgPool, Postgres,
 };
 
 use crate::{database::basic::Zero2ProdAxumDatabase, settings::DatabaseSettings};
@@ -38,18 +38,11 @@ impl PostgresPool {
 }
 
 pub trait DatabaseSettingsExt {
-    type DB: Database;
-    fn connect_options_without_db(
-        &self,
-    ) -> impl ConnectOptions<Connection = <Self::DB as Database>::Connection>;
-    fn connect_options_with_db(
-        &self,
-    ) -> impl ConnectOptions<Connection = <Self::DB as Database>::Connection>;
+    fn connect_options_without_db(&self) -> PgConnectOptions;
+    fn connect_options_with_db(&self) -> PgConnectOptions;
 }
 
 impl DatabaseSettingsExt for DatabaseSettings {
-    type DB = Postgres;
-    #[allow(refining_impl_trait)]
     fn connect_options_without_db(&self) -> PgConnectOptions {
         PgConnectOptions::new()
             .username(&self.username)
@@ -57,7 +50,6 @@ impl DatabaseSettingsExt for DatabaseSettings {
             .host(&self.host)
             .port(self.port)
     }
-    #[allow(refining_impl_trait)]
     fn connect_options_with_db(&self) -> PgConnectOptions {
         self.connect_options_without_db()
             .database(&self.database_name)

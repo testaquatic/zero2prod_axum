@@ -2,7 +2,10 @@ use sqlx::{postgres::PgQueryResult, Database, Executor, FromRow};
 use tokio::net::TcpListener;
 use uuid::Uuid;
 use zero2prod_axum::{
-    database::{basic::Zero2ProdAxumDatabase, postgres::postgrespool::DatabaseSettingsExt},
+    database::{
+        basic::Zero2ProdAxumDatabase,
+        postgres::postgrespool::{DatabaseSettingsExt, PostgresPool},
+    },
     settings::{DatabaseSettings, DefaultDBPool, Settings},
 };
 
@@ -15,19 +18,22 @@ trait DefaultDBPoolExt: Zero2ProdAxumDatabase {
     ) -> Result<<Self::DB as Database>::QueryResult, sqlx::Error>;
 
     async fn fetch_one(&self, query: &str) -> Result<<Self::DB as Database>::Row, sqlx::Error>;
+
     async fn execute(
         &self,
         query: &str,
     ) -> Result<<Self::DB as Database>::QueryResult, sqlx::Error>;
+
     async fn migrate(&self) -> Result<(), sqlx::Error>;
 }
 
-impl DefaultDBPoolExt for DefaultDBPool {
+impl DefaultDBPoolExt for PostgresPool {
     async fn connect_without_db(database_settings: &DatabaseSettings) -> Result<Self, sqlx::Error> {
         let connect_options = database_settings.connect_options_without_db();
         let pool = sqlx::PgPool::connect_with(connect_options).await?;
         Ok(Self::new(pool))
     }
+
     async fn create_db(
         &self,
         database_settings: &DatabaseSettings,
@@ -37,6 +43,7 @@ impl DefaultDBPoolExt for DefaultDBPool {
         pool.execute(format!(r#"CREATE DATABASE "{}""#, database_settings.database_name).as_str())
             .await
     }
+
     async fn fetch_one(
         &self,
         query: &str,
@@ -61,28 +68,29 @@ pub struct TestApp {
     pub settings: Settings,
 }
 
-/// 애플리케이션 인스턴스를 새로 실행하고 그 주소를 반환한다.
-// 백그라운드에서 애플리케이션을 구동한다.
-async fn spawn_app() -> TestApp {
-    let settings = Settings::get_settings().expect("Failed to read settings");
-    let mut test_app = TestApp { settings };
-    let tcp_listener = test_app.get_tcp_listener().await;
-    let pool = test_app.get_db_pool().await;
-
-    let server = zero2prod_axum::startup::run(tcp_listener, pool);
-    // 서버를 백그라운드로 구동한다.
-    // tokio::spawn은 생성된 퓨처에 대한 핸들을 반환한다.
-    // 하지만 여기에서는 사용하지 않으므로 let을 바인딩하지 않는다.
-    let _ = tokio::spawn(server);
-    // 애플리케이션 주소를 호출자에게 반환한다.
-
-    test_app
-}
-
 impl TestApp {
+    /// 애플리케이션 인스턴스를 새로 실행하고 그 주소를 반환한다.
+    // 백그라운드에서 애플리케이션을 구동한다.
+    async fn spawn_app() -> Self {
+        let settings = Settings::get_settings().expect("Failed to read settings");
+        let mut test_app = TestApp { settings };
+        let tcp_listener = test_app.get_tcp_listener().await;
+        let pool = test_app.get_test_db_pool().await;
+
+        let server = zero2prod_axum::startup::run(tcp_listener, pool);
+        // 서버를 백그라운드로 구동한다.
+        // tokio::spawn은 생성된 퓨처에 대한 핸들을 반환한다.
+        // 하지만 여기에서는 사용하지 않으므로 let을 바인딩하지 않는다.
+        let _ = tokio::spawn(server);
+        // 애플리케이션 주소를 호출자에게 반환한다.
+
+        test_app
+    }
+
     fn address(&self) -> String {
         format!("127.0.0.1:{}", self.settings.application_port)
     }
+
     fn subscriptions_uri(&self) -> String {
         format!("http://{}/subscriptions", self.address())
     }
@@ -100,7 +108,7 @@ impl TestApp {
     }
 
     // DB 설정
-    async fn get_db_pool(&mut self) -> DefaultDBPool {
+    async fn get_test_db_pool(&mut self) -> DefaultDBPool {
         // 임의의 DB 이름을 생성한다.
         self.settings.database.database_name = Uuid::new_v4().to_string();
         // 데이터베이스를 생성한다.
@@ -126,7 +134,7 @@ impl TestApp {
 #[tokio::test]
 async fn health_check_works() {
     // 준비
-    let test_app = spawn_app().await;
+    let test_app = TestApp::spawn_app().await;
     // `reqwest`를 사용해서 애플리케이션에 대한 HTTP 요청을 수행한다.
     let client = reqwest::Client::new();
 
@@ -149,7 +157,7 @@ async fn subscribe_returns_a_200_for_valid_form_data() {
     let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
 
     // 준비
-    let test_app = spawn_app().await;
+    let test_app = TestApp::spawn_app().await;
     let pool = DefaultDBPool::connect(&test_app.settings.database)
         .expect("Failed to connect to Postgres.");
     let client = reqwest::Client::new();
@@ -191,7 +199,7 @@ async fn subscribe_returns_a_400_when_data_is_missing() {
         ("", "missing both name and email"),
     ];
     // 준비
-    let test_app = spawn_app().await;
+    let test_app = TestApp::spawn_app().await;
     let client = reqwest::Client::new();
 
     for (invalid_body, error_messages) in test_cases {

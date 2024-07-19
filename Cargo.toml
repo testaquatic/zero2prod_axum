@@ -27,6 +27,17 @@ serde = { version = "1", features = ["derive"] }
 config = { version = "0.14" }
 trait-variant = { version = "0.1" }
 uuid = { version = "1", features = ["v4"] }
+tower = { version = "0.4" }
+tower-http = { version = "0.5", features = ["full"] }
+tracing = { version = "0.1" }
+tracing-bunyan-formatter = { version = "0.3" }
+tracing-subscriber = { version = "0.3", features = [
+    "fmt",
+    "env-filter",
+    "json",
+] }
+tracing-log = "0.2"
+log = "0.4"
 
 # 테이블과 유사한 toml 구문을 사용해서 긴 코드 행을 줄이자.
 [dependencies.sqlx]
