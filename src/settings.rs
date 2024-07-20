@@ -1,3 +1,4 @@
+use secrecy::Secret;
 use sqlx::Postgres;
 
 use crate::database::postgres::postgrespool::PostgresPool;
@@ -14,7 +15,7 @@ pub struct Settings {
 #[derive(serde::Deserialize)]
 pub struct DatabaseSettings {
     pub username: String,
-    pub password: String,
+    pub password: Secret<String>,
     pub port: u16,
     pub host: String,
     pub database_name: String,

@@ -1,3 +1,4 @@
+use secrecy::ExposeSecret;
 use sqlx::{
     postgres::{PgConnectOptions, PgQueryResult},
     PgPool, Postgres,
@@ -59,7 +60,7 @@ impl DatabaseSettingsExt for DatabaseSettings {
     fn connect_options_without_db(&self) -> PgConnectOptions {
         PgConnectOptions::new()
             .username(&self.username)
-            .password(&self.password)
+            .password(self.password.expose_secret())
             .host(&self.host)
             .port(self.port)
     }
