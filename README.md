@@ -29,16 +29,17 @@ actix-web 대신 axum ( https://docs.rs/axum/latest/axum/ )으로 작성했다.
   `curl --request POST --data 'email=thomas_mann@hotmail.com&name=Tom' --verbose http://127.0.0.1:8000/subscriptions`
 
   - 200 OK
-  - 500 Internal Server Error  
-     이메일 중복
+  - 500 Internal Server Error => 이메일 중복
 
-  `curl --request POST --data 'email=thomas_mann@hotmail.com' --verbose http://127.0.0.1:8000/subscriptions` : 일부 또는 전체 필드가 없음
+  `curl --request POST --data 'email=thomas_mann@hotmail.com' --verbose http://127.0.0.1:8000/subscriptions`
 
-  - 422 Unprocessable Entity
+  - 422 Unprocessable Entity => 일부 또는 전체 필드가 없음
 
 ## 참고사항
 
 ### /scripts
+
+#### init_db.sh
 
 - 테스트를 위한 Postgres 컨테이너 생성 및 마이그레이션  
   `./scripts/init_db.sh`
@@ -48,7 +49,8 @@ actix-web 대신 axum ( https://docs.rs/axum/latest/axum/ )으로 작성했다.
       도커 생성을 건너 뛴다.  
        `SKIP_DOCKER=true ./scripts/init_db.sh`
 
-- 환경변수:
-  - `TEST_LOG`
-    테스트 할 때 로그를 볼 수 있다.  
-     `TEST_LOG=true cargo test health_check_works`
+### 환경변수:
+
+- `TEST_LOG`
+  테스트 할 때 로그를 볼 수 있다.  
+   `TEST_LOG=true cargo test health_check_works`
