@@ -92,12 +92,11 @@ impl TestApp {
         test_app
     }
 
-    fn address(&self) -> String {
-        format!("127.0.0.1:{}", self.settings.application_port)
-    }
-
     fn subscriptions_uri(&self) -> String {
-        format!("http://{}/subscriptions", self.address())
+        format!(
+            "http://{}/subscriptions",
+            self.settings.application.get_address()
+        )
     }
 
     // TCP 설정
@@ -107,7 +106,7 @@ impl TestApp {
             .expect("Failed to bind address to listener.");
         // OS가 할당한 포트 번호를 추출한다.
         // 임의의 포트가 할당되므로 설정을 변경한다.
-        self.settings.application_port = tcp_listener.local_addr().unwrap().port();
+        self.settings.application.port = tcp_listener.local_addr().unwrap().port();
 
         tcp_listener
     }
@@ -158,7 +157,10 @@ async fn health_check_works() {
 
     //실행
     let response = client
-        .get(format!("http://{}/health_check", test_app.address()))
+        .get(format!(
+            "http://{}/health_check",
+            test_app.settings.application.get_address()
+        ))
         .send()
         .await
         .expect("Failed to execute request.");

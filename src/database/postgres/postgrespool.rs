@@ -1,6 +1,6 @@
 use secrecy::ExposeSecret;
 use sqlx::{
-    postgres::{PgConnectOptions, PgQueryResult},
+    postgres::{PgConnectOptions, PgPoolOptions, PgQueryResult},
     PgPool, Postgres,
 };
 
@@ -17,7 +17,9 @@ impl Zero2ProdAxumDatabase for PostgresPool {
     type DB = Postgres;
     fn connect(database_settings: &crate::settings::DatabaseSettings) -> Result<Self, sqlx::Error> {
         let pg_connect_options = database_settings.connect_options_with_db();
-        let pool = PgPool::connect_lazy_with(pg_connect_options);
+        let pool = PgPoolOptions::new()
+            .acquire_timeout(std::time::Duration::from_secs(2))
+            .connect_lazy_with(pg_connect_options);
         Ok(PostgresPool { pool })
     }
 

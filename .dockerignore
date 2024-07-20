@@ -1,0 +1,9 @@
+.migrations/
+.scripts/
+target/
+test/
+.dockerignore
+.env
+.gitignore
+Dockerfile
+README.md

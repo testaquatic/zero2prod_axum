@@ -54,6 +54,8 @@ features = [
     "uuid",
     "chrono",
     "migrate",
+    # "offline"은 필요하지 않다.
+    # 참고 : https://github.com/launchbadge/sqlx/blob/main/sqlx-cli/README.md#enable-building-in-offline-mode-with-query
 ]
 [dependencies.chrono]
 version = "0.4"
