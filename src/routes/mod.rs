@@ -1,3 +1,7 @@
-pub mod health_check;
-pub mod root;
-pub mod subscriptions;
+mod health_check;
+mod root;
+mod subscriptions;
+
+pub use health_check::health_check;
+pub use root::root;
+pub use subscriptions::subscribe;

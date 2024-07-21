@@ -1,10 +1,4 @@
-// `String`과 `&str`에 `graphemes` 메서드를 제공하기 위한 확장 트레이트
 use unicode_segmentation::UnicodeSegmentation;
-
-pub struct NewSubscriber {
-    pub email: String,
-    pub name: SubscriberName,
-}
 
 #[derive(Debug)]
 pub struct SubscriberName(String);

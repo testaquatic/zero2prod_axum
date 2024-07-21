@@ -6,8 +6,8 @@ use tracing::{level_filters::LevelFilter, Subscriber};
 use uuid::Uuid;
 use zero2prod_axum::{
     database::{
-        basic::Zero2ProdAxumDatabase,
-        postgres::postgrespool::{DatabaseSettingsExt, PostgresPool},
+        postgres::{DatabaseSettingsExt, PostgresPool},
+        Zero2ProdAxumDatabase,
     },
     settings::{DatabaseSettings, DefaultDBPool, Settings},
     telemetry::{get_tracing_subscriber, init_tracing_subscriber},

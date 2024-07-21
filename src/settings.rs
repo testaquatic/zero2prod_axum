@@ -3,8 +3,7 @@ use serde_aux::prelude::deserialize_number_from_string;
 use sqlx::Postgres;
 use tokio::net::TcpListener;
 
-use crate::database::{basic::Zero2ProdAxumDatabase, postgres::postgrespool::PostgresPool};
-
+use crate::database::{postgres::PostgresPool, Zero2ProdAxumDatabase};
 pub type DefaultDBPool = PostgresPool;
 pub type DefaultDB = Postgres;
 

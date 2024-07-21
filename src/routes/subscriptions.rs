@@ -1,5 +1,5 @@
 use crate::{
-    database::basic::Zero2ProdAxumDatabase,
+    database::Zero2ProdAxumDatabase,
     domain::{NewSubscriber, SubscriberName},
     settings::DefaultDBPool,
 };

@@ -11,7 +11,7 @@ use tower_http::trace::{DefaultOnRequest, DefaultOnResponse, MakeSpan, TraceLaye
 use tracing::{Level, Span};
 
 use crate::{
-    routes::{health_check::health_check, root::root, subscriptions::subscribe},
+    routes::{health_check, root, subscribe},
     settings::DefaultDBPool,
 };
 
