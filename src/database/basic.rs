@@ -1,6 +1,5 @@
-use sqlx::{Database, Pool};
-
 use crate::settings::DatabaseSettings;
+use sqlx::{Database, Pool};
 
 #[trait_variant::make(Send)]
 pub trait Zero2ProdAxumDatabase: AsRef<Pool<Self::DB>> + Sized {

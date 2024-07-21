@@ -25,13 +25,13 @@ actix-web 대신 axum ( https://docs.rs/axum/latest/axum/ )으로 작성했다.
 - /health_check  
    `curl -v http://127.0.0.1:8000/health_check`
 
-       200 OK
+      200 OK
 
 - /subscriptions  
    `curl --request POST --data 'email=thomas_mann@hotmail.com&name=Tom' --verbose http://127.0.0.1:8000/subscriptions`
 
-       200 OK
-       500 Internal Server Error => 이메일 중복
+      200 OK
+      500 Internal Server Error => 이메일 중복
 
   `curl --request POST --data 'email=thomas_mann@hotmail.com' --verbose http://127.0.0.1:8000/subscriptions`
 
