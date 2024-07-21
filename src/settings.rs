@@ -3,7 +3,11 @@ use serde_aux::prelude::deserialize_number_from_string;
 use sqlx::Postgres;
 use tokio::net::TcpListener;
 
-use crate::database::{postgres::PostgresPool, Zero2ProdAxumDatabase};
+use crate::{
+    database::{postgres::PostgresPool, Zero2ProdAxumDatabase},
+    domain::SubscriberEmail,
+    email_client::EmailClient,
+};
 pub type DefaultDBPool = PostgresPool;
 pub type DefaultDB = Postgres;
 
@@ -11,6 +15,7 @@ pub type DefaultDB = Postgres;
 pub struct Settings {
     pub application: ApplicationSettings,
     pub database: DatabaseSettings,
+    pub email_client: EmailClientSettings,
 }
 
 #[derive(serde::Deserialize)]
@@ -30,6 +35,18 @@ pub struct DatabaseSettings {
     pub database_name: String,
     // 커넥션의 암호화 요청 여부를 결정한다.
     pub require_ssl: bool,
+}
+
+#[derive(serde::Deserialize)]
+pub struct EmailClientSettings {
+    pub base_url: String,
+    pub sender_email: String,
+}
+
+/// 애플리케이션이 사용할 수 있는 런타임 환경
+pub enum Envrionment {
+    Local,
+    Production,
 }
 
 impl Settings {
@@ -83,10 +100,15 @@ impl DatabaseSettings {
     }
 }
 
-/// 애플리케이션이 사용할 수 있는 런타임 환경
-pub enum Envrionment {
-    Local,
-    Production,
+impl EmailClientSettings {
+    fn sender(&self) -> Result<SubscriberEmail, String> {
+        SubscriberEmail::try_from(self.sender_email.clone())
+    }
+
+    pub fn get_email_client(&self) -> Result<EmailClient, String> {
+        let email_client = EmailClient::new(self.base_url.clone(), self.sender()?);
+        Ok(email_client)
+    }
 }
 
 impl Envrionment {

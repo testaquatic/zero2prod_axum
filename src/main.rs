@@ -1,6 +1,7 @@
 use tracing::level_filters::LevelFilter;
 use zero2prod_axum::{
     settings::Settings,
+    startup::Server,
     telemetry::{get_tracing_subscriber, init_tracing_subscriber},
 };
 
@@ -10,8 +11,6 @@ async fn main() -> Result<(), std::io::Error> {
     init_tracing_subscriber(tracing_subscriber);
     // 구성을 읽을 수 없으면 패닉에 빠진다.
     let settings = Settings::get_settings().expect("Failed to read configuration.");
-    // 하드 코딩했던 `8000`을 제거한다.
-    // 해당 값은 세팅에서 얻는다.
     let tcp_listener = settings
         .application
         .get_listener()
@@ -22,7 +21,14 @@ async fn main() -> Result<(), std::io::Error> {
         .get_pool()
         .await
         .expect("Failed to connect to Postgres.");
+    // `settings`를 사용해서 `EmailClient`를 만든다.
+    let email_client = settings
+        .email_client
+        .get_email_client()
+        .expect("Failed to get EmailClient..");
 
     tracing::info!(name: "server", status = "Starting server", addr = %tcp_listener.local_addr().unwrap().to_string());
-    zero2prod_axum::startup::run(tcp_listener, pool).await
+    // `run`, `email_client`를 위한 새로운 인자
+    let server = Server::new(tcp_listener, pool, email_client);
+    server.run().await
 }

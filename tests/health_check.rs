@@ -10,6 +10,7 @@ use zero2prod_axum::{
         Zero2ProdAxumDatabase,
     },
     settings::{DatabaseSettings, DefaultDBPool, Settings},
+    startup::Server,
     telemetry::{get_tracing_subscriber, init_tracing_subscriber},
 };
 
@@ -81,12 +82,19 @@ impl TestApp {
         let mut test_app = TestApp { settings };
         let tcp_listener = test_app.get_tcp_listener().await;
         let pool = test_app.get_test_db_pool().await;
+        // 새로운 이메일 클라이언트를 만든다.
+        let email_client = test_app
+            .settings
+            .email_client
+            .get_email_client()
+            .expect("Failed to get a email client.");
 
-        let server = zero2prod_axum::startup::run(tcp_listener, pool);
+        // 새로운 클라이언트를 `Server`에 전달한다.
+        let server = Server::new(tcp_listener, pool, email_client);
         // 서버를 백그라운드로 구동한다.
         // tokio::spawn은 생성된 퓨처에 대한 핸들을 반환한다.
         // 하지만 여기에서는 사용하지 않으므로 let을 바인딩하지 않는다.
-        let _ = tokio::spawn(server);
+        let _ = tokio::spawn(server.run());
 
         test_app
     }

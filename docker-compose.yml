@@ -1,0 +1,24 @@
+# 테스트를 위한 docker-compose
+services:
+  postgres:
+    image: postgres:latest
+    ports:
+      - 5432:5432
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=newsletter
+  zero2prod_axum:
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    ports:
+      - 8000:8000
+    environment:
+      - APP_ENVIRONMENT=production
+      - APP_DATABASE__HOST=postgres
+      - APP_DATABASE__PORT=5432
+      - APP_DATABASE__USERNAME=postgres
+      - APP_DATABASE__PASSWORD=password
+      - APP_DATABASE__DATABASE_NAME=newsletter
+      - APP_DATABASE__REQUIRE_SSL=false

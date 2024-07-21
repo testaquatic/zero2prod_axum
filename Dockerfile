@@ -14,7 +14,7 @@ ENV SQLX_OFFLINE=true
 RUN cargo build --release
 
 # runtime 단계
-FROM debian:stable-slim As runtime
+FROM debian:stable-slim AS runtime
 WORKDIR /app
 # OpenSSL을 설치한다.
 # 일부 디펜던시에 의해 동적으로 링크된다.

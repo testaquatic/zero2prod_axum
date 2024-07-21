@@ -53,6 +53,11 @@ actix-web 대신 axum ( https://docs.rs/axum/latest/axum/ )으로 작성했다.
       도커 생성을 건너 뛴다.  
        `SKIP_DOCKER=true ./scripts/init_db.sh`
 
+### docker-compose.sh
+
+- 테스트를 위한 docker compose 실행
+  `./scripts/docker-compose.sh`
+
 ## /tests
 
 - `TEST_LOG`  
