@@ -78,3 +78,4 @@ claim = { version = "0.5" }
 fake = { version = "2" }
 quickcheck = "1"
 quickcheck_macros = "1"
+wiremock = "0.6"

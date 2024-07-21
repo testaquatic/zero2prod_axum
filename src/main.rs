@@ -29,6 +29,5 @@ async fn main() -> Result<(), std::io::Error> {
 
     tracing::info!(name: "server", status = "Starting server", addr = %tcp_listener.local_addr().unwrap().to_string());
     // `run`, `email_client`를 위한 새로운 인자
-    let server = Server::new(tcp_listener, pool, email_client);
-    server.run().await
+    Server::new(tcp_listener, pool, email_client).run().await
 }
