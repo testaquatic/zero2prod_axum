@@ -245,3 +245,39 @@ async fn subscribe_returns_a_422_when_data_is_missing() {
         );
     }
 }
+
+#[tokio::test]
+async fn subscribe_returns_a_200_when_fields_are_present_but_empty() {
+    // 테스트 데이터
+    let test_cases = vec![
+        ("name=&email=ursula_le_guin%40gmail.com", "empty name"),
+        ("name=Ursula&email=", "empty email"),
+        ("name=Ursula&email=definitelyNotAnEmail", "invalid email"),
+    ];
+
+    // 준비
+    let app = TestApp::spawn_app().await;
+    let client = reqwest::Client::new();
+
+    for (body, description) in test_cases {
+        // 실행
+        let response = client
+            .post(app.subscriptions_uri())
+            .header(
+                reqwest::header::CONTENT_TYPE,
+                "application/x-www-form-urlencoded",
+            )
+            .body(body)
+            .send()
+            .await
+            .expect("Failed to execute request.");
+
+        // 확인
+        assert_eq!(
+            reqwest::StatusCode::OK,
+            response.status(),
+            "The API did not return a 200 OK when the payload was {}.",
+            description
+        );
+    }
+}

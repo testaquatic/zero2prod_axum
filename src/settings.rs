@@ -53,7 +53,7 @@ impl Settings {
             // `configuration.json`부터 구성값을 추가한다.
             .add_source(config::File::from(settings_directory.join("base.json")))
             .add_source(config::File::from(
-                settings_directory.join(&environment_filename),
+                settings_directory.join(environment_filename),
             ))
             // 환경 변수로부터 설정에 추가한다.
             // `APP_APPLICATION__PORT=5001` => `Settings.application.port`
