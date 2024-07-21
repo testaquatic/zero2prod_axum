@@ -4,7 +4,9 @@ use sqlx::{
     PgPool, Postgres,
 };
 
-use crate::{database::basic::Zero2ProdAxumDatabase, settings::DatabaseSettings};
+use crate::{
+    database::basic::Zero2ProdAxumDatabase, domain::NewSubscriber, settings::DatabaseSettings,
+};
 
 use super::query::pg_save_subscriber;
 
@@ -29,20 +31,26 @@ impl Zero2ProdAxumDatabase for PostgresPool {
     )]
     async fn insert_subscriber(
         &self,
-        email: &str,
-        name: &str,
+        new_subscriber: &NewSubscriber,
     ) -> Result<PgQueryResult, sqlx::Error> {
-        pg_save_subscriber(&self.pool, email, name)
-            .await
-            .map_err(|e| {
-                tracing::error!("Failed to execute query: {:?}", &e);
-                e
-            })
+        pg_save_subscriber(
+            &self.pool,
+            &new_subscriber.email,
+            // 이제 `as_ref`를 사용한다.
+            new_subscriber.name.as_ref(),
+        )
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to execute query: {:?}", &e);
+            e
+        })
     }
 }
 
 impl AsRef<PgPool> for PostgresPool {
     fn as_ref(&self) -> &PgPool {
+        // 호출자는 inner 문자열에 대한 공유 참조를 얻는다.
+        // 호출자는 읽기 전용으로 접근할 수 있으며, 이는 불변량을 깨뜨리지 못한다.
         &self.pool
     }
 }

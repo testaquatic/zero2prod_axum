@@ -1,4 +1,4 @@
-use crate::settings::DatabaseSettings;
+use crate::{domain::NewSubscriber, settings::DatabaseSettings};
 use sqlx::{Database, Pool};
 
 #[trait_variant::make(Send)]
@@ -9,7 +9,6 @@ pub trait Zero2ProdAxumDatabase: AsRef<Pool<Self::DB>> + Sized {
 
     async fn insert_subscriber(
         &self,
-        email: &str,
-        name: &str,
+        new_subscriber: &NewSubscriber,
     ) -> Result<<Self::DB as Database>::QueryResult, sqlx::Error>;
 }
