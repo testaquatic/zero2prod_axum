@@ -6,13 +6,15 @@ pub struct NewSubscriber {
     pub name: SubscriberName,
 }
 
+#[derive(Debug)]
 pub struct SubscriberName(String);
 
-impl SubscriberName {
+impl TryFrom<String> for SubscriberName {
+    type Error = String;
     /// 입력이 subscriber 이름에 대한 검증 조건을 모두 만족하면
-    /// `SubscriberName` 인스턴스를 반환한다.
-    /// 그렇지 않으면 패닉에 빠진다.
-    pub fn parse(s: String) -> Self {
+    /// `Ok(SubscriberName)`을 반환한다.
+    /// 그렇지 않으면 'Err(String)'을 반환한다.
+    fn try_from(s: String) -> Result<Self, Self::Error> {
         // `trim()`은 입력 `s`에 대해 뒤로 계속되는 공백 문자가 없는 뷰를 반환한다.
         // `is_empty()`는 해당 뷰가 문자를 포함하고 있는지 확인한다.
         let is_empty_or_whitespace = s.trim().is_empty();
@@ -26,13 +28,15 @@ impl SubscriberName {
         let forbidden_characters = [
             '/', '(', ')', '"', '<', '>', '\\', '{', '}', '$', ';', '%', '&', '|',
         ];
-        let conatains_forbidden_characters = s.contains(&forbidden_characters);
+        let conatains_forbidden_characters = s.contains(forbidden_characters);
 
         // 어느 한 조건이라도 위반하면 `false`를 반환한다.
         if is_empty_or_whitespace || is_too_long || conatains_forbidden_characters {
-            panic!("{} is not a valid user name.", s)
+            // `panic`을 `Err(e)`으로 치환한다.
+
+            Err(format!("{} is not a valid user name.", s))
         } else {
-            Self(s)
+            Ok(Self(s))
         }
     }
 }
@@ -40,5 +44,52 @@ impl SubscriberName {
 impl AsRef<str> for SubscriberName {
     fn as_ref(&self) -> &str {
         &self.0
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use claim::{assert_err, assert_ok};
+
+    use crate::domain::SubscriberName;
+
+    #[test]
+    fn a_256_grapheme_long_name_is_valid() {
+        let name = "쀍".repeat(256);
+        assert_ok!(SubscriberName::try_from(name));
+    }
+
+    #[test]
+    fn a_name_longer_than_256_graphemes_is_rejected() {
+        let name = "쀍".repeat(257);
+        assert_err!(SubscriberName::try_from(name));
+    }
+
+    #[test]
+    fn a_whitespace_only_names_are_rejected() {
+        let name = " ".to_string();
+        assert_err!(SubscriberName::try_from(name));
+    }
+
+    #[test]
+    fn empty_name_is_rejected() {
+        let name = "".to_string();
+        assert_err!(SubscriberName::try_from(name));
+    }
+
+    #[test]
+    fn names_containing_an_invalid_character_are_rejected() {
+        for name in &[
+            '/', '(', ')', '"', '<', '>', '\\', '{', '}', '$', ';', '%', '&', '|',
+        ] {
+            let name = name.to_string();
+            assert_err!(SubscriberName::try_from(name));
+        }
+    }
+
+    #[test]
+    fn a_valid_name_is_parsed_successfully() {
+        let name = "Ursula Le Guin".to_string();
+        assert_ok!(SubscriberName::try_from(name));
     }
 }

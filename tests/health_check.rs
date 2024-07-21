@@ -247,7 +247,7 @@ async fn subscribe_returns_a_422_when_data_is_missing() {
 }
 
 #[tokio::test]
-async fn subscribe_returns_a_200_when_fields_are_present_but_empty() {
+async fn subscribe_returns_a_400_when_fields_are_present_but_invalid() {
     // 테스트 데이터
     let test_cases = vec![
         ("name=&email=ursula_le_guin%40gmail.com", "empty name"),
@@ -274,7 +274,8 @@ async fn subscribe_returns_a_200_when_fields_are_present_but_empty() {
 
         // 확인
         assert_eq!(
-            reqwest::StatusCode::OK,
+            // 더이상 200 OK가 아니다.
+            reqwest::StatusCode::BAD_REQUEST,
             response.status(),
             "The API did not return a 200 OK when the payload was {}.",
             description
