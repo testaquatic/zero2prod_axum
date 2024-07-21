@@ -1,6 +1,5 @@
 use tracing::level_filters::LevelFilter;
 use zero2prod_axum::{
-    database::{basic::Zero2ProdAxumDatabase, postgres::postgrespool::PostgresPool},
     settings::Settings,
     telemetry::{get_tracing_subscriber, init_tracing_subscriber},
 };
@@ -18,8 +17,12 @@ async fn main() -> Result<(), std::io::Error> {
         .get_listener()
         .await
         .expect("Failed to get a TCP listener.");
-    let pool = PostgresPool::connect(&settings.database).expect("Failed to connect to Postgres.");
+    let pool = settings
+        .database
+        .get_pool()
+        .await
+        .expect("Failed to connect to Postgres.");
 
-    tracing::info!("Starting Server");
+    tracing::info!(name: "server", status = "Starting server", addr = %tcp_listener.local_addr().unwrap().to_string());
     zero2prod_axum::startup::run(tcp_listener, pool).await
 }

@@ -2,7 +2,7 @@ use secrecy::Secret;
 use sqlx::Postgres;
 use tokio::net::TcpListener;
 
-use crate::database::postgres::postgrespool::PostgresPool;
+use crate::database::{basic::Zero2ProdAxumDatabase, postgres::postgrespool::PostgresPool};
 
 pub type DefaultDBPool = PostgresPool;
 pub type DefaultDB = Postgres;
@@ -50,6 +50,13 @@ impl Settings {
             .add_source(config::File::from(
                 settings_directory.join(&environment_filename),
             ))
+            // 환경 변수로부터 설정에 추가한다.
+            // `APP_APPLICATION__PORT=5001` => `Settings.application.port`
+            .add_source(
+                config::Environment::with_prefix("APP")
+                    .prefix_separator("_")
+                    .separator("__"),
+            )
             .build()?;
         // 읽은 구성값을 Settings 타입으로 변환한다.
         settings.try_deserialize::<Settings>()
@@ -63,6 +70,12 @@ impl ApplicationSettings {
 
     pub async fn get_listener(&self) -> Result<TcpListener, std::io::Error> {
         TcpListener::bind(self.get_address()).await
+    }
+}
+
+impl DatabaseSettings {
+    pub async fn get_pool(&self) -> Result<DefaultDBPool, sqlx::Error> {
+        DefaultDBPool::connect(self)
     }
 }
 
