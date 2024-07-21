@@ -1,4 +1,5 @@
 use secrecy::Secret;
+use serde_aux::prelude::deserialize_number_from_string;
 use sqlx::Postgres;
 use tokio::net::TcpListener;
 
@@ -15,6 +16,7 @@ pub struct Settings {
 
 #[derive(serde::Deserialize)]
 pub struct ApplicationSettings {
+    #[serde(deserialize_with = "deserialize_number_from_string")]
     pub port: u16,
     pub host: String,
 }
@@ -23,9 +25,12 @@ pub struct ApplicationSettings {
 pub struct DatabaseSettings {
     pub username: String,
     pub password: Secret<String>,
+    #[serde(deserialize_with = "deserialize_number_from_string")]
     pub port: u16,
     pub host: String,
     pub database_name: String,
+    // 커넥션의 암호화 요청 여부를 결정한다.
+    pub require_ssl: bool,
 }
 
 impl Settings {

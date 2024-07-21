@@ -13,7 +13,7 @@ use zero2prod_axum::{
     telemetry::{get_tracing_subscriber, init_tracing_subscriber},
 };
 
-trait DefaultDBPoolExt: Zero2ProdAxumDatabase {
+trait DefaultDBPoolTestExt: Zero2ProdAxumDatabase {
     async fn connect_without_db(database_settings: &DatabaseSettings) -> Result<Self, sqlx::Error>;
 
     async fn create_db(
@@ -31,7 +31,7 @@ trait DefaultDBPoolExt: Zero2ProdAxumDatabase {
     async fn migrate(&self) -> Result<(), sqlx::Error>;
 }
 
-impl DefaultDBPoolExt for PostgresPool {
+impl DefaultDBPoolTestExt for PostgresPool {
     async fn connect_without_db(database_settings: &DatabaseSettings) -> Result<Self, sqlx::Error> {
         let connect_options = database_settings.connect_options_without_db();
         let pool = sqlx::PgPool::connect_with(connect_options).await?;
@@ -87,11 +87,11 @@ impl TestApp {
         // tokio::spawn은 생성된 퓨처에 대한 핸들을 반환한다.
         // 하지만 여기에서는 사용하지 않으므로 let을 바인딩하지 않는다.
         let _ = tokio::spawn(server);
-        // 애플리케이션 주소를 호출자에게 반환한다.
 
         test_app
     }
 
+    // /subscriptions의 주소를 얻는다.
     fn subscriptions_uri(&self) -> String {
         format!(
             "http://{}/subscriptions",
@@ -136,8 +136,8 @@ impl TestApp {
             // 트레이트 객체를 사용해서 타입 문제를 해결했다.
             let tracing_subscriber: Box<dyn Subscriber + Send + Sync> = std::env::var("TEST_LOG")
                 .map_or(
-                    Box::new(get_tracing_subscriber(LevelFilter::DEBUG, std::io::sink)),
-                    |_| Box::new(get_tracing_subscriber(LevelFilter::DEBUG, std::io::stdout)),
+                    Box::new(get_tracing_subscriber(LevelFilter::ERROR, std::io::sink)),
+                    |_| Box::new(get_tracing_subscriber(LevelFilter::TRACE, std::io::stdout)),
                 );
             init_tracing_subscriber(tracing_subscriber);
         });
