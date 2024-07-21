@@ -35,8 +35,8 @@ impl Zero2ProdAxumDatabase for PostgresPool {
     ) -> Result<PgQueryResult, sqlx::Error> {
         pg_save_subscriber(
             &self.pool,
-            &new_subscriber.email,
             // 이제 `as_ref`를 사용한다.
+            new_subscriber.email.as_ref(),
             new_subscriber.name.as_ref(),
         )
         .await

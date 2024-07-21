@@ -1,6 +1,6 @@
 use crate::{
     database::Zero2ProdAxumDatabase,
-    domain::{NewSubscriber, SubscriberName},
+    domain::{NewSubscriber, SubscriberEmail, SubscriberName},
     settings::DefaultDBPool,
 };
 use axum::{
@@ -15,6 +15,17 @@ use std::sync::Arc;
 pub struct FormData {
     email: String,
     name: String,
+}
+
+impl TryFrom<FormData> for NewSubscriber {
+    type Error = String;
+    fn try_from(form_data: FormData) -> Result<Self, Self::Error> {
+        let new_subscriber = NewSubscriber::new(
+            SubscriberEmail::try_from(form_data.email)?,
+            SubscriberName::try_from(form_data.name)?,
+        );
+        Ok(new_subscriber)
+    }
 }
 
 // `curl --request POST --data 'name=le%20guin' --verbose http://127.0.0.1:8000/subscriptions`
@@ -37,15 +48,10 @@ pub async fn subscribe(
     // axum의 특성상 Form은 마지막으로 가야 한다.
     Form(form): Form<FormData>,
 ) -> Response {
-    let name = match SubscriberName::try_from(form.name) {
-        Ok(name) => name,
-        // name이 유효하지 않으면 400을 빠르게 반환한다.
+    let new_subscriber = match form.try_into() {
+        Ok(new_subscriber) => new_subscriber,
+        // `form`이 유효하지 않으면 400을 빠르게 반환한다.
         Err(_) => return StatusCode::BAD_REQUEST.into_response(),
-    };
-    let new_subscriber = NewSubscriber {
-        email: form.email,
-        // `expect`를 사용해서 의미 있는 패닉 메시지를 지정한다.
-        name,
     };
     // `Result`는 `Ok`와 `Err`라는 두개의 변형을 갖는다.
     // 첫 번째는 성공, 두 번째는 실패를 의미한다.
