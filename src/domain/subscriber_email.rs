@@ -1,17 +1,17 @@
 use validator::ValidateEmail;
 
-use crate::error::DomainError;
+use crate::error::Zero2ProdAxumError;
 
 #[derive(Debug)]
 pub struct SubscriberEmail(String);
 
 impl TryFrom<String> for SubscriberEmail {
-    type Error = DomainError;
+    type Error = Zero2ProdAxumError;
     fn try_from(s: String) -> Result<Self, Self::Error> {
         if s.validate_email() {
             Ok(Self(s))
         } else {
-            Err(DomainError::SubscriberEmailError(format!(
+            Err(Zero2ProdAxumError::SubscriberEmailError(format!(
                 "{} is not a valid subscriber email.",
                 s
             )))

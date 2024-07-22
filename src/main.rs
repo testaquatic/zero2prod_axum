@@ -25,7 +25,7 @@ async fn main() -> Result<(), std::io::Error> {
     let email_client = settings
         .email_client
         .get_email_client()
-        .expect("Failed to get EmailClient..");
+        .expect("Failed to get EmailClient.");
 
     tracing::info!(name: "server", status = "Starting server", addr = %tcp_listener.local_addr().unwrap().to_string());
     // `run`, `email_client`를 위한 새로운 인자
