@@ -45,6 +45,9 @@ futures-util = { version = "0.3" }
 serde-aux = { version = "4" }
 unicode-segmentation = { version = "1" }
 validator = { version = "0.18" }
+url = { version = "2" }
+# anyhow = { version = "1" }
+thiserror = { version = "1" }
 # 테이블과 유사한 toml 구문을 사용해서 긴 코드 행을 줄이자.
 [dependencies.sqlx]
 version = "0.7"

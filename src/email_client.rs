@@ -1,20 +1,38 @@
 use reqwest::Client;
+use secrecy::Secret;
 
-use crate::domain::SubscriberEmail;
+use crate::{domain::SubscriberEmail, error::EmailClientError};
 
 pub struct EmailClient {
     http_client: Client,
-    base_url: String,
+    base_url: reqwest::Url,
     sender: SubscriberEmail,
+    // 우발적인 로깅을 원치 않는다.
+    authorization_token: Secret<String>,
+}
+
+#[derive(serde::Serialize)]
+struct SendEmailRequest<'a> {
+    from: &'a str,
+    to: &'a str,
+    subject: &'a str,
+    html_body: &'a str,
+    text_body: &'a str,
 }
 
 impl EmailClient {
-    pub fn new(base_url: String, sender: SubscriberEmail) -> Self {
-        Self {
+    pub fn new(
+        base_url: String,
+        sender: SubscriberEmail,
+        authorization_token: Secret<String>,
+    ) -> Result<Self, EmailClientError> {
+        let base_url = Self {
             http_client: Client::new(),
-            base_url,
+            base_url: reqwest::Url::parse(&base_url)?,
             sender,
-        }
+            authorization_token,
+        };
+        Ok(base_url)
     }
 
     pub async fn send_email(
@@ -23,8 +41,22 @@ impl EmailClient {
         subject: &str,
         html_content: &str,
         text_content: &str,
-    ) -> Result<(), String> {
-        todo!()
+    ) -> Result<(), EmailClientError> {
+        // `base_url`의 타입을 `String`에서 `reqwest::Url`로 변경하면 `reqwest::Url::join`을 사용해서 더 나은 구현을 할 수 있다.
+        let url = self.base_url.join("/email")?;
+        let request_body = SendEmailRequest {
+            from: self.sender.as_ref(),
+            to: recipient.as_ref(),
+            subject,
+            html_body: html_content,
+            text_body: text_content,
+        };
+        self.http_client
+            .post(url)
+            .json(&request_body)
+            .send()
+            .await?;
+        Ok(())
     }
 }
 
@@ -32,8 +64,9 @@ impl EmailClient {
 mod tests {
     use fake::{
         faker::{internet::en::SafeEmail, lorem::en::Sentence},
-        Fake,
+        Fake, Faker,
     };
+    use secrecy::Secret;
     use wiremock::{matchers::any, Mock, MockServer, ResponseTemplate};
 
     use crate::{domain::SubscriberEmail, email_client::EmailClient};
@@ -43,7 +76,9 @@ mod tests {
         // 준비
         let mock_server = MockServer::start().await;
         let sender = SubscriberEmail::try_from(SafeEmail().fake::<String>()).unwrap();
-        let email_client = EmailClient::new(mock_server.uri(), sender);
+        let authorization_token = Secret::new(Faker.fake());
+        let email_client =
+            EmailClient::new(mock_server.uri(), sender, authorization_token).unwrap();
 
         Mock::given(any())
             .respond_with(ResponseTemplate::new(200))

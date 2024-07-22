@@ -1,6 +1,7 @@
 use crate::{
     database::Zero2ProdAxumDatabase,
     domain::{NewSubscriber, SubscriberEmail, SubscriberName},
+    error::DomainError,
     settings::DefaultDBPool,
 };
 use axum::{
@@ -18,7 +19,7 @@ pub struct FormData {
 }
 
 impl TryFrom<FormData> for NewSubscriber {
-    type Error = String;
+    type Error = DomainError;
     fn try_from(form_data: FormData) -> Result<Self, Self::Error> {
         let new_subscriber = NewSubscriber::new(
             SubscriberEmail::try_from(form_data.email)?,

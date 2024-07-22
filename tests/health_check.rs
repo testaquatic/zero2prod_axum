@@ -109,7 +109,11 @@ impl TestApp {
 
     // TCP 설정
     async fn get_tcp_listener(&mut self) -> TcpListener {
-        let tcp_listener = TcpListener::bind("127.0.0.1:0")
+        self.settings.application.port = 0;
+        let tcp_listener = self
+            .settings
+            .application
+            .get_listener()
             .await
             .expect("Failed to bind address to listener.");
         // OS가 할당한 포트 번호를 추출한다.
@@ -131,8 +135,12 @@ impl TestApp {
             .await
             .expect("Failed to create database.");
         // 데이터베이스를 마이그레이션 한다.
-        let pool =
-            DefaultDBPool::connect(&self.settings.database).expect("Failed to connect Database.");
+        let pool = self
+            .settings
+            .database
+            .get_pool()
+            .await
+            .expect("Failed to get pool.");
         pool.migrate().await.expect("Failed to migrate database.");
 
         pool
@@ -290,5 +298,3 @@ async fn subscribe_returns_a_400_when_fields_are_present_but_invalid() {
         );
     }
 }
-
-

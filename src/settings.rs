@@ -7,6 +7,7 @@ use crate::{
     database::{postgres::PostgresPool, Zero2ProdAxumDatabase},
     domain::SubscriberEmail,
     email_client::EmailClient,
+    error::{DomainError, EmailClientError, Zero2ProdAxumError},
 };
 pub type DefaultDBPool = PostgresPool;
 pub type DefaultDB = Postgres;
@@ -41,6 +42,7 @@ pub struct DatabaseSettings {
 pub struct EmailClientSettings {
     pub base_url: String,
     pub sender_email: String,
+    pub authorization_token: Secret<String>,
 }
 
 /// 애플리케이션이 사용할 수 있는 런타임 환경
@@ -101,12 +103,16 @@ impl DatabaseSettings {
 }
 
 impl EmailClientSettings {
-    fn sender(&self) -> Result<SubscriberEmail, String> {
+    fn sender(&self) -> Result<SubscriberEmail, DomainError> {
         SubscriberEmail::try_from(self.sender_email.clone())
     }
 
-    pub fn get_email_client(&self) -> Result<EmailClient, String> {
-        let email_client = EmailClient::new(self.base_url.clone(), self.sender()?);
+    pub fn get_email_client(&self) -> Result<EmailClient, Zero2ProdAxumError> {
+        let base_url = self.base_url.clone();
+        let sender = self.sender()?;
+        let authorization_token = self.authorization_token.clone();
+
+        let email_client = EmailClient::new(base_url, sender, authorization_token)?;
         Ok(email_client)
     }
 }
