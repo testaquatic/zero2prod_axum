@@ -10,6 +10,10 @@ pub enum Zero2ProdAxumError {
     ReqwestError(#[from] reqwest::Error),
     #[error("Url Error")]
     UrlParseError(#[from] url::ParseError),
+    #[error("IO Error")]
+    IOError(#[from] std::io::Error),
+    #[error("SQLX Error")]
+    SQLXError(#[from] sqlx::Error),
 }
 
 impl std::fmt::Debug for Zero2ProdAxumError {

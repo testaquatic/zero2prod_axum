@@ -12,8 +12,9 @@ use tracing::{Level, Span};
 
 use crate::{
     email_client::EmailClient,
+    error::Zero2ProdAxumError,
     routes::{health_check, root, subscribe},
-    settings::DefaultDBPool,
+    settings::{DefaultDBPool, Settings},
 };
 
 pub struct Server {
@@ -31,8 +32,20 @@ impl Server {
         }
     }
 
+    pub async fn build(settings: &Settings) -> Result<Server, Zero2ProdAxumError> {
+        let tcp_listener = settings.application.get_listener().await?;
+        let pool = settings.database.get_pool().await?;
+        // `settings`를 사용해서 `EmailClient`를 만든다.
+        let email_client = settings.email_client.get_email_client()?;
+
+        let server = Server::new(tcp_listener, pool, email_client);
+
+        Ok(server)
+    }
+
     // `run`을 `public`으로 마크해야 한다.
     // `run`은 더 이상 바이너리 엔트리 포인트가 아니므로, proc-macro 주문 없이 async로 마크할 수 있다.
+    // `run`, `email_client`를 위한 새로운 인자
     pub async fn run(self) -> Result<(), std::io::Error> {
         let pool = Arc::new(self.pool);
         let email_client = Arc::new(self.email_client);
@@ -50,7 +63,12 @@ impl Server {
             )
             .with_state(pool.clone())
             .with_state(email_client.clone());
-        axum::serve(self.tcp_listener, app).await
+
+        tracing::info!(name: "server", status = "Starting server", addr = %self.tcp_listener.local_addr().unwrap().to_string());
+        axum::serve(self.tcp_listener, app).await?;
+        tracing::info!(name: "server", status = "Server closed");
+
+        Ok(())
     }
 }
 

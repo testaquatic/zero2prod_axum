@@ -8,6 +8,7 @@ use crate::{
     domain::SubscriberEmail,
     email_client::EmailClient,
     error::Zero2ProdAxumError,
+    startup::Server,
 };
 pub type DefaultDBPool = PostgresPool;
 pub type DefaultDB = Postgres;
@@ -84,6 +85,10 @@ impl Settings {
             .build()?;
         // 읽은 구성값을 Settings 타입으로 변환한다.
         settings.try_deserialize::<Settings>()
+    }
+
+    pub async fn build_server(&self) -> Result<Server, Zero2ProdAxumError> {
+        Server::build(self).await
     }
 }
 

@@ -38,7 +38,7 @@ impl EmailClient {
         let http_client = Client::builder().timeout(timeout).build()?;
         let email_client = Self {
             http_client,
-            base_url: reqwest::Url::parse(&base_url)?,
+            base_url: reqwest::Url::parse(base_url)?,
             sender,
             authorization_token,
         };
