@@ -7,7 +7,7 @@ use crate::{
     database::{postgres::PostgresPool, Zero2ProdAxumDatabase},
     domain::SubscriberEmail,
     email_client::EmailClient,
-    error::{DomainError, EmailClientError, Zero2ProdAxumError},
+    error::{DomainError, Zero2ProdAxumError},
 };
 pub type DefaultDBPool = PostgresPool;
 pub type DefaultDB = Postgres;
@@ -103,16 +103,17 @@ impl DatabaseSettings {
 }
 
 impl EmailClientSettings {
-    fn sender(&self) -> Result<SubscriberEmail, DomainError> {
+    fn get_sender_email(&self) -> Result<SubscriberEmail, DomainError> {
         SubscriberEmail::try_from(self.sender_email.clone())
     }
 
     pub fn get_email_client(&self) -> Result<EmailClient, Zero2ProdAxumError> {
-        let base_url = self.base_url.clone();
-        let sender = self.sender()?;
+        let base_url = &self.base_url;
+        let sender = self.get_sender_email()?;
         let authorization_token = self.authorization_token.clone();
 
         let email_client = EmailClient::new(base_url, sender, authorization_token)?;
+
         Ok(email_client)
     }
 }

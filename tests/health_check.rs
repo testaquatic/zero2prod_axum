@@ -80,7 +80,7 @@ impl TestApp {
         Self::set_tracing();
         let settings = Settings::get_settings().expect("Failed to read settings");
         let mut test_app = TestApp { settings };
-        let tcp_listener = test_app.get_tcp_listener().await;
+        let tcp_listener = test_app.get_test_tcp_listener().await;
         let pool = test_app.get_test_db_pool().await;
         // 새로운 이메일 클라이언트를 만든다.
         let email_client = test_app
@@ -108,7 +108,7 @@ impl TestApp {
     }
 
     // TCP 설정
-    async fn get_tcp_listener(&mut self) -> TcpListener {
+    async fn get_test_tcp_listener(&mut self) -> TcpListener {
         self.settings.application.port = 0;
         let tcp_listener = self
             .settings

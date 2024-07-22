@@ -79,6 +79,7 @@ features = ["json", "rustls-tls", "http2"]
 claim = { version = "0.5" }
 # 이 목록에서 `reqwest` 엔트리를 제거한다.
 fake = { version = "2" }
-quickcheck = "1"
-quickcheck_macros = "1"
-wiremock = "0.6"
+quickcheck = { version = "1" }
+quickcheck_macros = { version = "1" }
+wiremock = { version = "0.6" }
+serde_json = { version = "1" }
