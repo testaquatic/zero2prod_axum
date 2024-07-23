@@ -1,7 +1,7 @@
 use reqwest::Client;
 use secrecy::{ExposeSecret, Secret};
 
-use crate::{domain::SubscriberEmail, error::Zero2ProdAxumError};
+use crate::{domain::SubscriberEmail, error::Zero2ProdAxumError, settings::EmailClientSettings};
 
 pub struct EmailClient {
     http_client: Client,
@@ -44,6 +44,17 @@ impl EmailClient {
         };
 
         Ok(email_client)
+    }
+
+    pub fn from_email_client_settings(
+        email_client_settings: &EmailClientSettings,
+    ) -> Result<Self, Zero2ProdAxumError> {
+        let base_url = &email_client_settings.base_url;
+        let sender = email_client_settings.get_sender_email()?;
+        let authorization_token = email_client_settings.authorization_token.clone();
+        let timeout = std::time::Duration::from_micros(email_client_settings.timeout_milliseconds);
+
+        EmailClient::new(base_url, sender, authorization_token, timeout)
     }
 
     pub async fn send_email(

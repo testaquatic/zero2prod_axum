@@ -1,4 +1,5 @@
 use crate::helpers::{DefaultDBPoolTestExt, TestApp};
+use anyhow::Context;
 use sqlx::FromRow;
 use wiremock::{
     matchers::{method, path},
@@ -140,7 +141,7 @@ async fn subscribe_sends_a_confirmation_email_with_link() -> Result<(), anyhow::
         .test_email_server
         .received_requests()
         .await
-        .unwrap()[0];
+        .context("No received request.")?[0];
     // 바디를 JSON으로 파싱한다.
     let body: serde_json::Value = serde_json::from_slice(&email_request.body).unwrap();
 
@@ -154,8 +155,8 @@ async fn subscribe_sends_a_confirmation_email_with_link() -> Result<(), anyhow::
         links[0].as_str().to_owned()
     };
 
-    let html_link = get_link(&body["HtmlBody"].as_str().unwrap());
-    let text_link = get_link(&body["TextBody"].as_str().unwrap());
+    let html_link = get_link(&body["HtmlBody"].as_str().context("Not Found: HtmlBody")?);
+    let text_link = get_link(&body["TextBody"].as_str().context("NotFound: TextBody")?);
     // 두 링크는 동일해야 한다.
     assert_eq!(html_link, text_link);
 

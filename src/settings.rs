@@ -53,6 +53,8 @@ pub enum Envrionment {
     Production,
 }
 
+// 코드 관리의 편의서
+// `get_settings`를 제외하고는 되도록이면 외부에서 구현하고 가져온다.
 impl Settings {
     pub fn get_settings() -> Result<Self, config::ConfigError> {
         let base_path =
@@ -109,19 +111,12 @@ impl DatabaseSettings {
 }
 
 impl EmailClientSettings {
-    fn get_sender_email(&self) -> Result<SubscriberEmail, Zero2ProdAxumError> {
+    pub fn get_sender_email(&self) -> Result<SubscriberEmail, Zero2ProdAxumError> {
         SubscriberEmail::try_from(self.sender_email.clone())
     }
 
     pub fn get_email_client(&self) -> Result<EmailClient, Zero2ProdAxumError> {
-        let base_url = &self.base_url;
-        let sender = self.get_sender_email()?;
-        let authorization_token = self.authorization_token.clone();
-        let timeout = std::time::Duration::from_millis(self.timeout_milliseconds);
-
-        let email_client = EmailClient::new(base_url, sender, authorization_token, timeout)?;
-
-        Ok(email_client)
+        EmailClient::from_email_client_settings(self)
     }
 }
 
