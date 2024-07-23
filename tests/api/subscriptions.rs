@@ -16,7 +16,12 @@ async fn subscribe_returns_a_200_for_valid_form_data() -> Result<(), anyhow::Err
     let pool = DefaultDBPool::connect(&test_app.settings.database)
         .expect("Failed to connect to Postgres.");
 
+    let mock = Mock::given(path("/email"))
+        .and(method("POST"))
+        .respond_with(ResponseTemplate::new(200));
+
     // 실행
+    test_app.test_email_server.test_run(mock).await;
     let response = test_app.post_subscriptions(body).await.unwrap();
 
     let row = pool

@@ -1,21 +1,21 @@
 use std::sync::Arc;
 
-use axum::{
-    body::Body,
-    routing::{self},
-    Router,
-};
-use http::Request;
-use tokio::net::TcpListener;
-use tower_http::trace::{DefaultOnRequest, DefaultOnResponse, MakeSpan, TraceLayer};
-use tracing::{Level, Span};
-
 use crate::{
     email_client::EmailClient,
     error::Zero2ProdAxumError,
     routes::{health_check, root, subscribe},
     settings::{DefaultDBPool, Settings},
 };
+use axum::{
+    body::Body,
+    routing::{self},
+    Extension, Router,
+};
+use http::Request;
+use tokio::net::TcpListener;
+use tower::ServiceBuilder;
+use tower_http::trace::{DefaultOnRequest, DefaultOnResponse, MakeSpan, TraceLayer};
+use tracing::{Level, Span};
 
 pub struct Server {
     tcp_listener: TcpListener,
@@ -49,20 +49,25 @@ impl Server {
     pub async fn run(self) -> Result<(), std::io::Error> {
         let pool = Arc::new(self.pool);
         let email_client = Arc::new(self.email_client);
+
+        let subscriptions_method_router = routing::post(subscribe).layer(
+            ServiceBuilder::new()
+                .layer(Extension(email_client.clone()))
+                .layer(Extension(pool.clone())),
+        );
+
         let app = Router::new()
             .route("/", routing::get(root))
             .route("/health_check", routing::get(health_check))
             // POST /subscriptions 요청에 대한 라우팅 테이블의 새 엔트리 포인트
-            .route("/subscriptions", routing::post(subscribe))
+            .route("/subscriptions", subscriptions_method_router)
             // Arc로 pool을 감싼다.
             .layer(
                 TraceLayer::new_for_http()
                     .make_span_with(AddRequestID)
                     .on_request(DefaultOnRequest::new().level(Level::INFO))
                     .on_response(DefaultOnResponse::new().level(Level::INFO)),
-            )
-            .with_state(pool.clone())
-            .with_state(email_client.clone());
+            );
 
         tracing::info!(name: "server", status = "Starting server", addr = %self.tcp_listener.local_addr().unwrap().to_string());
         axum::serve(self.tcp_listener, app).await?;

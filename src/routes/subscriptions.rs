@@ -1,13 +1,13 @@
 use crate::{
     database::Zero2ProdAxumDatabase,
     domain::{NewSubscriber, SubscriberEmail, SubscriberName},
+    email_client::EmailClient,
     error::Zero2ProdAxumError,
     settings::DefaultDBPool,
 };
 use axum::{
-    extract::State,
     response::{IntoResponse, Response},
-    Form,
+    Extension, Form,
 };
 use http::StatusCode;
 use std::sync::Arc;
@@ -32,7 +32,7 @@ impl TryFrom<FormData> for NewSubscriber {
 // `curl --request POST --data 'name=le%20guin' --verbose http://127.0.0.1:8000/subscriptions`
 // => 422 Unprocessable Entity Form 직렬화 실패
 // `curl --request POST --data 'email=thomas_mann@hotmail.com&name=Tom' --verbose http://127.0.0.1:8000/subscriptions`
-// => 500 Internal Server Error 데이터 베이스 오류(중복된 이메일 등)
+// => 500 Internal Server Error 데이터 베이스 오류, 이메일 전송 실패
 // => 200 OK 정상 작동
 // `curl --request POST --data 'email=thomas_mannhotmail.com&name=Tom' --verbose http://127.0.0.1:8000/subscriptions`
 // => 필드 검증 실패 => 400 Bad Request
@@ -45,7 +45,9 @@ impl TryFrom<FormData> for NewSubscriber {
     )
 )]
 pub async fn subscribe(
-    State(pool): State<Arc<DefaultDBPool>>,
+    pool: Extension<Arc<DefaultDBPool>>,
+    // 앱 콘텍스트에서 이메일 클라인트를 받는다.
+    email_client: Extension<Arc<EmailClient>>,
     // axum의 특성상 Form은 마지막으로 가야 한다.
     Form(form): Form<FormData>,
 ) -> Response {
@@ -57,8 +59,25 @@ pub async fn subscribe(
     // `Result`는 `Ok`와 `Err`라는 두개의 변형을 갖는다.
     // 첫 번째는 성공, 두 번째는 실패를 의미한다.
     // `match` 구문을 사용해서 결과에 따라 무엇을 수행할지 선택한다.
-    match pool.as_ref().insert_subscriber(&new_subscriber).await {
+    match pool.insert_subscriber(&new_subscriber).await {
         Ok(_) => StatusCode::OK.into_response(),
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    };
+
+    // 이메일을 신규 가입자에게 전송한다.
+    // 전송에 실패하면 `INTERNAL_SERVER_ERROR`를 반환한다.
+    if email_client
+        .send_email(
+            new_subscriber.email,
+            "Welcome!",
+            "Welcome to our newletter!",
+            "Welcome to our newletter!",
+        )
+        .await
+        .is_err()
+    {
+        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     }
+
+    StatusCode::OK.into_response()
 }
