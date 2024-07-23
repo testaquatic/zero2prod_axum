@@ -1,5 +1,6 @@
 use std::sync::Once;
 
+use anyhow::Context;
 use tokio::net::TcpListener;
 use tracing::{level_filters::LevelFilter, Subscriber};
 use url::Url;
@@ -16,13 +17,19 @@ use super::DefaultDBPoolTestExt;
 
 pub struct TestApp {
     pub settings: Settings,
-    // settings만으로 테스트를 수행하고 싶지만 테스트 이메일 서버의 주소를 파악하려면 인스턴스가 필요하다.
-    // `&mut`을 사용하면 되겠지만 나중에 혼란을 줄 것 같다.
+    // `TestApp::settings`만으로 모든 테스트를 수행하고 싶지만 테스트 이메일 서버의 주소를 파악하려면 인스턴스가 필요하다.
+    // 한번에 필요한 인스턴스가 모두 생성되지 않으면 나중에 혼란을 줄 것 같다.
     pub test_email_server: TestEmailServer,
 }
 
 pub struct TestEmailServer {
     mock_server: MockServer,
+}
+
+/// 이메일 API에 대한 요청에 포함된 확인 링크
+pub struct ConfirmationLinks {
+    pub html: reqwest::Url,
+    pub plain_text: reqwest::Url,
 }
 
 impl TestEmailServer {
@@ -95,9 +102,10 @@ impl TestApp {
         let pool = self.get_test_db_pool().await?;
         // 새로운 이메일 클라이언트를 만든다.
         let email_client = self.settings.email_client.get_email_client()?;
+        let base_url = self.settings.application.base_url.clone();
 
         // 새로운 클라이언트를 `Server`에 전달한다.
-        let server = Server::new(tcp_listener, pool, email_client);
+        let server = Server::new(tcp_listener, pool, email_client, base_url);
         // 서버를 백그라운드로 구동한다.
         // tokio::spawn은 생성된 퓨처에 대한 핸들을 반환한다.
         // 하지만 여기에서는 사용하지 않으므로 let을 바인딩하지 않는다.
@@ -105,6 +113,7 @@ impl TestApp {
     }
 
     // 테스트 `TcpListener`를 생성한다.
+    // `TcpListener`에 맞춰서 `TestApp`의 주소와 관련한 설정을 한다.
     // 무작위 포트로 `TestApp`을 설정한다.
     async fn get_test_tcp_listener(&mut self) -> Result<TcpListener, std::io::Error> {
         self.settings.application.port = 0;
@@ -112,6 +121,8 @@ impl TestApp {
         // OS가 할당한 포트 번호를 추출한다.
         // 임의의 포트가 할당되므로 설정을 변경한다.
         self.settings.application.port = tcp_listener.local_addr()?.port();
+        // url에 포트를 추가한다.
+        self.settings.application.base_url += &format!(":{}", self.settings.application.port);
 
         Ok(tcp_listener)
     }
@@ -131,18 +142,6 @@ impl TestApp {
         Ok(pool)
     }
 
-    pub fn get_uri(&self) -> Result<Url, url::ParseError> {
-        Url::parse(&format!(
-            "http://{}/",
-            self.settings.application.get_address()
-        ))
-    }
-
-    // /subscriptions의 주소를 얻는다.
-    pub fn get_subscriptions_uri(&self) -> Result<Url, url::ParseError> {
-        self.get_uri()?.join("subscriptions")
-    }
-
     pub async fn post_subscriptions(
         &self,
         body: &'static str,
@@ -157,5 +156,53 @@ impl TestApp {
             .send()
             .await
             .map_err(Zero2ProdAxumError::ReqwestError)
+    }
+
+    // 이메일 API에 대한 요청에 포함된 확인 링크를 추출한다.
+    pub fn get_confirmation_links(
+        &self,
+        email_request: &wiremock::Request,
+    ) -> Result<ConfirmationLinks, anyhow::Error> {
+        let body: serde_json::Value = serde_json::from_slice(&email_request.body)?;
+
+        // 요청 필드의 하나에서 링크를 추출한다.
+        let get_link = |s: &str| -> Result<_, anyhow::Error> {
+            let links = linkify::LinkFinder::new()
+                .links(s)
+                .filter(|l| *l.kind() == linkify::LinkKind::Url)
+                .collect::<Vec<_>>();
+            assert_eq!(links.len(), 1);
+            let raw_link = links[0].as_str().to_owned();
+            let confirmation_link = Url::parse(&raw_link)?;
+            // 웹에 대해 무작위 API를 호출하지 않는 것을 확인한다.
+            assert_eq!(
+                confirmation_link
+                    .host_str()
+                    .context("Not Found: host str")?,
+                "127.0.0.1"
+            );
+            Ok(confirmation_link)
+        };
+
+        let html = get_link(&body["HtmlBody"].as_str().context("Not Found: HtmlBody")?)?;
+        let plain_text = get_link(&body["TextBody"].as_str().context("Not Found: TextBody")?)?;
+
+        Ok(ConfirmationLinks { html, plain_text })
+    }
+
+    pub fn get_uri(&self) -> Result<Url, url::ParseError> {
+        Url::parse(&format!(
+            "http://{}/",
+            self.settings.application.get_address()
+        ))
+    }
+
+    // /subscriptions의 주소를 얻는다.
+    pub fn get_subscriptions_uri(&self) -> Result<Url, url::ParseError> {
+        self.get_uri()?.join("subscriptions")
+    }
+
+    pub fn get_subscriptions_confirm_uri(&self) -> Result<Url, url::ParseError> {
+        self.get_uri()?.join("subscriptions/confirm")
     }
 }

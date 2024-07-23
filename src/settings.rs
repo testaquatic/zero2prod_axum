@@ -25,6 +25,7 @@ pub struct ApplicationSettings {
     #[serde(deserialize_with = "deserialize_number_from_string")]
     pub port: u16,
     pub host: String,
+    pub base_url: String,
 }
 
 #[derive(serde::Deserialize)]
@@ -53,8 +54,8 @@ pub enum Envrionment {
     Production,
 }
 
-// 코드 관리의 편의서
-// `get_settings`를 제외하고는 되도록이면 외부에서 구현하고 가져온다.
+// `Settings`를 이용해서 필요한 타입을 생성한다.
+// 복잡함을 피하기 위해서 `get_settings`를 제외하고는 되도록이면 래퍼 함수로 작성한다.
 impl Settings {
     pub fn get_settings() -> Result<Self, config::ConfigError> {
         let base_path =

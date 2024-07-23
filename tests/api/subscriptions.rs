@@ -5,7 +5,6 @@ use wiremock::{
     matchers::{method, path},
     Mock, ResponseTemplate,
 };
-use zero2prod_axum::{database::Zero2ProdAxumDatabase, settings::DefaultDBPool};
 
 #[tokio::test]
 async fn subscribe_returns_a_200_for_valid_form_data() -> Result<(), anyhow::Error> {
@@ -14,32 +13,53 @@ async fn subscribe_returns_a_200_for_valid_form_data() -> Result<(), anyhow::Err
 
     // 준비
     let test_app = TestApp::spawn_app().await?;
-    let pool = DefaultDBPool::connect(&test_app.settings.database)
-        .expect("Failed to connect to Postgres.");
-
     let mock = Mock::given(path("/email"))
         .and(method("POST"))
         .respond_with(ResponseTemplate::new(200));
+    test_app.test_email_server.test_run(mock).await;
 
     // 실행
-    test_app.test_email_server.test_run(mock).await;
     let response = test_app.post_subscriptions(body).await.unwrap();
-
-    let row = pool
-        .fetch_one("SELECT email, name FROM subscriptions;")
-        .await
-        .expect("Failed to fetch saved subscriptions.");
 
     // 확인
     assert_eq!(response.status(), reqwest::StatusCode::OK);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn subscribe_persists_the_new_subscriber() -> Result<(), anyhow::Error> {
+    // 테스트 데이터
+    let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
+
+    // 준비
+    let test_app = TestApp::spawn_app().await?;
+    let mock = Mock::given(path("/email"))
+        .and(method("POST"))
+        .respond_with(ResponseTemplate::new(200));
+    test_app.test_email_server.test_run(mock).await;
+
+    // 실행
+    test_app.post_subscriptions(body).await?;
+
+    // 확인
+    let row = test_app
+        .settings
+        .database
+        .get_pool()
+        .await?
+        .fetch_one("SELECT email, name, status FROM subscriptions;")
+        .await?;
     #[derive(sqlx::FromRow)]
     struct Saved {
         email: String,
         name: String,
+        status: String,
     }
-    let saved = Saved::from_row(&row).expect("Failed to get data from Database.");
+    let saved = Saved::from_row(&row)?;
     assert_eq!(saved.email, "ursula_le_guin@gmail.com");
     assert_eq!(saved.name, "le guin");
+    assert_eq!(saved.status, "pending_confirmation");
 
     Ok(())
 }
@@ -136,29 +156,15 @@ async fn subscribe_sends_a_confirmation_email_with_link() -> Result<(), anyhow::
     test_app.post_subscriptions(body).await?;
 
     // 확인
-    // 첫번째 가로챈 요청을 얻는다.
     let email_request = &test_app
         .test_email_server
         .received_requests()
         .await
-        .context("No received request.")?[0];
-    // 바디를 JSON으로 파싱한다.
-    let body: serde_json::Value = serde_json::from_slice(&email_request.body).unwrap();
+        .context("No received request")?[0];
+    let confirmation_links = test_app.get_confirmation_links(email_request)?;
 
-    // 요청 필드 중 하나에서 링크를 추출한다.
-    let get_link = |s: &str| {
-        let links = linkify::LinkFinder::new()
-            .links(s)
-            .filter(|l| *l.kind() == linkify::LinkKind::Url)
-            .collect::<Vec<_>>();
-        assert_eq!(links.len(), 1);
-        links[0].as_str().to_owned()
-    };
-
-    let html_link = get_link(&body["HtmlBody"].as_str().context("Not Found: HtmlBody")?);
-    let text_link = get_link(&body["TextBody"].as_str().context("NotFound: TextBody")?);
     // 두 링크는 동일해야 한다.
-    assert_eq!(html_link, text_link);
+    assert_eq!(confirmation_links.html, confirmation_links.plain_text);
 
     Ok(())
 }

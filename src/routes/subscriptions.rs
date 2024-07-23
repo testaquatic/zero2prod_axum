@@ -4,6 +4,7 @@ use crate::{
     email_client::EmailClient,
     error::Zero2ProdAxumError,
     settings::DefaultDBPool,
+    startup::ApplicationBaseUrl,
 };
 use axum::{
     response::{IntoResponse, Response},
@@ -48,6 +49,7 @@ pub async fn subscribe(
     pool: Extension<Arc<DefaultDBPool>>,
     // 앱 콘텍스트에서 이메일 클라인트를 받는다.
     email_client: Extension<Arc<EmailClient>>,
+    base_url: Extension<Arc<ApplicationBaseUrl>>,
     // axum의 특성상 Form은 마지막으로 가야 한다.
     Form(form): Form<FormData>,
 ) -> Response {
@@ -65,7 +67,8 @@ pub async fn subscribe(
     };
     // 이메일을 신규 가입자에게 전송한다.
     // 전송에 실패하면 `INTERNAL_SERVER_ERROR`를 반환한다.
-    if send_confirmation_email(&email_client, new_subscriber)
+    // 애플리케이션 url을 전달한다.
+    if send_confirmation_email(&email_client, new_subscriber, &base_url.0 .0)
         .await
         .is_err()
     {
@@ -79,10 +82,14 @@ pub async fn subscribe(
 pub async fn send_confirmation_email(
     email_client: &EmailClient,
     new_subscriber: NewSubscriber,
+    base_url: &str,
 ) -> Result<(), Zero2ProdAxumError> {
-    let confirmation_link = "https://my-api.com/subscriptions/confirm";
+    let confirmation_link = format!(
+        "{}/subscriptions/confirm?subscription_token=mytoken",
+        base_url
+    );
     let text_body = format!(
-        "Welcome to our newletter!\nVisit {} to confirm your subscription/",
+        "Welcome to our newletter!\nVisit {} to confirm your subscription",
         confirmation_link
     );
     let html_body = format!(
