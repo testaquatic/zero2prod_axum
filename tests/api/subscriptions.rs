@@ -1,5 +1,9 @@
 use crate::helpers::{DefaultDBPoolTestExt, TestApp};
 use sqlx::FromRow;
+use wiremock::{
+    matchers::{method, path},
+    Mock, ResponseTemplate,
+};
 use zero2prod_axum::{database::Zero2ProdAxumDatabase, settings::DefaultDBPool};
 
 #[tokio::test]
@@ -88,6 +92,24 @@ async fn subscribe_returns_a_400_when_fields_are_present_but_invalid() -> Result
             description
         );
     }
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn subscribe_sends_a_confirmation_email_for_valid_data() -> Result<(), anyhow::Error> {
+    // 테스트 데이터
+    let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
+    let mock = Mock::given(path("/email"))
+        .and(method("POST"))
+        .respond_with(ResponseTemplate::new(200))
+        .expect(1);
+
+    // 준비
+    let test_app = TestApp::spawn_app().await?;
+    test_app.test_email_server.test_run(mock).await;
+
+    test_app.post_subscriptions(body).await?;
 
     Ok(())
 }

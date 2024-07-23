@@ -4,6 +4,7 @@ use tokio::net::TcpListener;
 use tracing::{level_filters::LevelFilter, Subscriber};
 use url::Url;
 use uuid::Uuid;
+use wiremock::{Mock, MockServer};
 use zero2prod_axum::{
     error::Zero2ProdAxumError,
     settings::{DefaultDBPool, Settings},
@@ -15,17 +16,40 @@ use super::DefaultDBPoolTestExt;
 
 pub struct TestApp {
     pub settings: Settings,
+    // settings만으로 테스트를 수행하고 싶지만 테스트 이메일 서버의 주소를 파악하려면 인스턴스가 필요하다.
+    // `&mut`을 사용하면 되겠지만 나중에 혼란을 줄 것 같다.
+    pub test_email_server: TestEmailServer,
+}
+
+pub struct TestEmailServer {
+    mock_server: MockServer,
+}
+
+impl TestEmailServer {
+    async fn new() -> Self {
+        Self {
+            mock_server: MockServer::start().await,
+        }
+    }
+
+    fn uri(&self) -> String {
+        self.mock_server.uri()
+    }
+
+    pub async fn test_run(&self, mock: Mock) {
+        mock.mount(&self.mock_server).await
+    }
 }
 
 impl TestApp {
     /// 애플리케이션 인스턴스를 새로 실행하고 그 주소를 반환한다.
     // 백그라운드에서 애플리케이션을 구동한다.
-    pub async fn spawn_app() -> Result<Self, config::ConfigError> {
+    pub async fn spawn_app() -> Result<Self, Zero2ProdAxumError> {
         Self::set_tracing();
-        let settings = Settings::get_settings()?;
-        let mut test_app = TestApp { settings };
+        let mut test_app = Self::init().await?;
 
-        let _ = tokio::spawn(test_app.build_test_server().await.unwrap().run());
+        // 구성을 무작위해서 테스트 격리를 보장한다.
+        let _ = tokio::spawn(test_app.build_test_server().await?.run());
 
         Ok(test_app)
     }
@@ -45,8 +69,24 @@ impl TestApp {
         });
     }
 
+    async fn init() -> Result<TestApp, config::ConfigError> {
+        let mut settings = Settings::get_settings()?;
+        // MockServer를 구동해서 Postmark의 API를 대신한다.
+        let test_email_server = TestEmailServer::new().await;
+
+        // email_server를 이메일 API로 사용한다.
+        settings.email_client.base_url = test_email_server.uri();
+
+        let test_app = TestApp {
+            settings,
+            test_email_server,
+        };
+
+        Ok(test_app)
+    }
+
     // 테스트 서버를 만든다.
-    pub async fn build_test_server(&mut self) -> Result<Server, anyhow::Error> {
+    async fn build_test_server(&mut self) -> Result<Server, Zero2ProdAxumError> {
         let tcp_listener = self.get_test_tcp_listener().await?;
         let pool = self.get_test_db_pool().await?;
         // 새로운 이메일 클라이언트를 만든다.

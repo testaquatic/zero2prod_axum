@@ -14,6 +14,8 @@ pub enum Zero2ProdAxumError {
     IOError(#[from] std::io::Error),
     #[error("SQLX Error")]
     SQLXError(#[from] sqlx::Error),
+    #[error("Config Error")]
+    ConfigError(#[from] config::ConfigError),
 }
 
 impl std::fmt::Debug for Zero2ProdAxumError {
