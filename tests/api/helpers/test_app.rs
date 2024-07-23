@@ -39,6 +39,10 @@ impl TestEmailServer {
     pub async fn test_run(&self, mock: Mock) {
         mock.mount(&self.mock_server).await
     }
+
+    pub async fn received_requests(&self) -> Option<Vec<wiremock::Request>> {
+        self.mock_server.received_requests().await
+    }
 }
 
 impl TestApp {

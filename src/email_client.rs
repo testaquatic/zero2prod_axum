@@ -95,18 +95,24 @@ mod tests {
         Mock, MockServer, ResponseTemplate,
     };
 
-    struct TestEmailClient<'a> {
-        mock: Mock,
-        mock_server: &'a MockServer,
+    // 여기에서는 필요 없는 것 같지만 tests/ 와 최대한 동일한 코드를 적용했다.
+    pub struct TestEmailServer {
+        mock_server: MockServer,
     }
 
-    impl<'a> TestEmailClient<'a> {
-        fn new(mock: Mock, mock_server: &'a MockServer) -> Self {
-            Self { mock, mock_server }
+    impl TestEmailServer {
+        async fn new() -> Self {
+            Self {
+                mock_server: MockServer::start().await,
+            }
         }
 
-        async fn test_run(self) {
-            self.mock.mount(self.mock_server).await;
+        fn uri(&self) -> String {
+            self.mock_server.uri()
+        }
+
+        pub async fn test_run(&self, mock: Mock) {
+            mock.mount(&self.mock_server).await
         }
     }
 
@@ -172,11 +178,11 @@ mod tests {
             .expect(1);
 
         // 준비
-        let mock_server = MockServer::start().await;
+        let test_email_server = TestEmailServer::new().await;
 
         // 실행
-        TestEmailClient::new(mock, &mock_server).test_run().await;
-        let email_client = email_client(mock_server.uri());
+        test_email_server.test_run(mock).await;
+        let email_client = email_client(test_email_server.uri());
         let _ = email_client
             .send_email(email(), &subject, &content, &content)
             .await;
@@ -188,7 +194,7 @@ mod tests {
     #[tokio::test]
     async fn send_email_succeeds_if_the_server_returns_200() {
         // 준비
-        let mock_server = MockServer::start().await;
+        let test_email_server = TestEmailServer::new().await;
         // 다른 테스트에 있는 모든 매처를 복사하지 않는다.
         // 이 테스트의 목적은 밖으로 내보내는 요청에 대한 어서션을 하지 않는 것이다.
         // `send_email`에서 테스트 하기 위한 경로를 트리거 하기 위한 최소한의 것만 추가한다.
@@ -197,8 +203,8 @@ mod tests {
             .expect(1);
 
         // 실행
-        TestEmailClient::new(mock, &mock_server).test_run().await;
-        let eamil_client = email_client(mock_server.uri());
+        test_email_server.test_run(mock).await;
+        let eamil_client = email_client(test_email_server.uri());
         let outcome = eamil_client
             .send_email(email(), &subject(), &content(), &content())
             .await;
@@ -210,15 +216,15 @@ mod tests {
     #[tokio::test]
     async fn send_email_fails_if_the_server_returns_500() {
         // 준비
-        let mock_server = MockServer::start().await;
+        let test_email_server = TestEmailServer::new().await;
         let mock = Mock::given(any())
             // 더 이상 200이 아니다.
             .respond_with(ResponseTemplate::new(500))
             .expect(1);
 
         // 실행
-        TestEmailClient::new(mock, &mock_server).test_run().await;
-        let email_client = email_client(mock_server.uri());
+        test_email_server.test_run(mock).await;
+        let email_client = email_client(test_email_server.uri());
         let outcome = email_client
             .send_email(email(), &subject(), &content(), &content())
             .await;
@@ -230,15 +236,15 @@ mod tests {
     #[tokio::test]
     async fn send_email_times_out_if_the_server_takes_too_long() {
         // 준비
-        let mock_server = MockServer::start().await;
+        let test_email_server = TestEmailServer::new().await;
         let response = ResponseTemplate::new(200)
             // 3분!
             .set_delay(std::time::Duration::from_secs(180));
         let mock = Mock::given(any()).respond_with(response).expect(1);
 
         // 실행
-        TestEmailClient::new(mock, &mock_server).test_run().await;
-        let email_client = email_client(mock_server.uri());
+        test_email_server.test_run(mock).await;
+        let email_client = email_client(test_email_server.uri());
         let outcome = email_client
             .send_email(email(), &subject(), &content(), &content())
             .await;

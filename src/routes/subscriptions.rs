@@ -63,16 +63,9 @@ pub async fn subscribe(
         Ok(_) => StatusCode::OK.into_response(),
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     };
-
     // 이메일을 신규 가입자에게 전송한다.
     // 전송에 실패하면 `INTERNAL_SERVER_ERROR`를 반환한다.
-    if email_client
-        .send_email(
-            new_subscriber.email,
-            "Welcome!",
-            "Welcome to our newletter!",
-            "Welcome to our newletter!",
-        )
+    if send_confirmation_email(&email_client, new_subscriber)
         .await
         .is_err()
     {
@@ -80,4 +73,24 @@ pub async fn subscribe(
     }
 
     StatusCode::OK.into_response()
+}
+
+#[tracing::instrument(name = "Send a confirmation email to a new subscriber.", skip_all)]
+pub async fn send_confirmation_email(
+    email_client: &EmailClient,
+    new_subscriber: NewSubscriber,
+) -> Result<(), Zero2ProdAxumError> {
+    let confirmation_link = "https://my-api.com/subscriptions/confirm";
+    let text_body = format!(
+        "Welcome to our newletter!\nVisit {} to confirm your subscription/",
+        confirmation_link
+    );
+    let html_body = format!(
+        "Welcome to our newsletter!<br>
+            Click <a href=\"{}\">here</a> to confirm your subscription.",
+        confirmation_link
+    );
+    email_client
+        .send_email(new_subscriber.email, "Welcome", &html_body, &text_body)
+        .await
 }

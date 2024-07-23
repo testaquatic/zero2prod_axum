@@ -118,3 +118,46 @@ async fn subscribe_sends_a_confirmation_email_for_valid_data() -> Result<(), any
 
     Ok(())
 }
+
+#[tokio::test]
+async fn subscribe_sends_a_confirmation_email_with_link() -> Result<(), anyhow::Error> {
+    // 준비
+    let test_app = TestApp::spawn_app().await?;
+    let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
+    // 여기에서는 더 이상 기댓값을 설정하지 않는다.
+    // 테스트는 앱 동작의 다른 측면에 집중한다.
+    let mock = Mock::given(path("/email"))
+        .and(method("POST"))
+        .respond_with(ResponseTemplate::new(200));
+
+    // 실행
+    test_app.test_email_server.test_run(mock).await;
+    test_app.post_subscriptions(body).await?;
+
+    // 확인
+    // 첫번째 가로챈 요청을 얻는다.
+    let email_request = &test_app
+        .test_email_server
+        .received_requests()
+        .await
+        .unwrap()[0];
+    // 바디를 JSON으로 파싱한다.
+    let body: serde_json::Value = serde_json::from_slice(&email_request.body).unwrap();
+
+    // 요청 필드 중 하나에서 링크를 추출한다.
+    let get_link = |s: &str| {
+        let links = linkify::LinkFinder::new()
+            .links(s)
+            .filter(|l| *l.kind() == linkify::LinkKind::Url)
+            .collect::<Vec<_>>();
+        assert_eq!(links.len(), 1);
+        links[0].as_str().to_owned()
+    };
+
+    let html_link = get_link(&body["HtmlBody"].as_str().unwrap());
+    let text_link = get_link(&body["TextBody"].as_str().unwrap());
+    // 두 링크는 동일해야 한다.
+    assert_eq!(html_link, text_link);
+
+    Ok(())
+}

@@ -31,15 +31,21 @@ actix-web 대신 axum ( https://docs.rs/axum/latest/axum/ )으로 작성했다.
    `curl --request POST --data 'email=thomas_mann@hotmail.com&name=Tom' --verbose http://127.0.0.1:8000/subscriptions`
 
       200 OK
-      500 Internal Server Error => 이메일 중복됐다.
+          => 정상 작동
+
+      500 Internal Server Error
+          => 데이터 베이스 오류(이메일 중복)
+          => 이메일 전송 실패가 발생했다.
 
   `curl --request POST --data 'email=thomas_mannotmail.com&name=Tom' --verbose http://127.0.0.1:8000/subscriptions`
 
-      400 Bad Request => 필드에 잘못된 값이 입력됐다.
+      400 Bad Request
+          => 필드에 잘못된 값을 입력했다.
 
   `curl --request POST --data 'email=thomas_mann@hotmail.com' --verbose http://127.0.0.1:8000/subscriptions`
 
-      422 Unprocessable Entity => 일부 또는 전체 필드가 없다
+      422 Unprocessable Entity
+          => 일부 또는 전체 필드가 없다
 
 ## /scripts
 
@@ -55,7 +61,7 @@ actix-web 대신 axum ( https://docs.rs/axum/latest/axum/ )으로 작성했다.
 
 ### docker-compose.sh
 
-- 테스트를 위한 docker compose 실행  
+- 테스트를 위해서 docker compose를 실행한다.
   `./scripts/docker-compose.sh`
 
 ## /tests
