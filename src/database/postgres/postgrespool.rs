@@ -3,12 +3,15 @@ use sqlx::{
     postgres::{PgConnectOptions, PgPoolOptions, PgQueryResult, PgSslMode},
     PgPool, Postgres,
 };
+use uuid::Uuid;
 
 use crate::{
     database::basic::Zero2ProdAxumDatabase, domain::NewSubscriber, settings::DatabaseSettings,
 };
 
-use super::query::pg_save_subscriber;
+use super::query::{
+    pg_confirm_subscriber, pg_get_subscriber_id_from_token, pg_insert_subscriber, pg_store_token,
+};
 
 pub struct PostgresPool {
     pool: PgPool,
@@ -17,6 +20,8 @@ pub struct PostgresPool {
 impl Zero2ProdAxumDatabase for PostgresPool {
     type Z2PADBPool = Self;
     type DB = Postgres;
+
+    #[tracing::instrument(name = "Connect to the Postgres server.", skip_all)]
     fn connect(database_settings: &crate::settings::DatabaseSettings) -> Result<Self, sqlx::Error> {
         let pg_connect_options = database_settings.connect_options_with_db();
         let pool = PgPoolOptions::new()
@@ -29,11 +34,8 @@ impl Zero2ProdAxumDatabase for PostgresPool {
         name = "Saving new subscriber details in the database."
         skip_all,
     )]
-    async fn insert_subscriber(
-        &self,
-        new_subscriber: &NewSubscriber,
-    ) -> Result<PgQueryResult, sqlx::Error> {
-        pg_save_subscriber(
+    async fn insert_subscriber(&self, new_subscriber: &NewSubscriber) -> Result<Uuid, sqlx::Error> {
+        pg_insert_subscriber(
             &self.pool,
             // 이제 `as_ref`를 사용한다.
             new_subscriber.email.as_ref(),
@@ -41,9 +43,48 @@ impl Zero2ProdAxumDatabase for PostgresPool {
         )
         .await
         .map_err(|e| {
-            tracing::error!("Failed to execute query: {:?}", &e);
+            tracing::error!("Failed to execute query: {:?}", e);
             e
         })
+    }
+
+    #[tracing::instrument(name = "Store subscription token in the database", skip_all)]
+    fn store_token(
+        &self,
+        subscriber_id: Uuid,
+        subscription_token: &str,
+    ) -> impl ::core::future::Future<Output = Result<PgQueryResult, sqlx::Error>> + Send {
+        async move {
+            pg_store_token(self.as_ref(), subscriber_id, subscription_token)
+                .await
+                .map_err(|e| {
+                    tracing::error!("Failed to execute query: {:?}", e);
+                    e
+                })
+        }
+    }
+
+    #[tracing::instrument(name = "Mark subscriber as confirmed", skip_all)]
+    async fn confirm_subscriber(&self, subscriber_id: Uuid) -> Result<PgQueryResult, sqlx::Error> {
+        pg_confirm_subscriber(self.as_ref(), subscriber_id)
+            .await
+            .map_err(|e| {
+                tracing::error!("Failed to execute query: {:?}", e);
+                e
+            })
+    }
+
+    #[tracing::instrument(name = "Get subscriber_id from token", skip_all)]
+    async fn get_subscriber_id_from_token(
+        &self,
+        subscription_token: &str,
+    ) -> Result<Option<Uuid>, sqlx::Error> {
+        pg_get_subscriber_id_from_token(self.as_ref(), subscription_token)
+            .await
+            .map_err(|e| {
+                tracing::error!("Failed to execute query: {:?}", e);
+                e
+            })
     }
 }
 

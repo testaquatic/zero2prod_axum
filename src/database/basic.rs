@@ -1,5 +1,6 @@
 use crate::{domain::NewSubscriber, settings::DatabaseSettings};
 use sqlx::{Database, Pool};
+use uuid::Uuid;
 
 #[trait_variant::make(Send)]
 pub trait Zero2ProdAxumDatabase: AsRef<Pool<Self::DB>> + Sized {
@@ -7,8 +8,22 @@ pub trait Zero2ProdAxumDatabase: AsRef<Pool<Self::DB>> + Sized {
     type DB: Database;
     fn connect(database_settings: &DatabaseSettings) -> Result<Self::Z2PADBPool, sqlx::Error>;
 
-    async fn insert_subscriber(
+    /// 반환 값은 구독자의 uuid이다.
+    async fn insert_subscriber(&self, new_subscriber: &NewSubscriber) -> Result<Uuid, sqlx::Error>;
+
+    async fn store_token(
         &self,
-        new_subscriber: &NewSubscriber,
+        subscriber_id: Uuid,
+        subscription_token: &str,
     ) -> Result<<Self::DB as Database>::QueryResult, sqlx::Error>;
+
+    async fn confirm_subscriber(
+        &self,
+        subscriber_id: Uuid,
+    ) -> Result<<Self::DB as Database>::QueryResult, sqlx::Error>;
+
+    async fn get_subscriber_id_from_token(
+        &self,
+        subscription_token: &str,
+    ) -> Result<Option<Uuid>, sqlx::Error>;
 }

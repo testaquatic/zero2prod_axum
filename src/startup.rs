@@ -70,7 +70,6 @@ impl Server {
         let subscriptions_method_router = routing::post(subscribe).layer(
             ServiceBuilder::new()
                 .layer(Extension(email_client.clone()))
-                .layer(Extension(pool.clone()))
                 .layer(Extension(base_url.clone())),
         );
 
@@ -85,7 +84,8 @@ impl Server {
                     .make_span_with(AddRequestID)
                     .on_request(DefaultOnRequest::new().level(Level::INFO))
                     .on_response(DefaultOnResponse::new().level(Level::INFO)),
-            );
+            )
+            .layer(Extension(pool.clone()));
 
         tracing::info!(name: "server", status = "Starting the server now", addr = ?self.tcp_listener.local_addr());
         axum::serve(self.tcp_listener, app).await?;

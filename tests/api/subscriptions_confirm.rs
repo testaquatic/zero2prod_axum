@@ -1,10 +1,11 @@
 use anyhow::Context;
+use sqlx::FromRow;
 use wiremock::{
     matchers::{method, path},
     Mock, ResponseTemplate,
 };
 
-use crate::helpers::TestApp;
+use crate::helpers::{DefaultDBPoolTestExt, TestApp};
 
 #[tokio::test]
 async fn confirmations_without_token_are_rejected_with_a_400() -> Result<(), anyhow::Error> {
@@ -45,6 +46,54 @@ async fn the_link_returned_by_subscribe_returns_a_200_if_called() -> Result<(), 
 
     // 확인
     assert_eq!(response.status(), http::StatusCode::OK);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn clicking_on_the_confirmation_link_confirms_a_subscriber() -> Result<(), anyhow::Error> {
+    // 준비
+    let test_app = TestApp::spawn_app().await?;
+    let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
+    let mock = Mock::given(path("/email"))
+        .and(method("POST"))
+        .respond_with(ResponseTemplate::new(200));
+    test_app.test_email_server.test_run(mock).await;
+
+    test_app.post_subscriptions(body).await?;
+    let email_request = &test_app
+        .test_email_server
+        .received_requests()
+        .await
+        .context("No received requests")?[0];
+    let confirmation_links = test_app.get_confirmation_links(email_request)?;
+
+    // 실행
+    reqwest::get(confirmation_links.html)
+        .await?
+        .error_for_status()?;
+
+    // 확인
+    let saved = test_app
+        .settings
+        .database
+        .get_pool()
+        .await?
+        .fetch_one("SELECT email, name, status FROM subscriptions;")
+        .await?;
+
+    #[derive(sqlx::FromRow)]
+    struct Subscriber {
+        email: String,
+        name: String,
+        status: String,
+    }
+
+    let subscriber = Subscriber::from_row(&saved)?;
+
+    assert_eq!(subscriber.email, "ursula_le_guin@gmail.com");
+    assert_eq!(subscriber.name, "le guin");
+    assert_eq!(subscriber.status, "confirmed");
 
     Ok(())
 }
