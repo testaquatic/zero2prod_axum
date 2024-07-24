@@ -1,4 +1,4 @@
 mod postgrespool;
 mod query;
 
-pub use postgrespool::{DatabaseSettingsExt, PostgresPool};
+pub use postgrespool::{DatabaseSettingsPgExt, PostgresPool};

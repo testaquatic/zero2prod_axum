@@ -1,7 +1,7 @@
 use crate::{
     database::Zero2ProdAxumDatabase,
     domain::{NewSubscriber, SubscriberEmail, SubscriberName},
-    email_client::EmailClient,
+    email_client::{EmailClient, Postmark},
     error::Zero2ProdAxumError,
     settings::DefaultDBPool,
     startup::ApplicationBaseUrl,
@@ -48,7 +48,7 @@ impl TryFrom<FormData> for NewSubscriber {
 pub async fn subscribe(
     Extension(pool): Extension<Arc<DefaultDBPool>>,
     // 앱 콘텍스트에서 이메일 클라인트를 받는다.
-    Extension(email_client): Extension<Arc<EmailClient>>,
+    Extension(email_client): Extension<Arc<Postmark>>,
     Extension(base_url): Extension<Arc<ApplicationBaseUrl>>,
     // axum의 특성상 Form은 마지막으로 가야 한다.
     Form(form): Form<FormData>,

@@ -1,3 +1,5 @@
+// DB 변경을 쉽게 하기 위한 트레이트
+
 use crate::{domain::NewSubscriber, settings::DatabaseSettings, utils::SubscriptionToken};
 use sqlx::{Database, Pool};
 use uuid::Uuid;

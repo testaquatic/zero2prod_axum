@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use crate::{
-    email_client::EmailClient,
+    email_client::Postmark,
     error::Zero2ProdAxumError,
     routes::{confirm, health_check, root, subscribe},
     settings::{DefaultDBPool, Settings},
@@ -20,7 +20,7 @@ use tracing::{Level, Span};
 pub struct Server {
     tcp_listener: TcpListener,
     pool: DefaultDBPool,
-    email_client: EmailClient,
+    email_client: Postmark,
     base_url: String,
 }
 
@@ -31,7 +31,7 @@ impl Server {
     pub fn new(
         tcp_listener: TcpListener,
         pool: DefaultDBPool,
-        email_client: EmailClient,
+        email_client: Postmark,
         base_url: String,
     ) -> Self {
         Self {

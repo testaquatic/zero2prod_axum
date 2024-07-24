@@ -1,7 +1,7 @@
 use sqlx::{postgres::PgQueryResult, Database, Executor};
 use zero2prod_axum::{
     database::{
-        postgres::{DatabaseSettingsExt, PostgresPool},
+        postgres::{DatabaseSettingsPgExt, PostgresPool},
         Zero2ProdAxumDatabase,
     },
     settings::DatabaseSettings,

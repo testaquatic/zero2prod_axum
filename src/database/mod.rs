@@ -1,4 +1,4 @@
-mod basic;
+mod base;
 pub mod postgres;
 
-pub use basic::Zero2ProdAxumDatabase;
+pub use base::Zero2ProdAxumDatabase;

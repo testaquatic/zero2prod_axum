@@ -6,7 +6,7 @@ use tokio::net::TcpListener;
 use crate::{
     database::{postgres::PostgresPool, Zero2ProdAxumDatabase},
     domain::SubscriberEmail,
-    email_client::EmailClient,
+    email_client::Postmark,
     error::Zero2ProdAxumError,
     startup::Server,
 };
@@ -116,8 +116,8 @@ impl EmailClientSettings {
         SubscriberEmail::try_from(self.sender_email.clone())
     }
 
-    pub fn get_email_client(&self) -> Result<EmailClient, Zero2ProdAxumError> {
-        EmailClient::from_email_client_settings(self)
+    pub fn get_email_client(&self) -> Result<Postmark, Zero2ProdAxumError> {
+        Postmark::from_email_client_settings(self)
     }
 }
 

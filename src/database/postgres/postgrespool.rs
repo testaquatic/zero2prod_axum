@@ -6,7 +6,7 @@ use sqlx::{
 use uuid::Uuid;
 
 use crate::{
-    database::basic::Zero2ProdAxumDatabase, domain::NewSubscriber, settings::DatabaseSettings,
+    database::base::Zero2ProdAxumDatabase, domain::NewSubscriber, settings::DatabaseSettings,
     utils::SubscriptionToken,
 };
 
@@ -107,12 +107,12 @@ impl PostgresPool {
     }
 }
 
-pub trait DatabaseSettingsExt {
+pub trait DatabaseSettingsPgExt {
     fn connect_options_without_db(&self) -> PgConnectOptions;
     fn connect_options_with_db(&self) -> PgConnectOptions;
 }
 
-impl DatabaseSettingsExt for DatabaseSettings {
+impl DatabaseSettingsPgExt for DatabaseSettings {
     fn connect_options_without_db(&self) -> PgConnectOptions {
         let ssl_mod = if self.require_ssl {
             PgSslMode::Require

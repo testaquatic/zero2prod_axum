@@ -1,14 +1,11 @@
 use reqwest::Client;
 use secrecy::{ExposeSecret, Secret};
 
-use crate::{
-    domain::{NewSubscriber, SubscriberEmail},
-    error::Zero2ProdAxumError,
-    settings::EmailClientSettings,
-    utils::SubscriptionToken,
-};
+use crate::{domain::SubscriberEmail, error::Zero2ProdAxumError, settings::EmailClientSettings};
 
-pub struct EmailClient {
+use super::EmailClient;
+
+pub struct Postmark {
     http_client: Client,
     base_url: reqwest::Url,
     sender: SubscriberEmail,
@@ -33,7 +30,7 @@ struct SendEmailRequest<'a> {
     text_body: &'a str,
 }
 
-impl EmailClient {
+impl Postmark {
     pub fn new(
         base_url: &str,
         sender: SubscriberEmail,
@@ -59,10 +56,12 @@ impl EmailClient {
         let authorization_token = email_client_settings.authorization_token.clone();
         let timeout = std::time::Duration::from_micros(email_client_settings.timeout_milliseconds);
 
-        EmailClient::new(base_url, sender, authorization_token, timeout)
+        Postmark::new(base_url, sender, authorization_token, timeout)
     }
+}
 
-    pub async fn send_email(
+impl EmailClient for Postmark {
+    async fn send_email(
         &self,
         recipient: SubscriberEmail,
         subject: &str,
@@ -90,37 +89,15 @@ impl EmailClient {
             .error_for_status()?;
         Ok(())
     }
-
-    #[tracing::instrument(name = "Send a confirmation email to a new subscriber.", skip_all)]
-    pub async fn send_confirmation_email(
-        &self,
-        new_subscriber: NewSubscriber,
-        base_url: &str,
-        subscription_token: &SubscriptionToken,
-    ) -> Result<(), Zero2ProdAxumError> {
-        let confirmation_link = format!(
-            "{}/subscriptions/confirm?subscription_token={}",
-            base_url,
-            subscription_token.as_ref()
-        );
-        let text_body = format!(
-            "Welcome to our newletter!\nVisit {} to confirm your subscription",
-            confirmation_link
-        );
-        let html_body = format!(
-            "Welcome to our newsletter!<br>
-            Click <a href=\"{}\">here</a> to confirm your subscription.",
-            confirmation_link
-        );
-        self.send_email(new_subscriber.email, "Welcome", &html_body, &text_body)
-            .await
-    }
 }
 
 #[cfg(test)]
 mod tests {
 
-    use crate::{domain::SubscriberEmail, email_client::EmailClient};
+    use crate::{
+        domain::SubscriberEmail,
+        email_client::{postmark::Postmark, EmailClient},
+    };
     use claim::{assert_err, assert_ok};
     use fake::{
         faker::{
@@ -173,8 +150,8 @@ mod tests {
     }
 
     // `EmailClient`의 테스트 인스턴스를 얻는다.
-    fn email_client(base_url: String) -> EmailClient {
-        EmailClient::new(
+    fn email_client(base_url: String) -> Postmark {
+        Postmark::new(
             &base_url,
             email(),
             Secret::new(Faker.fake()),
