@@ -7,6 +7,7 @@ use uuid::Uuid;
 
 use crate::{
     database::basic::Zero2ProdAxumDatabase, domain::NewSubscriber, settings::DatabaseSettings,
+    utils::SubscriptionToken,
 };
 
 use super::query::{
@@ -31,12 +32,16 @@ impl Zero2ProdAxumDatabase for PostgresPool {
     }
 
     #[tracing::instrument(
-        name = "Saving new subscriber details in the database."
+        name = "Saving new subscriber details and token in the database."
         skip_all,
     )]
-    async fn insert_subscriber(&self, new_subscriber: &NewSubscriber) -> Result<Uuid, sqlx::Error> {
-        pg_insert_subscriber(
-            &self.pool,
+    async fn insert_subscriber(
+        &self,
+        new_subscriber: &NewSubscriber,
+    ) -> Result<SubscriptionToken, sqlx::Error> {
+        let mut pg_transaction = self.pool.begin().await?;
+        let subscriber_id = pg_insert_subscriber(
+            pg_transaction.as_mut(),
             // 이제 `as_ref`를 사용한다.
             new_subscriber.email.as_ref(),
             new_subscriber.name.as_ref(),
@@ -45,23 +50,23 @@ impl Zero2ProdAxumDatabase for PostgresPool {
         .map_err(|e| {
             tracing::error!("Failed to execute query: {:?}", e);
             e
-        })
-    }
+        })?;
 
-    #[tracing::instrument(name = "Store subscription token in the database", skip_all)]
-    fn store_token(
-        &self,
-        subscriber_id: Uuid,
-        subscription_token: &str,
-    ) -> impl ::core::future::Future<Output = Result<PgQueryResult, sqlx::Error>> + Send {
-        async move {
-            pg_store_token(self.as_ref(), subscriber_id, subscription_token)
-                .await
-                .map_err(|e| {
-                    tracing::error!("Failed to execute query: {:?}", e);
-                    e
-                })
-        }
+        let subscription_token = crate::utils::generate_subscription_token();
+        pg_store_token(
+            pg_transaction.as_mut(),
+            subscriber_id,
+            subscription_token.as_ref(),
+        )
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to execute query: {:?}", e);
+            e
+        })?;
+
+        pg_transaction.commit().await?;
+
+        Ok(subscription_token)
     }
 
     #[tracing::instrument(name = "Mark subscriber as confirmed", skip_all)]

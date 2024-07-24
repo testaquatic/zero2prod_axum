@@ -5,13 +5,13 @@ use crate::{
     error::Zero2ProdAxumError,
     settings::DefaultDBPool,
     startup::ApplicationBaseUrl,
+    utils::SubscriptionToken,
 };
 use axum::{
     response::{IntoResponse, Response},
     Extension, Form,
 };
 use http::StatusCode;
-use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use std::sync::Arc;
 
 #[derive(serde::Deserialize)]
@@ -62,18 +62,11 @@ pub async fn subscribe(
     // `Result`는 `Ok`와 `Err`라는 두개의 변형을 갖는다.
     // 첫 번째는 성공, 두 번째는 실패를 의미한다.
     // `match` 구문을 사용해서 결과에 따라 무엇을 수행할지 선택한다.
-    let subscriber_id = match pool.insert_subscriber(&new_subscriber).await {
-        Ok(subscriber_id) => subscriber_id,
+    let subscription_token = match pool.insert_subscriber(&new_subscriber).await {
+        Ok(subscription_token) => subscription_token,
         Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     };
-    let subscription_token = generate_subscription_token();
-    if pool
-        .store_token(subscriber_id, &subscription_token)
-        .await
-        .is_err()
-    {
-        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
-    }
+
     // 이메일을 신규 가입자에게 전송한다.
     // 전송에 실패하면 `INTERNAL_SERVER_ERROR`를 반환한다.
     // 애플리케이션 url을 전달한다.
@@ -97,11 +90,12 @@ pub async fn send_confirmation_email(
     email_client: &EmailClient,
     new_subscriber: NewSubscriber,
     base_url: &str,
-    subscription_token: &str,
+    subscription_token: &SubscriptionToken,
 ) -> Result<(), Zero2ProdAxumError> {
     let confirmation_link = format!(
         "{}/subscriptions/confirm?subscription_token={}",
-        base_url, subscription_token
+        base_url,
+        subscription_token.as_ref()
     );
     let text_body = format!(
         "Welcome to our newletter!\nVisit {} to confirm your subscription",
@@ -115,14 +109,4 @@ pub async fn send_confirmation_email(
     email_client
         .send_email(new_subscriber.email, "Welcome", &html_body, &text_body)
         .await
-}
-
-/// 대소문자를 구분하는 무작위 25문자로 구성된 구독 토큰을 생성한다.
-fn generate_subscription_token() -> String {
-    let rng = thread_rng();
-
-    rng.sample_iter(Alphanumeric)
-        .map(char::from)
-        .take(25)
-        .collect()
 }
