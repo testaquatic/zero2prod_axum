@@ -5,6 +5,7 @@ use wiremock::{
     matchers::{method, path},
     Mock, ResponseTemplate,
 };
+use zero2prod_axum::settings::DefaultDBPool;
 
 #[tokio::test]
 async fn subscribe_returns_a_200_for_valid_form_data() -> Result<(), anyhow::Error> {
@@ -46,7 +47,7 @@ async fn subscribe_persists_the_new_subscriber() -> Result<(), anyhow::Error> {
     let row = test_app
         .settings
         .database
-        .get_pool()
+        .get_pool::<DefaultDBPool>()
         .await?
         .fetch_one("SELECT email, name, status FROM subscriptions;")
         .await?;

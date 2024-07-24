@@ -1,11 +1,11 @@
-// 이메일 전송 서비스 변경시 코드 재사용을 위한 트레이트
-
 use crate::{
     domain::{NewSubscriber, SubscriberEmail},
     error::Zero2ProdAxumError,
+    settings::EmailClientSettings,
     utils::SubscriptionToken,
 };
 
+// 이메일 전송 서비스 변경시 코드 재사용을 위한 트레이트
 #[trait_variant::make(Send)]
 pub trait EmailClient {
     async fn send_email(
@@ -15,6 +15,12 @@ pub trait EmailClient {
         html_content: &str,
         text_content: &str,
     ) -> Result<(), Zero2ProdAxumError>;
+
+    fn from_email_client_settings(
+        email_client_settings: &EmailClientSettings,
+    ) -> Result<Self, Zero2ProdAxumError>
+    where
+        Self: Sized;
 
     #[tracing::instrument(name = "Send a confirmation email to a new subscriber.", skip_all)]
     fn send_confirmation_email(

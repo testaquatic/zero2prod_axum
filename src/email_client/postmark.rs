@@ -47,17 +47,6 @@ impl Postmark {
 
         Ok(email_client)
     }
-
-    pub fn from_email_client_settings(
-        email_client_settings: &EmailClientSettings,
-    ) -> Result<Self, Zero2ProdAxumError> {
-        let base_url = &email_client_settings.base_url;
-        let sender = email_client_settings.get_sender_email()?;
-        let authorization_token = email_client_settings.authorization_token.clone();
-        let timeout = std::time::Duration::from_micros(email_client_settings.timeout_milliseconds);
-
-        Postmark::new(base_url, sender, authorization_token, timeout)
-    }
 }
 
 impl EmailClient for Postmark {
@@ -88,6 +77,17 @@ impl EmailClient for Postmark {
             .await?
             .error_for_status()?;
         Ok(())
+    }
+
+    fn from_email_client_settings(
+        email_client_settings: &EmailClientSettings,
+    ) -> Result<Self, Zero2ProdAxumError> {
+        let base_url = &email_client_settings.base_url;
+        let sender = email_client_settings.get_sender_email()?;
+        let authorization_token = email_client_settings.authorization_token.clone();
+        let timeout = std::time::Duration::from_micros(email_client_settings.timeout_milliseconds);
+
+        Postmark::new(base_url, sender, authorization_token, timeout)
     }
 }
 

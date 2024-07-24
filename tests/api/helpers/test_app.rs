@@ -136,7 +136,7 @@ impl TestApp {
         let pool = DefaultDBPool::connect_without_db(&self.settings.database).await?;
         pool.create_db(&self.settings.database).await?;
         // 데이터베이스를 마이그레이션 한다.
-        let pool = self.settings.database.get_pool().await?;
+        let pool = self.settings.database.get_pool::<DefaultDBPool>().await?;
         pool.migrate().await?;
 
         Ok(pool)

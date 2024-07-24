@@ -44,9 +44,9 @@ impl Server {
 
     pub async fn build(settings: &Settings) -> Result<Server, Zero2ProdAxumError> {
         let tcp_listener = settings.application.get_listener().await?;
-        let pool = settings.database.get_pool().await?;
+        let pool = settings.database.get_pool::<DefaultDBPool>().await?;
         // `settings`를 사용해서 `EmailClient`를 만든다.
-        let email_client = settings.email_client.get_email_client()?;
+        let email_client = settings.email_client.get_email_client::<Postmark>()?;
 
         let server = Server::new(
             tcp_listener,

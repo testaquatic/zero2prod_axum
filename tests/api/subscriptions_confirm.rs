@@ -4,6 +4,7 @@ use wiremock::{
     matchers::{method, path},
     Mock, ResponseTemplate,
 };
+use zero2prod_axum::settings::DefaultDBPool;
 
 use crate::helpers::{DefaultDBPoolTestExt, TestApp};
 
@@ -77,7 +78,7 @@ async fn clicking_on_the_confirmation_link_confirms_a_subscriber() -> Result<(),
     let saved = test_app
         .settings
         .database
-        .get_pool()
+        .get_pool::<DefaultDBPool>()
         .await?
         .fetch_one("SELECT email, name, status FROM subscriptions;")
         .await?;
