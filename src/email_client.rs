@@ -1,7 +1,12 @@
 use reqwest::Client;
 use secrecy::{ExposeSecret, Secret};
 
-use crate::{domain::SubscriberEmail, error::Zero2ProdAxumError, settings::EmailClientSettings};
+use crate::{
+    domain::{NewSubscriber, SubscriberEmail},
+    error::Zero2ProdAxumError,
+    settings::EmailClientSettings,
+    utils::SubscriptionToken,
+};
 
 pub struct EmailClient {
     http_client: Client,
@@ -84,6 +89,31 @@ impl EmailClient {
             .await?
             .error_for_status()?;
         Ok(())
+    }
+
+    #[tracing::instrument(name = "Send a confirmation email to a new subscriber.", skip_all)]
+    pub async fn send_confirmation_email(
+        &self,
+        new_subscriber: NewSubscriber,
+        base_url: &str,
+        subscription_token: &SubscriptionToken,
+    ) -> Result<(), Zero2ProdAxumError> {
+        let confirmation_link = format!(
+            "{}/subscriptions/confirm?subscription_token={}",
+            base_url,
+            subscription_token.as_ref()
+        );
+        let text_body = format!(
+            "Welcome to our newletter!\nVisit {} to confirm your subscription",
+            confirmation_link
+        );
+        let html_body = format!(
+            "Welcome to our newsletter!<br>
+            Click <a href=\"{}\">here</a> to confirm your subscription.",
+            confirmation_link
+        );
+        self.send_email(new_subscriber.email, "Welcome", &html_body, &text_body)
+            .await
     }
 }
 

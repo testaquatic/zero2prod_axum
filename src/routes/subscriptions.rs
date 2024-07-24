@@ -5,7 +5,6 @@ use crate::{
     error::Zero2ProdAxumError,
     settings::DefaultDBPool,
     startup::ApplicationBaseUrl,
-    utils::SubscriptionToken,
 };
 use axum::{
     response::{IntoResponse, Response},
@@ -70,43 +69,13 @@ pub async fn subscribe(
     // 이메일을 신규 가입자에게 전송한다.
     // 전송에 실패하면 `INTERNAL_SERVER_ERROR`를 반환한다.
     // 애플리케이션 url을 전달한다.
-    if send_confirmation_email(
-        &email_client,
-        new_subscriber,
-        &base_url.0,
-        &subscription_token,
-    )
-    .await
-    .is_err()
+    if email_client
+        .send_confirmation_email(new_subscriber, &base_url.0, &subscription_token)
+        .await
+        .is_err()
     {
         return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     }
 
     StatusCode::OK.into_response()
-}
-
-#[tracing::instrument(name = "Send a confirmation email to a new subscriber.", skip_all)]
-pub async fn send_confirmation_email(
-    email_client: &EmailClient,
-    new_subscriber: NewSubscriber,
-    base_url: &str,
-    subscription_token: &SubscriptionToken,
-) -> Result<(), Zero2ProdAxumError> {
-    let confirmation_link = format!(
-        "{}/subscriptions/confirm?subscription_token={}",
-        base_url,
-        subscription_token.as_ref()
-    );
-    let text_body = format!(
-        "Welcome to our newletter!\nVisit {} to confirm your subscription",
-        confirmation_link
-    );
-    let html_body = format!(
-        "Welcome to our newsletter!<br>
-            Click <a href=\"{}\">here</a> to confirm your subscription.",
-        confirmation_link
-    );
-    email_client
-        .send_email(new_subscriber.email, "Welcome", &html_body, &text_body)
-        .await
 }

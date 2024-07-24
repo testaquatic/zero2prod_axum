@@ -52,7 +52,7 @@ impl Zero2ProdAxumDatabase for PostgresPool {
             e
         })?;
 
-        let subscription_token = crate::utils::generate_subscription_token();
+        let subscription_token = SubscriptionToken::generate_subscription_token();
         pg_store_token(
             pg_transaction.as_mut(),
             subscriber_id,
