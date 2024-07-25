@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::{
     email_client::Postmark,
-    error::Zero2ProdAxumError,
+    error::Z2PAError,
     routes::{confirm, health_check, root, subscribe},
     settings::{DefaultDBPool, Settings},
 };
@@ -14,7 +14,9 @@ use axum::{
 use http::Request;
 use tokio::net::TcpListener;
 use tower::ServiceBuilder;
-use tower_http::trace::{DefaultOnRequest, DefaultOnResponse, MakeSpan, TraceLayer};
+use tower_http::trace::{
+    DefaultOnFailure, DefaultOnRequest, DefaultOnResponse, MakeSpan, TraceLayer,
+};
 use tracing::{Level, Span};
 
 pub struct Server {
@@ -42,7 +44,7 @@ impl Server {
         }
     }
 
-    pub async fn build(settings: &Settings) -> Result<Server, Zero2ProdAxumError> {
+    pub async fn build(settings: &Settings) -> Result<Server, Z2PAError> {
         let tcp_listener = settings.application.get_listener().await?;
         let pool = settings.database.get_pool::<DefaultDBPool>().await?;
         // `settings`를 사용해서 `EmailClient`를 만든다.
@@ -83,6 +85,7 @@ impl Server {
                 TraceLayer::new_for_http()
                     .make_span_with(AddRequestID)
                     .on_request(DefaultOnRequest::new().level(Level::INFO))
+                    .on_failure(DefaultOnFailure::new().level(Level::ERROR))
                     .on_response(DefaultOnResponse::new().level(Level::INFO)),
             )
             .layer(Extension(pool.clone()));
@@ -108,7 +111,8 @@ impl MakeSpan<Body> for AddRequestID {
             method = %request.method(),
             uri = %request.uri(),
             version = ?request.version(),
-            headers = ?request.headers()
+            headers = ?request.headers(),
+            error = tracing::field::Empty,
         )
     }
 }

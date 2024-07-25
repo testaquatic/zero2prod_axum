@@ -41,6 +41,7 @@ pub async fn pg_store_token(
     .await
 }
 
+// 두번 요청이 들어오더라도 오류를 반환하지 않는다.
 pub async fn pg_confirm_subscriber(
     pg_executor: impl PgExecutor<'_>,
     subscriber_id: Uuid,

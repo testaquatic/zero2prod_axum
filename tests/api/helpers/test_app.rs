@@ -7,7 +7,7 @@ use url::Url;
 use uuid::Uuid;
 use wiremock::{Mock, MockServer};
 use zero2prod_axum::{
-    error::Zero2ProdAxumError,
+    error::Z2PAError,
     settings::{DefaultDBPool, Settings},
     startup::Server,
     telemetry::{get_tracing_subscriber, init_tracing_subscriber},
@@ -55,7 +55,7 @@ impl TestEmailServer {
 impl TestApp {
     /// 애플리케이션 인스턴스를 새로 실행하고 그 주소를 반환한다.
     // 백그라운드에서 애플리케이션을 구동한다.
-    pub async fn spawn_app() -> Result<Self, Zero2ProdAxumError> {
+    pub async fn spawn_app() -> Result<Self, Z2PAError> {
         Self::set_tracing();
         let mut test_app = Self::init().await?;
 
@@ -97,7 +97,7 @@ impl TestApp {
     }
 
     // 테스트 서버를 만든다.
-    async fn build_test_server(&mut self) -> Result<Server, Zero2ProdAxumError> {
+    async fn build_test_server(&mut self) -> Result<Server, Z2PAError> {
         let tcp_listener = self.get_test_tcp_listener().await?;
         let pool = self.get_test_db_pool().await?;
         // 새로운 이메일 클라이언트를 만든다.
@@ -145,7 +145,7 @@ impl TestApp {
     pub async fn post_subscriptions(
         &self,
         body: &'static str,
-    ) -> Result<reqwest::Response, Zero2ProdAxumError> {
+    ) -> Result<reqwest::Response, Z2PAError> {
         reqwest::Client::new()
             .post(self.get_subscriptions_uri()?)
             .header(
@@ -155,7 +155,7 @@ impl TestApp {
             .body(body)
             .send()
             .await
-            .map_err(Zero2ProdAxumError::ReqwestError)
+            .map_err(Z2PAError::ReqwestError)
     }
 
     // 이메일 API에 대한 요청에 포함된 확인 링크를 추출한다.

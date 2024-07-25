@@ -2,7 +2,7 @@ use crate::{
     database::Zero2ProdAxumDatabase,
     domain::{NewSubscriber, SubscriberEmail, SubscriberName},
     email_client::{EmailClient, Postmark},
-    error::Zero2ProdAxumError,
+    error::{Z2PAErrResponse, Z2PAError},
     settings::DefaultDBPool,
     startup::ApplicationBaseUrl,
 };
@@ -10,7 +10,6 @@ use axum::{
     response::{IntoResponse, Response},
     Extension, Form,
 };
-use http::StatusCode;
 use std::sync::Arc;
 
 #[derive(serde::Deserialize)]
@@ -20,7 +19,7 @@ pub struct FormData {
 }
 
 impl TryFrom<FormData> for NewSubscriber {
-    type Error = Zero2ProdAxumError;
+    type Error = Z2PAError;
     fn try_from(form_data: FormData) -> Result<Self, Self::Error> {
         let new_subscriber = NewSubscriber::new(
             SubscriberEmail::try_from(form_data.email)?,
@@ -52,19 +51,22 @@ pub async fn subscribe(
     Extension(base_url): Extension<Arc<ApplicationBaseUrl>>,
     // axum의 특성상 Form은 마지막으로 가야 한다.
     Form(form): Form<FormData>,
-) -> Response {
-    let new_subscriber = match form.try_into() {
-        Ok(new_subscriber) => new_subscriber,
-        // `form`이 유효하지 않으면 400을 빠르게 반환한다.
-        Err(_) => return StatusCode::BAD_REQUEST.into_response(),
-    };
+) -> axum::response::Result<Response, Z2PAErrResponse> {
+    // 반환을 `Ok`로 감싸야 한다.
     // `Result`는 `Ok`와 `Err`라는 두개의 변형을 갖는다.
     // 첫 번째는 성공, 두 번째는 실패를 의미한다.
     // `match` 구문을 사용해서 결과에 따라 무엇을 수행할지 선택한다.
-    let subscription_token = match pool.insert_subscriber(&new_subscriber).await {
-        Ok(subscription_token) => subscription_token,
-        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    let new_subscriber = match form.try_into() {
+        Ok(new_subscriber) => new_subscriber,
+        // `form`이 유효하지 않으면 400을 빠르게 반환한다.
+        Err(_) => return Ok(http::StatusCode::BAD_REQUEST.into_response()),
     };
+
+    // `?` 연산자는 투명하게 `Into` 트레이트를 호출한다.
+    let subscription_token = pool
+        .insert_subscriber(&new_subscriber)
+        .await
+        .map_err(Z2PAErrResponse::StoreTokenError)?;
 
     // 이메일을 신규 가입자에게 전송한다.
     // 전송에 실패하면 `INTERNAL_SERVER_ERROR`를 반환한다.
@@ -74,8 +76,8 @@ pub async fn subscribe(
         .await
         .is_err()
     {
-        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        return Ok(http::StatusCode::INTERNAL_SERVER_ERROR.into_response());
     }
 
-    StatusCode::OK.into_response()
+    Ok(http::StatusCode::OK.into_response())
 }

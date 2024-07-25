@@ -23,29 +23,46 @@ actix-web 대신 axum ( https://docs.rs/axum/latest/axum/ )으로 작성했다.
 ## 엔드포인트
 
 - /health_check  
-   `curl -v http://127.0.0.1:8000/health_check`
+   `curl http://127.0.0.1:8000/health_check --verbose`
 
       200 OK
 
 - /subscriptions  
-   `curl --request POST --data 'email=thomas_mann@hotmail.com&name=Tom' --verbose http://127.0.0.1:8000/subscriptions`
+   `curl --request POST --data 'email=thomas_mann@hotmail.com&name=Tom' http://127.0.0.1:8000/subscriptions --verbose`
 
       200 OK
           => 정상 작동
 
       500 Internal Server Error
           => 데이터 베이스 오류(이메일 중복)
-          => 이메일 전송 실패가 발생했다.
+          => 이메일 전송 실패가 발생
 
-  `curl --request POST --data 'email=thomas_mannotmail.com&name=Tom' --verbose http://127.0.0.1:8000/subscriptions`
+  `curl --request POST --data 'email=thomas_mannotmail.com&name=Tom' http://127.0.0.1:8000/subscriptions --verbose`
 
       400 Bad Request
-          => 필드에 잘못된 값을 입력했다.
+          => 필드에 유효하지 않은 값이 있음
 
-  `curl --request POST --data 'email=thomas_mann@hotmail.com' --verbose http://127.0.0.1:8000/subscriptions`
+  `curl --request POST --data 'email=thomas_mann@hotmail.com' http://127.0.0.1:8000/subscriptions --verbose`
 
       422 Unprocessable Entity
-          => 일부 또는 전체 필드가 없다
+          => 필드에 필요한 요소가 누락
+
+- /subscriptions/confirm
+- `curl 'http://127.0.0.1:8000/subscriptions/confirm?subscription_token=token' --verbose`
+
+      200 OK
+          => 정상 작동
+
+      401 Unauthorized
+          => 유효하지 않은 토큰
+
+      500 Internal Server Eror
+          => 내부 서버 오류(데이터베이스 등)
+
+- `curl 'http://127.0.0.1:8000/subscriptions/confirm?subscriptions_token=token' --verbose`
+
+      400 Bad Request
+          => 쿼리 전달 오류
 
 ## /scripts
 
@@ -61,11 +78,14 @@ actix-web 대신 axum ( https://docs.rs/axum/latest/axum/ )으로 작성했다.
 
 ### docker-compose.sh
 
-- 테스트를 위해서 docker compose를 실행한다.
+- 테스트용 docker compose를 실행한다.  
   `./scripts/docker-compose.sh`
 
 ## /tests
 
-- `TEST_LOG`  
-  테스트 할 때 로그를 출력한다.  
-   `TEST_LOG=true cargo test health_check_works`
+- 환경변수
+
+  - `TEST_LOG`
+
+    테스트 로그를 출력한다.  
+    `TEST_LOG=true cargo test health_check_works`

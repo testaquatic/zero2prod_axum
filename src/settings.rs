@@ -7,9 +7,10 @@ use crate::{
     database::{postgres::PostgresPool, Zero2ProdAxumDatabase},
     domain::SubscriberEmail,
     email_client::{EmailClient, Postmark},
-    error::Zero2ProdAxumError,
+    error::Z2PAError,
     startup::Server,
 };
+// 기본으로 사용할 타입 모음
 pub type DefaultDBPool = PostgresPool;
 pub type DefaultDB = Postgres;
 pub type DefaultEmailClient = Postmark;
@@ -91,7 +92,7 @@ impl Settings {
         settings.try_deserialize::<Settings>()
     }
 
-    pub async fn build_server(&self) -> Result<Server, Zero2ProdAxumError> {
+    pub async fn build_server(&self) -> Result<Server, Z2PAError> {
         Server::build(self).await
     }
 }
@@ -113,11 +114,11 @@ impl DatabaseSettings {
 }
 
 impl EmailClientSettings {
-    pub fn get_sender_email(&self) -> Result<SubscriberEmail, Zero2ProdAxumError> {
+    pub fn get_sender_email(&self) -> Result<SubscriberEmail, Z2PAError> {
         SubscriberEmail::try_from(self.sender_email.clone())
     }
 
-    pub fn get_email_client<T: EmailClient>(&self) -> Result<T, Zero2ProdAxumError> {
+    pub fn get_email_client<T: EmailClient>(&self) -> Result<T, Z2PAError> {
         T::from_email_client_settings(self)
     }
 }

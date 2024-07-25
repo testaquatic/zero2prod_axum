@@ -15,15 +15,15 @@ async fn subscribe_returns_a_200_for_valid_form_data() -> Result<(), anyhow::Err
     // 준비
     let test_app = TestApp::spawn_app().await?;
     let mock = Mock::given(path("/email"))
-        .and(method("POST"))
-        .respond_with(ResponseTemplate::new(200));
+        .and(method(http::Method::POST))
+        .respond_with(ResponseTemplate::new(http::StatusCode::OK));
     test_app.test_email_server.test_run(mock).await;
 
     // 실행
-    let response = test_app.post_subscriptions(body).await.unwrap();
+    let response = test_app.post_subscriptions(body).await?;
 
     // 확인
-    assert_eq!(response.status(), reqwest::StatusCode::OK);
+    assert_eq!(response.status(), http::StatusCode::OK);
 
     Ok(())
 }
@@ -36,8 +36,8 @@ async fn subscribe_persists_the_new_subscriber() -> Result<(), anyhow::Error> {
     // 준비
     let test_app = TestApp::spawn_app().await?;
     let mock = Mock::given(path("/email"))
-        .and(method("POST"))
-        .respond_with(ResponseTemplate::new(200));
+        .and(method(http::Method::POST))
+        .respond_with(ResponseTemplate::new(http::StatusCode::OK));
     test_app.test_email_server.test_run(mock).await;
 
     // 실행
@@ -83,7 +83,7 @@ async fn subscribe_returns_a_422_when_data_is_missing() -> Result<(), anyhow::Er
         // 확인
         assert_eq!(
             response.status(),
-            reqwest::StatusCode::UNPROCESSABLE_ENTITY,
+            http::StatusCode::UNPROCESSABLE_ENTITY,
             // 테스트 실패시 출력할 커스터마이즈된 추가 오류 메세지
             "The API did not fail with 400 Bad Request when the payload was {},",
             error_messages,
@@ -113,7 +113,7 @@ async fn subscribe_returns_a_400_when_fields_are_present_but_invalid() -> Result
         // 확인
         assert_eq!(
             // 더이상 200 OK가 아니다.
-            reqwest::StatusCode::BAD_REQUEST,
+            http::StatusCode::BAD_REQUEST,
             response.status(),
             "The API did not return a 200 OK when the payload was {}.",
             description
@@ -128,8 +128,8 @@ async fn subscribe_sends_a_confirmation_email_for_valid_data() -> Result<(), any
     // 테스트 데이터
     let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
     let mock = Mock::given(path("/email"))
-        .and(method("POST"))
-        .respond_with(ResponseTemplate::new(200))
+        .and(method(http::Method::POST))
+        .respond_with(ResponseTemplate::new(http::StatusCode::OK))
         .expect(1);
 
     // 준비
@@ -149,8 +149,8 @@ async fn subscribe_sends_a_confirmation_email_with_link() -> Result<(), anyhow::
     // 여기에서는 더 이상 기댓값을 설정하지 않는다.
     // 테스트는 앱 동작의 다른 측면에 집중한다.
     let mock = Mock::given(path("/email"))
-        .and(method("POST"))
-        .respond_with(ResponseTemplate::new(200));
+        .and(method(http::Method::POST))
+        .respond_with(ResponseTemplate::new(http::StatusCode::OK));
 
     // 실행
     test_app.test_email_server.test_run(mock).await;
@@ -166,6 +166,30 @@ async fn subscribe_sends_a_confirmation_email_with_link() -> Result<(), anyhow::
 
     // 두 링크는 동일해야 한다.
     assert_eq!(confirmation_links.html, confirmation_links.plain_text);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn subscribe_fails_if_there_is_a_fatal_database_error() -> Result<(), anyhow::Error> {
+    // 준비
+    let test_app = TestApp::spawn_app().await?;
+    let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
+
+    // 데이터베이스를 무시한다.
+    let pool = test_app
+        .settings
+        .database
+        .get_pool::<DefaultDBPool>()
+        .await?;
+    pool.execute("ALTER TABLE subscription_tokens DROP COLUMN subscription_token;")
+        .await?;
+
+    // 실행
+    let response = test_app.post_subscriptions(body).await?;
+
+    // 확인
+    assert_eq!(response.status(), http::StatusCode::INTERNAL_SERVER_ERROR);
 
     Ok(())
 }

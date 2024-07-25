@@ -1,12 +1,12 @@
 use unicode_segmentation::UnicodeSegmentation;
 
-use crate::error::Zero2ProdAxumError;
+use crate::error::Z2PAError;
 
 #[derive(Debug)]
 pub struct SubscriberName(String);
 
 impl TryFrom<String> for SubscriberName {
-    type Error = Zero2ProdAxumError;
+    type Error = Z2PAError;
     /// 입력이 subscriber 이름에 대한 검증 조건을 모두 만족하면
     /// `Ok(SubscriberName)`을 반환한다.
     /// 그렇지 않으면 'Err(String)'을 반환한다.
@@ -30,7 +30,7 @@ impl TryFrom<String> for SubscriberName {
         if is_empty_or_whitespace || is_too_long || conatains_forbidden_characters {
             // `panic`을 `Err(e)`으로 치환한다.
 
-            Err(Zero2ProdAxumError::SubscriberNameError(format!(
+            Err(Z2PAError::SubscriberNameError(format!(
                 "{} is not a valid user name.",
                 s
             )))

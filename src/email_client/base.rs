@@ -1,6 +1,6 @@
 use crate::{
     domain::{NewSubscriber, SubscriberEmail},
-    error::Zero2ProdAxumError,
+    error::Z2PAError,
     settings::EmailClientSettings,
     utils::SubscriptionToken,
 };
@@ -14,11 +14,11 @@ pub trait EmailClient {
         subject: &str,
         html_content: &str,
         text_content: &str,
-    ) -> Result<(), Zero2ProdAxumError>;
+    ) -> Result<(), Z2PAError>;
 
     fn from_email_client_settings(
         email_client_settings: &EmailClientSettings,
-    ) -> Result<Self, Zero2ProdAxumError>
+    ) -> Result<Self, Z2PAError>
     where
         Self: Sized;
 
@@ -28,7 +28,7 @@ pub trait EmailClient {
         new_subscriber: NewSubscriber,
         base_url: &str,
         subscription_token: &SubscriptionToken,
-    ) -> impl std::future::Future<Output = Result<(), Zero2ProdAxumError>> + Send
+    ) -> impl std::future::Future<Output = Result<(), Z2PAError>> + Send
     where
         Self: Sync,
     {

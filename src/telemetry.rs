@@ -1,4 +1,4 @@
-use std::sync::Once;
+use std::{str::FromStr, sync::Once};
 
 use tracing::{dispatcher::set_global_default, level_filters::LevelFilter, Subscriber};
 use tracing_log::LogTracer;
@@ -21,7 +21,8 @@ where
 {
     // RUST_LOG 환경 변수가 설정되어 있지 않으면 info 레벨 및 그 이상의 모든 span을 출력한다.
     let env_filter = EnvFilter::try_from_default_env()
-        .unwrap_or(EnvFilter::default().add_directive(env_filter.into()));
+        .unwrap_or(EnvFilter::from_str("axum::rejection=trace").unwrap_or(EnvFilter::default()))
+        .add_directive(env_filter.into());
     let formatting_layer = tracing_subscriber::fmt::layer().pretty().with_writer(sink);
     Registry::default().with(env_filter).with(formatting_layer)
 }

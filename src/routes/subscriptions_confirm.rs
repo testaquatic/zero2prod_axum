@@ -7,17 +7,20 @@ use axum::{
 };
 use http::StatusCode;
 
-use crate::database::{postgres::PostgresPool, Zero2ProdAxumDatabase};
+use crate::{database::Zero2ProdAxumDatabase, settings::DefaultDBPool};
 
 #[derive(serde::Deserialize)]
 pub struct Parameters {
     subscription_token: String,
 }
 
+// 200 => 정상 작동
+// 401 => 유효하지 않은 토큰
+// 500 => 내부 서버(데이터 베이스 등) 오류
 #[tracing::instrument(name = "Confirm a pending subscriber", skip_all)]
 pub async fn confirm(
     Query(parameters): Query<Parameters>,
-    Extension(pool): Extension<Arc<PostgresPool>>,
+    Extension(pool): Extension<Arc<DefaultDBPool>>,
 ) -> Response {
     let id = match pool
         .as_ref()
