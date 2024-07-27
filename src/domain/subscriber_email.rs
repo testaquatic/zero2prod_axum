@@ -1,20 +1,15 @@
 use validator::ValidateEmail;
 
-use crate::error::Z2PAError;
-
 #[derive(Debug)]
 pub struct SubscriberEmail(String);
 
 impl TryFrom<String> for SubscriberEmail {
-    type Error = Z2PAError;
+    type Error = String;
     fn try_from(s: String) -> Result<Self, Self::Error> {
         if s.validate_email() {
             Ok(Self(s))
         } else {
-            Err(Z2PAError::SubscriberEmailError(format!(
-                "{} is not a valid subscriber email.",
-                s
-            )))
+            Err(format!("{} is not a valid subscriber email.", s))
         }
     }
 }

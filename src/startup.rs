@@ -46,7 +46,11 @@ impl Server {
 
     pub async fn build(settings: &Settings) -> Result<Server, Z2PAError> {
         let tcp_listener = settings.application.get_listener().await?;
-        let pool = settings.database.get_pool::<DefaultDBPool>().await?;
+        let pool = settings
+            .database
+            .get_pool::<DefaultDBPool>()
+            .await
+            .map_err(Z2PAError::DatabaseError)?;
         // `settings`를 사용해서 `EmailClient`를 만든다.
         let email_client = settings.email_client.get_email_client::<Postmark>()?;
 
@@ -69,17 +73,18 @@ impl Server {
         let email_client = Arc::new(self.email_client);
         let base_url = Arc::new(ApplicationBaseUrl(self.base_url));
 
-        let subscriptions_method_router = routing::post(subscribe).layer(
-            ServiceBuilder::new()
-                .layer(Extension(email_client.clone()))
-                .layer(Extension(base_url.clone())),
-        );
-
         let app = Router::new()
             .route("/", routing::get(root))
             .route("/health_check", routing::get(health_check))
             // POST /subscriptions 요청에 대한 라우팅 테이블의 새 엔트리 포인트
-            .route("/subscriptions", subscriptions_method_router)
+            .route(
+                "/subscriptions",
+                routing::post(subscribe).layer(
+                    ServiceBuilder::new()
+                        .layer(Extension(email_client.clone()))
+                        .layer(Extension(base_url)),
+                ),
+            )
             .route("/subscriptions/confirm", routing::get(confirm))
             .layer(
                 TraceLayer::new_for_http()
@@ -107,12 +112,14 @@ impl MakeSpan<Body> for AddRequestID {
         tracing::span!(
             Level::ERROR,
             "request",
-            request_id=%uuid::Uuid::new_v4().to_string(),
+            request_id = %uuid::Uuid::new_v4().to_string(),
+            error = tracing::field::Empty,
+            error_detail = tracing::field::Empty,
             method = %request.method(),
             uri = %request.uri(),
             version = ?request.version(),
             headers = ?request.headers(),
-            error = tracing::field::Empty,
         )
+        .make_span(request)
     }
 }

@@ -23,3 +23,16 @@ impl AsRef<str> for SubscriptionToken {
         &self.subscription_token
     }
 }
+
+pub fn error_chain_fmt(
+    e: &dyn std::error::Error,
+    f: &mut std::fmt::Formatter<'_>,
+) -> Result<(), std::fmt::Error> {
+    writeln!(f, "{}\n", e)?;
+    let mut current = e.source();
+    while let Some(cause) = current {
+        writeln!(f, "Casued by:\n\t{}", cause)?;
+        current = cause.source();
+    }
+    Ok(())
+}

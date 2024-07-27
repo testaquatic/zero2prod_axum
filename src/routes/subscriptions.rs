@@ -1,10 +1,11 @@
 use crate::{
-    database::Zero2ProdAxumDatabase,
+    database::{Z2PADBError, Z2PADB},
     domain::{NewSubscriber, SubscriberEmail, SubscriberName},
-    email_client::{EmailClient, Postmark},
-    error::{Z2PAErrResponse, Z2PAError},
+    email_client::{EmailClient, EmailClientError, Postmark},
+    error::Z2PAError,
     settings::DefaultDBPool,
     startup::ApplicationBaseUrl,
+    utils::error_chain_fmt,
 };
 use axum::{
     response::{IntoResponse, Response},
@@ -19,13 +20,70 @@ pub struct FormData {
 }
 
 impl TryFrom<FormData> for NewSubscriber {
-    type Error = Z2PAError;
+    type Error = String;
     fn try_from(form_data: FormData) -> Result<Self, Self::Error> {
         let new_subscriber = NewSubscriber::new(
             SubscriberEmail::try_from(form_data.email)?,
             SubscriberName::try_from(form_data.name)?,
         );
         Ok(new_subscriber)
+    }
+}
+
+#[derive(thiserror::Error)]
+pub enum SubscribeError {
+    #[error("{0}")]
+    ValidationError(String),
+    #[error("Failed to aqcuire a Postgres connection from the pool.")]
+    PoolError(sqlx::Error),
+    #[error("Failed to insert new subscriber in the database.")]
+    InsertSubscriberError(sqlx::Error),
+    #[error("Failed to commit SQL transaction to store a new subscriber.")]
+    TransactionError(sqlx::Error),
+    #[error("Failed to store the confirmation token for a new subscriber.")]
+    StoreTokenError(sqlx::Error),
+    #[error("Failed to send a confirmation email.")]
+    SendEmailError(EmailClientError),
+    #[error("Unknown error")]
+    Unknown,
+}
+
+impl From<Z2PAError> for SubscribeError {
+    fn from(e: Z2PAError) -> Self {
+        match e {
+            Z2PAError::SubscriberEmailError(s) => SubscribeError::ValidationError(s),
+            Z2PAError::SubscriberNameError(s) => SubscribeError::ValidationError(s),
+            Z2PAError::EmailClientError(e) => SubscribeError::SendEmailError(e),
+            Z2PAError::DatabaseError(db_error) => match db_error {
+                Z2PADBError::PoolError(e) => SubscribeError::PoolError(e),
+                Z2PADBError::InsertSubscriberError(e) => SubscribeError::InsertSubscriberError(e),
+                Z2PADBError::StoreTokenError(e) => SubscribeError::StoreTokenError(e),
+                Z2PADBError::TransactionError(e) => SubscribeError::TransactionError(e),
+                Z2PADBError::SqlxError(_) => SubscribeError::Unknown,
+            },
+            _ => SubscribeError::Unknown,
+        }
+    }
+}
+
+impl std::fmt::Debug for SubscribeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        error_chain_fmt(self, f)
+    }
+}
+
+impl IntoResponse for SubscribeError {
+    fn into_response(self) -> Response {
+        tracing::error!(error = %self, error_detail = ?self);
+        tracing::Span::current()
+            .record("error", self.to_string())
+            .record("error_detail", format!("{:?}", self));
+        match self {
+            // `form`이 유효하지 않으면 400을 빠르게 반환한다.
+            SubscribeError::ValidationError(_) => http::StatusCode::BAD_REQUEST,
+            _ => http::StatusCode::INTERNAL_SERVER_ERROR,
+        }
+        .into_response()
     }
 }
 
@@ -51,33 +109,25 @@ pub async fn subscribe(
     Extension(base_url): Extension<Arc<ApplicationBaseUrl>>,
     // axum의 특성상 Form은 마지막으로 가야 한다.
     Form(form): Form<FormData>,
-) -> axum::response::Result<Response, Z2PAErrResponse> {
+) -> axum::response::Result<Response, SubscribeError> {
     // 반환을 `Ok`로 감싸야 한다.
     // `Result`는 `Ok`와 `Err`라는 두개의 변형을 갖는다.
     // 첫 번째는 성공, 두 번째는 실패를 의미한다.
     // `match` 구문을 사용해서 결과에 따라 무엇을 수행할지 선택한다.
-    let new_subscriber = match form.try_into() {
-        Ok(new_subscriber) => new_subscriber,
-        // `form`이 유효하지 않으면 400을 빠르게 반환한다.
-        Err(_) => return Ok(http::StatusCode::BAD_REQUEST.into_response()),
-    };
+    let new_subscriber = form.try_into().map_err(SubscribeError::ValidationError)?;
 
     // `?` 연산자는 투명하게 `Into` 트레이트를 호출한다.
     let subscription_token = pool
         .insert_subscriber(&new_subscriber)
         .await
-        .map_err(Z2PAErrResponse::StoreTokenError)?;
+        .map_err(Z2PAError::DatabaseError)?;
 
     // 이메일을 신규 가입자에게 전송한다.
     // 전송에 실패하면 `INTERNAL_SERVER_ERROR`를 반환한다.
     // 애플리케이션 url을 전달한다.
-    if email_client
+    email_client
         .send_confirmation_email(new_subscriber, &base_url.0, &subscription_token)
         .await
-        .is_err()
-    {
-        return Ok(http::StatusCode::INTERNAL_SERVER_ERROR.into_response());
-    }
-
+        .map_err(Z2PAError::EmailClientError)?;
     Ok(http::StatusCode::OK.into_response())
 }

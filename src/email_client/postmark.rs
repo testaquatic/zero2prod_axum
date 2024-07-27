@@ -1,9 +1,9 @@
 use reqwest::Client;
 use secrecy::{ExposeSecret, Secret};
 
-use crate::{domain::SubscriberEmail, error::Z2PAError, settings::EmailClientSettings};
+use crate::{domain::SubscriberEmail, settings::EmailClientSettings};
 
-use super::EmailClient;
+use super::{EmailClient, EmailClientError};
 
 pub struct Postmark {
     http_client: Client,
@@ -36,7 +36,7 @@ impl Postmark {
         sender: SubscriberEmail,
         authorization_token: Secret<String>,
         timeout: std::time::Duration,
-    ) -> Result<Self, Z2PAError> {
+    ) -> Result<Self, EmailClientError> {
         let http_client = Client::builder().timeout(timeout).build()?;
         let email_client = Self {
             http_client,
@@ -56,9 +56,12 @@ impl EmailClient for Postmark {
         subject: &str,
         html_content: &str,
         text_content: &str,
-    ) -> Result<(), Z2PAError> {
+    ) -> Result<(), EmailClientError> {
         // `base_url`의 타입을 `String`에서 `reqwest::Url`로 변경하면 `reqwest::Url::join`을 사용해서 더 나은 구현을 할 수 있다.
-        let url = self.base_url.join("/email")?;
+        let url = self
+            .base_url
+            .join("/email")
+            .map_err(EmailClientError::UrlParseError)?;
         let request_body = SendEmailRequest {
             from: self.sender.as_ref(),
             to: recipient.as_ref(),
@@ -81,9 +84,11 @@ impl EmailClient for Postmark {
 
     fn from_email_client_settings(
         email_client_settings: &EmailClientSettings,
-    ) -> Result<Self, Z2PAError> {
+    ) -> Result<Self, EmailClientError> {
         let base_url = &email_client_settings.base_url;
-        let sender = email_client_settings.get_sender_email()?;
+        let sender = email_client_settings
+            .get_sender_email()
+            .map_err(EmailClientError::SubscriberEmailError)?;
         let authorization_token = email_client_settings.authorization_token.clone();
         let timeout = std::time::Duration::from_micros(email_client_settings.timeout_milliseconds);
 

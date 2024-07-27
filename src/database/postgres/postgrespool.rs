@@ -6,7 +6,9 @@ use sqlx::{
 use uuid::Uuid;
 
 use crate::{
-    database::base::Zero2ProdAxumDatabase, domain::NewSubscriber, settings::DatabaseSettings,
+    database::base::{Z2PADBError, Z2PADB},
+    domain::NewSubscriber,
+    settings::DatabaseSettings,
     utils::SubscriptionToken,
 };
 
@@ -18,12 +20,12 @@ pub struct PostgresPool {
     pool: PgPool,
 }
 
-impl Zero2ProdAxumDatabase for PostgresPool {
+impl Z2PADB for PostgresPool {
     type Z2PADBPool = Self;
     type DB = Postgres;
 
     #[tracing::instrument(name = "Connect to the Postgres server.", skip_all)]
-    fn connect(database_settings: &crate::settings::DatabaseSettings) -> Result<Self, sqlx::Error> {
+    fn connect(database_settings: &crate::settings::DatabaseSettings) -> Result<Self, Z2PADBError> {
         let pg_connect_options = database_settings.connect_options_with_db();
         let pool = PgPoolOptions::new()
             .acquire_timeout(std::time::Duration::from_secs(2))
@@ -38,8 +40,12 @@ impl Zero2ProdAxumDatabase for PostgresPool {
     async fn insert_subscriber(
         &self,
         new_subscriber: &NewSubscriber,
-    ) -> Result<SubscriptionToken, sqlx::Error> {
-        let mut pg_transaction = self.pool.begin().await?;
+    ) -> Result<SubscriptionToken, Z2PADBError> {
+        let mut pg_transaction = self
+            .pool
+            .begin()
+            .await
+            .map_err(Z2PADBError::TransactionError)?;
         let subscriber_id = pg_insert_subscriber(
             pg_transaction.as_mut(),
             // 이제 `as_ref`를 사용한다.
@@ -49,7 +55,7 @@ impl Zero2ProdAxumDatabase for PostgresPool {
         .await
         .map_err(|e| {
             tracing::error!("Failed to execute query: {:?}", e);
-            e
+            Z2PADBError::InsertSubscriberError(e)
         })?;
 
         let subscription_token = SubscriptionToken::generate_subscription_token();
@@ -61,21 +67,24 @@ impl Zero2ProdAxumDatabase for PostgresPool {
         .await
         .map_err(|e| {
             tracing::error!("Failed to execute query: {:?}", e);
-            e
+            Z2PADBError::StoreTokenError(e)
         })?;
 
-        pg_transaction.commit().await?;
+        pg_transaction
+            .commit()
+            .await
+            .map_err(Z2PADBError::TransactionError)?;
 
         Ok(subscription_token)
     }
 
     #[tracing::instrument(name = "Mark subscriber as confirmed", skip_all)]
-    async fn confirm_subscriber(&self, subscriber_id: Uuid) -> Result<PgQueryResult, sqlx::Error> {
+    async fn confirm_subscriber(&self, subscriber_id: Uuid) -> Result<PgQueryResult, Z2PADBError> {
         pg_confirm_subscriber(self.as_ref(), subscriber_id)
             .await
             .map_err(|e| {
                 tracing::error!("Failed to execute query: {:?}", e);
-                e
+                Z2PADBError::SqlxError(e)
             })
     }
 
@@ -83,12 +92,12 @@ impl Zero2ProdAxumDatabase for PostgresPool {
     async fn get_subscriber_id_from_token(
         &self,
         subscription_token: &str,
-    ) -> Result<Option<Uuid>, sqlx::Error> {
+    ) -> Result<Option<Uuid>, Z2PADBError> {
         pg_get_subscriber_id_from_token(self.as_ref(), subscription_token)
             .await
             .map_err(|e| {
                 tracing::error!("Failed to execute query: {:?}", e);
-                e
+                Z2PADBError::SqlxError(e)
             })
     }
 }

@@ -4,9 +4,9 @@ use sqlx::Postgres;
 use tokio::net::TcpListener;
 
 use crate::{
-    database::{postgres::PostgresPool, Zero2ProdAxumDatabase},
+    database::{postgres::PostgresPool, Z2PADBError, Z2PADB},
     domain::SubscriberEmail,
-    email_client::{EmailClient, Postmark},
+    email_client::{EmailClient, EmailClientError, Postmark},
     error::Z2PAError,
     startup::Server,
 };
@@ -108,17 +108,17 @@ impl ApplicationSettings {
 }
 
 impl DatabaseSettings {
-    pub async fn get_pool<T: Zero2ProdAxumDatabase>(&self) -> Result<T::Z2PADBPool, sqlx::Error> {
+    pub async fn get_pool<T: Z2PADB>(&self) -> Result<T::Z2PADBPool, Z2PADBError> {
         T::connect(self)
     }
 }
 
 impl EmailClientSettings {
-    pub fn get_sender_email(&self) -> Result<SubscriberEmail, Z2PAError> {
+    pub fn get_sender_email(&self) -> Result<SubscriberEmail, String> {
         SubscriberEmail::try_from(self.sender_email.clone())
     }
 
-    pub fn get_email_client<T: EmailClient>(&self) -> Result<T, Z2PAError> {
+    pub fn get_email_client<T: EmailClient>(&self) -> Result<T, EmailClientError> {
         T::from_email_client_settings(self)
     }
 }

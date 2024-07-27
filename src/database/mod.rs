@@ -1,4 +1,4 @@
 mod base;
 pub mod postgres;
 
-pub use base::Zero2ProdAxumDatabase;
+pub use base::{Z2PADBError, Z2PADB};

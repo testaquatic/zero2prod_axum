@@ -7,6 +7,7 @@ use url::Url;
 use uuid::Uuid;
 use wiremock::{Mock, MockServer};
 use zero2prod_axum::{
+    database::Z2PADBError,
     error::Z2PAError,
     settings::{DefaultDBPool, Settings},
     startup::Server,
@@ -99,7 +100,10 @@ impl TestApp {
     // 테스트 서버를 만든다.
     async fn build_test_server(&mut self) -> Result<Server, Z2PAError> {
         let tcp_listener = self.get_test_tcp_listener().await?;
-        let pool = self.get_test_db_pool().await?;
+        let pool = self
+            .get_test_db_pool()
+            .await
+            .map_err(Z2PAError::DatabaseError)?;
         // 새로운 이메일 클라이언트를 만든다.
         let email_client = self.settings.email_client.get_email_client()?;
         let base_url = self.settings.application.base_url.clone();
@@ -129,7 +133,7 @@ impl TestApp {
 
     // 테스트 `DefaultDBPool`을 생성한다.
     // 데이터 마이그레이션을 수행한다.
-    async fn get_test_db_pool(&mut self) -> Result<DefaultDBPool, sqlx::Error> {
+    async fn get_test_db_pool(&mut self) -> Result<DefaultDBPool, Z2PADBError> {
         // 임의의 DB 이름을 생성한다.
         self.settings.database.database_name = Uuid::new_v4().to_string();
         // 데이터베이스를 생성한다.
