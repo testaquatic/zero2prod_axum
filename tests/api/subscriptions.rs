@@ -182,7 +182,7 @@ async fn subscribe_fails_if_there_is_a_fatal_database_error() -> Result<(), anyh
         .database
         .get_pool::<DefaultDBPool>()
         .await?;
-    pool.execute("ALTER TABLE subscription_tokens DROP COLUMN subscription_token;")
+    pool.execute("ALTER TABLE subscriptions DROP COLUMN email;")
         .await?;
 
     // 실행

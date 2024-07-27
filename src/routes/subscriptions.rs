@@ -44,8 +44,8 @@ pub enum SubscribeError {
     StoreTokenError(sqlx::Error),
     #[error("Failed to send a confirmation email.")]
     SendEmailError(EmailClientError),
-    #[error("Unknown error")]
-    Unknown,
+    #[error("{1}")]
+    UnexpectedError(anyhow::Error, String),
 }
 
 impl From<Z2PAError> for SubscribeError {
@@ -59,9 +59,15 @@ impl From<Z2PAError> for SubscribeError {
                 Z2PADBError::InsertSubscriberError(e) => SubscribeError::InsertSubscriberError(e),
                 Z2PADBError::StoreTokenError(e) => SubscribeError::StoreTokenError(e),
                 Z2PADBError::TransactionError(e) => SubscribeError::TransactionError(e),
-                Z2PADBError::SqlxError(_) => SubscribeError::Unknown,
+                Z2PADBError::SqlxError(e) => {
+                    let s = e.to_string();
+                    SubscribeError::UnexpectedError(e.into(), s)
+                }
             },
-            _ => SubscribeError::Unknown,
+            e => {
+                let s = e.to_string();
+                SubscribeError::UnexpectedError(e.into(), s)
+            }
         }
     }
 }

@@ -2,16 +2,44 @@ use std::sync::Arc;
 
 use axum::{
     extract::Query,
-    response::{IntoResponse, Response},
+    response::{IntoResponse, Response, Result},
     Extension,
 };
-use http::StatusCode;
 
-use crate::{database::Z2PADB, settings::DefaultDBPool};
+use crate::{
+    database::{Z2PADBError, Z2PADB},
+    settings::DefaultDBPool,
+};
 
 #[derive(serde::Deserialize)]
 pub struct Parameters {
     subscription_token: String,
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum ConfrimError {
+    #[error(transparent)]
+    DatabaseError(Z2PADBError),
+    #[error("Invalid token: {token}")]
+    TokenError { token: String },
+}
+
+impl IntoResponse for ConfrimError {
+    fn into_response(self) -> Response {
+        match self {
+            ConfrimError::DatabaseError(e) => {
+                tracing::error!("{:?}", e);
+                http::StatusCode::INTERNAL_SERVER_ERROR.into_response()
+            }
+            ConfrimError::TokenError { token } => {
+                tracing::Span::current()
+                    .record("error", "Invalid token")
+                    .record("error_detail", &format!("{} is a invalid token.", &token));
+                tracing::error!("Invalid token: {}", token);
+                http::StatusCode::UNAUTHORIZED.into_response()
+            }
+        }
+    }
 }
 
 // 200 => 정상 작동
@@ -21,30 +49,23 @@ pub struct Parameters {
 pub async fn confirm(
     Query(parameters): Query<Parameters>,
     Extension(pool): Extension<Arc<DefaultDBPool>>,
-) -> Response {
-    let id = match pool
+) -> Result<Response, ConfrimError> {
+    let id = pool
         .as_ref()
         .get_subscriber_id_from_token(&parameters.subscription_token)
         .await
-    {
-        Ok(id) => id,
-        Err(_) => return http::StatusCode::INTERNAL_SERVER_ERROR.into_response(),
-    };
+        .map_err(ConfrimError::DatabaseError)?;
     match id {
         // 존재하지 않는 토큰
         None => {
-            tracing::error!(
-            name: "Invalid token",
-            msg = %"Invalid token.",
-            token = %parameters.subscription_token
-            );
-            StatusCode::UNAUTHORIZED.into_response()
+            let token = parameters.subscription_token;
+            Err(ConfrimError::TokenError { token })
         }
         Some(subscriber_id) => {
-            if pool.confirm_subscriber(subscriber_id).await.is_err() {
-                return http::StatusCode::INTERNAL_SERVER_ERROR.into_response();
-            }
-            http::StatusCode::OK.into_response()
+            pool.confirm_subscriber(subscriber_id)
+                .await
+                .map_err(ConfrimError::DatabaseError)?;
+            Ok(http::StatusCode::OK.into_response())
         }
     }
 }
