@@ -5,7 +5,7 @@ use tokio::net::TcpListener;
 use tracing::{level_filters::LevelFilter, Subscriber};
 use url::Url;
 use uuid::Uuid;
-use wiremock::{Mock, MockServer};
+use wiremock::MockServer;
 use zero2prod_axum::{
     database::Z2PADBError,
     error::Z2PAError,
@@ -18,39 +18,13 @@ use super::DefaultDBPoolTestExt;
 
 pub struct TestApp {
     pub settings: Settings,
-    // `TestApp::settings`만으로 모든 테스트를 수행하고 싶지만 테스트 이메일 서버의 주소를 파악하려면 인스턴스가 필요하다.
-    // 한번에 필요한 인스턴스가 모두 생성되지 않으면 나중에 혼란을 줄 것 같다.
-    pub test_email_server: TestEmailServer,
-}
-
-pub struct TestEmailServer {
-    mock_server: MockServer,
+    pub email_mock_server: MockServer,
 }
 
 /// 이메일 API에 대한 요청에 포함된 확인 링크
 pub struct ConfirmationLinks {
     pub html: reqwest::Url,
     pub plain_text: reqwest::Url,
-}
-
-impl TestEmailServer {
-    async fn new() -> Self {
-        Self {
-            mock_server: MockServer::start().await,
-        }
-    }
-
-    fn uri(&self) -> String {
-        self.mock_server.uri()
-    }
-
-    pub async fn test_run(&self, mock: Mock) {
-        mock.mount(&self.mock_server).await
-    }
-
-    pub async fn received_requests(&self) -> Option<Vec<wiremock::Request>> {
-        self.mock_server.received_requests().await
-    }
 }
 
 impl TestApp {
@@ -81,17 +55,17 @@ impl TestApp {
         });
     }
 
+    // `TestApp`을 초기화한다.
     async fn init() -> Result<TestApp, config::ConfigError> {
+        // 설정 파일을 읽는다.
         let mut settings = Settings::get_settings()?;
-        // MockServer를 구동해서 Postmark의 API를 대신한다.
-        let test_email_server = TestEmailServer::new().await;
-
-        // email_server를 이메일 API로 사용한다.
-        settings.email_client.base_url = test_email_server.uri();
+        // email_mock_server를 생성하고, `settings.email_client.uri`를 변경한다.
+        let email_mock_server = MockServer::start().await;
+        settings.email_client.base_url = email_mock_server.uri();
 
         let test_app = TestApp {
             settings,
-            test_email_server,
+            email_mock_server,
         };
 
         Ok(test_app)
@@ -126,7 +100,8 @@ impl TestApp {
         // 임의의 포트가 할당되므로 설정을 변경한다.
         self.settings.application.port = tcp_listener.local_addr()?.port();
         // url에 포트를 추가한다.
-        self.settings.application.base_url += &format!(":{}", self.settings.application.port);
+        self.settings.application.base_url +=
+            &format!("http://{}", tcp_listener.local_addr()?.to_string());
 
         Ok(tcp_listener)
     }
@@ -144,6 +119,13 @@ impl TestApp {
         pool.migrate().await?;
 
         Ok(pool)
+    }
+
+    // `MockServer`를 생성하도록 코드를 변경
+    pub async fn get_mock_server(&mut self) -> MockServer {
+        let mock_server = MockServer::start().await;
+        self.settings.email_client.base_url = mock_server.uri();
+        mock_server
     }
 
     pub async fn post_subscriptions(

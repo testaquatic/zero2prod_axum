@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::{
     email_client::Postmark,
     error::Z2PAError,
-    routes::{confirm, health_check, root, subscribe},
+    routes::{confirm, health_check, publish_newsletter, root, subscribe},
     settings::{DefaultDBPool, Settings},
 };
 use axum::{
@@ -76,6 +76,7 @@ impl Server {
         let app = Router::new()
             .route("/", routing::get(root))
             .route("/health_check", routing::get(health_check))
+            .route("/newsletters", routing::post(publish_newsletter))
             // POST /subscriptions 요청에 대한 라우팅 테이블의 새 엔트리 포인트
             .route(
                 "/subscriptions",

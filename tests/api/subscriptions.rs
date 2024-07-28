@@ -14,10 +14,11 @@ async fn subscribe_returns_a_200_for_valid_form_data() -> Result<(), anyhow::Err
 
     // 준비
     let test_app = TestApp::spawn_app().await?;
-    let mock = Mock::given(path("/email"))
+    Mock::given(path("/email"))
         .and(method(http::Method::POST))
-        .respond_with(ResponseTemplate::new(http::StatusCode::OK));
-    test_app.test_email_server.test_run(mock).await;
+        .respond_with(ResponseTemplate::new(http::StatusCode::OK))
+        .mount(&test_app.email_mock_server)
+        .await;
 
     // 실행
     let response = test_app.post_subscriptions(body).await?;
@@ -35,10 +36,11 @@ async fn subscribe_persists_the_new_subscriber() -> Result<(), anyhow::Error> {
 
     // 준비
     let test_app = TestApp::spawn_app().await?;
-    let mock = Mock::given(path("/email"))
+    Mock::given(path("/email"))
         .and(method(http::Method::POST))
-        .respond_with(ResponseTemplate::new(http::StatusCode::OK));
-    test_app.test_email_server.test_run(mock).await;
+        .respond_with(ResponseTemplate::new(http::StatusCode::OK))
+        .mount(&test_app.email_mock_server)
+        .await;
 
     // 실행
     test_app.post_subscriptions(body).await?;
@@ -127,18 +129,21 @@ async fn subscribe_returns_a_400_when_fields_are_present_but_invalid() -> Result
 async fn subscribe_sends_a_confirmation_email_for_valid_data() -> Result<(), anyhow::Error> {
     // 테스트 데이터
     let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
-    let mock = Mock::given(path("/email"))
-        .and(method(http::Method::POST))
-        .respond_with(ResponseTemplate::new(http::StatusCode::OK))
-        .expect(1);
 
     // 준비
     let test_app = TestApp::spawn_app().await?;
-    test_app.test_email_server.test_run(mock).await;
+    Mock::given(path("/email"))
+        .and(method(http::Method::POST))
+        .respond_with(ResponseTemplate::new(http::StatusCode::OK))
+        .expect(1)
+        .mount(&test_app.email_mock_server)
+        .await;
 
+    // 실행
     test_app.post_subscriptions(body).await?;
 
     Ok(())
+    // 확인
 }
 
 #[tokio::test]
@@ -148,17 +153,18 @@ async fn subscribe_sends_a_confirmation_email_with_link() -> Result<(), anyhow::
     let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
     // 여기에서는 더 이상 기댓값을 설정하지 않는다.
     // 테스트는 앱 동작의 다른 측면에 집중한다.
-    let mock = Mock::given(path("/email"))
+    Mock::given(path("/email"))
         .and(method(http::Method::POST))
-        .respond_with(ResponseTemplate::new(http::StatusCode::OK));
+        .respond_with(ResponseTemplate::new(http::StatusCode::OK))
+        .mount(&test_app.email_mock_server)
+        .await;
 
     // 실행
-    test_app.test_email_server.test_run(mock).await;
     test_app.post_subscriptions(body).await?;
 
     // 확인
     let email_request = &test_app
-        .test_email_server
+        .email_mock_server
         .received_requests()
         .await
         .context("No received request")?[0];

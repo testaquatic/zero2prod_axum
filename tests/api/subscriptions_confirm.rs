@@ -27,16 +27,17 @@ async fn the_link_returned_by_subscribe_returns_a_200_if_called() -> Result<(), 
     // 준비
     let test_app = TestApp::spawn_app().await?;
     let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
-    let mock = Mock::given(path("/email"))
+    Mock::given(path("/email"))
         .and(method("POST"))
-        .respond_with(ResponseTemplate::new(200));
-    test_app.test_email_server.test_run(mock).await;
+        .respond_with(ResponseTemplate::new(200))
+        .mount(&test_app.email_mock_server)
+        .await;
 
     // 구독을 신청한다.
     test_app.post_subscriptions(body).await?;
     // 메일 서버에서 송신한 메일을 확인한다.
     let email_request = &test_app
-        .test_email_server
+        .email_mock_server
         .received_requests()
         .await
         .context("No received requests")?[0];
@@ -56,14 +57,15 @@ async fn clicking_on_the_confirmation_link_confirms_a_subscriber() -> Result<(),
     // 준비
     let test_app = TestApp::spawn_app().await?;
     let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
-    let mock = Mock::given(path("/email"))
+    Mock::given(path("/email"))
         .and(method("POST"))
-        .respond_with(ResponseTemplate::new(200));
-    test_app.test_email_server.test_run(mock).await;
+        .respond_with(ResponseTemplate::new(200))
+        .mount(&test_app.email_mock_server)
+        .await;
 
     test_app.post_subscriptions(body).await?;
     let email_request = &test_app
-        .test_email_server
+        .email_mock_server
         .received_requests()
         .await
         .context("No received requests")?[0];
