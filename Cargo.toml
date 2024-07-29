@@ -52,6 +52,8 @@ anyhow = { version = "1" }
 # `std_rand`는 `default`에 이미 포함됐다.
 # https://docs.rs/crate/rand/latest/features
 rand = { version = "0.8" }
+base64 = "0.22"
+
 # 테이블과 유사한 toml 구문을 사용해서 긴 코드 행을 줄이자.
 [dependencies.sqlx]
 version = "0.7"
@@ -70,12 +72,12 @@ features = [
 version = "0.4"
 default-features = false
 features = ["clock"]
+
 [dependencies.reqwest]
 version = "0.12"
 default-features = false
 # JSON 페이로드를 직렬화/역직렬화 하기 위해 `json` 기능 플래그를 사용한다.
 features = ["json", "rustls-tls", "http2"]
-
 
 # `dev-dependencies`는 테스트나 예시를 실행할 때만 사용된다.
 # 최종 애플리케이션 바이너리에는 포함되지 않는다.

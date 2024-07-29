@@ -1,3 +1,4 @@
+use anyhow::Context;
 use wiremock::{
     matchers::{any, method, path},
     Mock, ResponseTemplate,
@@ -142,6 +143,34 @@ async fn newsletters_returns_422_for_invalid_data() -> Result<(), anyhow::Error>
             error_message
         );
     }
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn requests_missing_authorization_are_rejected() -> Result<(), anyhow::Error> {
+    // 준비
+    let test_app = TestApp::spawn_app().await?;
+
+    let response = reqwest::Client::new()
+        .post(test_app.newsletters_uri()?)
+        .json(&serde_json::json!({
+            "title": "Newsletter title",
+            "content": {
+                "text": "Newsletter body as plain text",
+                "html": "<p>Newsletter body as HTML</p>"
+            }
+        }))
+        .send()
+        .await
+        .context("Failed to execute request.")?;
+
+    // 확인
+    assert_eq!(response.status(), http::StatusCode::UNAUTHORIZED);
+    assert_eq!(
+        response.headers()[http::header::WWW_AUTHENTICATE],
+        r#"Basic realm="publish""#
+    );
 
     Ok(())
 }

@@ -24,11 +24,15 @@ actix-web 대신 axum ( https://docs.rs/axum/latest/axum/ )으로 작성했다.
 
 - /health_check
 
+  작동 상태를 확인한다.
+
   `curl http://127.0.0.1:8000/health_check --verbose`
 
         200 OK
 
 - /subscriptions
+
+  뉴스레터 구독을 요청한다.
 
   `curl --request POST --data 'email=thomas_mann@hotmail.com&name=Tom' http://127.0.0.1:8000/subscriptions --verbose`
 
@@ -43,12 +47,9 @@ actix-web 대신 axum ( https://docs.rs/axum/latest/axum/ )으로 작성했다.
         400 Bad Request
             => 잘못된 형식의 요청
 
-  `curl --request POST --data 'email=thomas_mann@hotmail.com' http://127.0.0.1:8000/subscriptions --verbose`
-
-        422 Unprocessable Entity
-            => 필드에 필요한 요소가 누락
-
 - /subscriptions/confirm
+
+  확인 이메일의 링크를 통해서 이메일 주소의 유효성을 확인한다.
 
   `curl 'http://127.0.0.1:8000/subscriptions/confirm?subscription_token=token' --verbose`
 
@@ -57,13 +58,24 @@ actix-web 대신 axum ( https://docs.rs/axum/latest/axum/ )으로 작성했다.
         401 Unauthorized
             => 유효하지 않은 토큰
 
-        500 Internal Server Eror
+        500 Internal Server Erorr
             => 내부 서버 오류(데이터베이스 등)
 
   `curl 'http://127.0.0.1:8000/subscriptions/confirm?subscriptions_token=token' --verbose`
 
         400 Bad Request
             => 잘못된 형식의 요청
+
+- /newsletters
+
+  뉴스레터를 전송한다.
+
+  `curl --request POST --header 'Content-Type: application/json' --data '{"title": "title", "content": {"html": "<p>html</p>", "text": "text"}}' 'http://127.0.0.1:8000/newsletters' --verbose`
+
+        200 OK
+
+        500 Internal Server Error
+            => 내부 서버 오류(데이터베이스 오류, 잘못된 이메일 주소, 이메일 전송 실패)
 
 ## /scripts
 

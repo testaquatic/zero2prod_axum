@@ -182,6 +182,9 @@ impl TestApp {
     ) -> Result<reqwest::Response, anyhow::Error> {
         reqwest::Client::new()
             .post(self.newsletters_uri()?)
+            // 무작위 크리덴셜
+            // `reqwest`가 인코딩/포매팅 업무를 처리한다.
+            .basic_auth(Uuid::new_v4(), Some(Uuid::new_v4()))
             .json(&body)
             .send()
             .await
