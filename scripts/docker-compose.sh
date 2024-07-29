@@ -11,4 +11,3 @@ SKIP_DOCKER=true ./scripts/init_db.sh
 >&2 eoch "To stop containers, use \"docker compose down\""
 
 docker compose logs -f -t zero2prod_axum
-

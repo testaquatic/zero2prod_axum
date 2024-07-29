@@ -5,7 +5,7 @@ pub struct SubscriberEmail(String);
 
 impl TryFrom<String> for SubscriberEmail {
     type Error = String;
-    fn try_from(s: String) -> Result<Self, Self::Error> {
+    fn try_from(s: String) -> Result<SubscriberEmail, String> {
         if s.validate_email() {
             Ok(Self(s))
         } else {
@@ -51,7 +51,7 @@ mod tests {
     struct ValidEmailFixture(pub String);
 
     impl quickcheck::Arbitrary for ValidEmailFixture {
-        fn arbitrary(_: &mut quickcheck::Gen) -> Self {
+        fn arbitrary(_: &mut quickcheck::Gen) -> ValidEmailFixture {
             let email = SafeEmail().fake();
             Self(email)
         }

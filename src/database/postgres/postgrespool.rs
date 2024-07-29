@@ -6,14 +6,18 @@ use sqlx::{
 use uuid::Uuid;
 
 use crate::{
-    database::base::{Z2PADBError, Z2PADB},
+    database::{
+        base::{Z2PADBError, Z2PADB},
+        ConfirmedSubscriber,
+    },
     domain::NewSubscriber,
     settings::DatabaseSettings,
     utils::SubscriptionToken,
 };
 
 use super::query::{
-    pg_confirm_subscriber, pg_get_subscriber_id_from_token, pg_insert_subscriber, pg_store_token,
+    pg_confirm_subscriber, pg_get_confirmed_subscribers, pg_get_subscriber_id_from_token,
+    pg_insert_subscriber, pg_store_token,
 };
 
 pub struct PostgresPool {
@@ -99,6 +103,11 @@ impl Z2PADB for PostgresPool {
                 tracing::error!("Failed to execute query: {:?}", e);
                 Z2PADBError::SqlxError(e)
             })
+    }
+
+    #[tracing::instrument(name = "Get confirmed subscribers", skip_all)]
+    async fn get_confirmed_subscribers(&self) -> Result<Vec<ConfirmedSubscriber>, sqlx::Error> {
+        pg_get_confirmed_subscribers(self.as_ref()).await
     }
 }
 

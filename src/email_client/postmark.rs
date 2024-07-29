@@ -1,5 +1,6 @@
 use reqwest::Client;
 use secrecy::{ExposeSecret, Secret};
+use url::Url;
 
 use crate::{domain::SubscriberEmail, settings::EmailClientSettings};
 
@@ -7,7 +8,7 @@ use super::{EmailClient, EmailClientError};
 
 pub struct Postmark {
     http_client: Client,
-    base_url: reqwest::Url,
+    base_url: url::Url,
     sender: SubscriberEmail,
     // 우발적인 로깅을 원치 않는다.
     authorization_token: Secret<String>,
@@ -40,7 +41,7 @@ impl Postmark {
         let http_client = Client::builder().timeout(timeout).build()?;
         let email_client = Self {
             http_client,
-            base_url: reqwest::Url::parse(base_url)?,
+            base_url: Url::parse(base_url)?,
             sender,
             authorization_token,
         };
@@ -52,7 +53,7 @@ impl Postmark {
 impl EmailClient for Postmark {
     async fn send_email(
         &self,
-        recipient: SubscriberEmail,
+        recipient: &SubscriberEmail,
         subject: &str,
         html_content: &str,
         text_content: &str,
@@ -207,7 +208,7 @@ mod tests {
         test_email_server.test_run(mock).await;
         let email_client = email_client(test_email_server.uri());
         let _ = email_client
-            .send_email(email(), &subject, &content, &content)
+            .send_email(&email(), &subject, &content, &content)
             .await;
 
         // 확인
@@ -229,7 +230,7 @@ mod tests {
         test_email_server.test_run(mock).await;
         let eamil_client = email_client(test_email_server.uri());
         let outcome = eamil_client
-            .send_email(email(), &subject(), &content(), &content())
+            .send_email(&email(), &subject(), &content(), &content())
             .await;
 
         // 확인
@@ -249,7 +250,7 @@ mod tests {
         test_email_server.test_run(mock).await;
         let email_client = email_client(test_email_server.uri());
         let outcome = email_client
-            .send_email(email(), &subject(), &content(), &content())
+            .send_email(&email(), &subject(), &content(), &content())
             .await;
 
         // 확인
@@ -269,7 +270,7 @@ mod tests {
         test_email_server.test_run(mock).await;
         let email_client = email_client(test_email_server.uri());
         let outcome = email_client
-            .send_email(email(), &subject(), &content(), &content())
+            .send_email(&email(), &subject(), &content(), &content())
             .await;
 
         // 확인

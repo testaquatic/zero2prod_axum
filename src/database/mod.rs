@@ -1,4 +1,4 @@
 mod base;
 pub mod postgres;
 
-pub use base::{Z2PADBError, Z2PADB};
+pub use base::{ConfirmedSubscriber, Z2PADBError, Z2PADB};

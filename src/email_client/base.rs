@@ -25,7 +25,7 @@ impl std::fmt::Debug for EmailClientError {
 pub trait EmailClient {
     async fn send_email(
         &self,
-        recipient: SubscriberEmail,
+        recipient: &SubscriberEmail,
         subject: &str,
         html_content: &str,
         text_content: &str,
@@ -62,7 +62,7 @@ pub trait EmailClient {
             Click <a href=\"{}\">here</a> to confirm your subscription.",
                 confirmation_link
             );
-            self.send_email(new_subscriber.email, "Welcome", &html_body, &text_body)
+            self.send_email(&new_subscriber.email, "Welcome", &html_body, &text_body)
                 .await
         }
     }

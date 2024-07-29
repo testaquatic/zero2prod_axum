@@ -14,10 +14,10 @@ async fn confirmations_without_token_are_rejected_with_a_400() -> Result<(), any
     let test_app = TestApp::spawn_app().await?;
 
     // 실행
-    let response = reqwest::get(test_app.get_subscriptions_confirm_uri()?).await?;
+    let response = reqwest::get(test_app.subscriptions_confirm_uri()?).await?;
 
     // 확인
-    assert_eq!(response.status(), reqwest::StatusCode::BAD_REQUEST);
+    assert_eq!(response.status(), http::StatusCode::BAD_REQUEST);
 
     Ok(())
 }
@@ -28,8 +28,8 @@ async fn the_link_returned_by_subscribe_returns_a_200_if_called() -> Result<(), 
     let test_app = TestApp::spawn_app().await?;
     let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
     Mock::given(path("/email"))
-        .and(method("POST"))
-        .respond_with(ResponseTemplate::new(200))
+        .and(method(http::Method::POST))
+        .respond_with(ResponseTemplate::new(http::StatusCode::OK))
         .mount(&test_app.email_mock_server)
         .await;
 
@@ -58,8 +58,8 @@ async fn clicking_on_the_confirmation_link_confirms_a_subscriber() -> Result<(),
     let test_app = TestApp::spawn_app().await?;
     let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
     Mock::given(path("/email"))
-        .and(method("POST"))
-        .respond_with(ResponseTemplate::new(200))
+        .and(method(http::Method::POST))
+        .respond_with(ResponseTemplate::new(http::StatusCode::OK))
         .mount(&test_app.email_mock_server)
         .await;
 

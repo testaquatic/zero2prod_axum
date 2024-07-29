@@ -22,47 +22,48 @@ actix-web 대신 axum ( https://docs.rs/axum/latest/axum/ )으로 작성했다.
 
 ## 엔드포인트
 
-- /health_check  
-   `curl http://127.0.0.1:8000/health_check --verbose`
+- /health_check
 
-      200 OK
+  `curl http://127.0.0.1:8000/health_check --verbose`
 
-- /subscriptions  
-   `curl --request POST --data 'email=thomas_mann@hotmail.com&name=Tom' http://127.0.0.1:8000/subscriptions --verbose`
+        200 OK
 
-      200 OK
-          => 정상 작동
+- /subscriptions
 
-      500 Internal Server Error
-          => 데이터 베이스 오류(이메일 중복)
-          => 이메일 전송 실패가 발생
+  `curl --request POST --data 'email=thomas_mann@hotmail.com&name=Tom' http://127.0.0.1:8000/subscriptions --verbose`
+
+        200 OK
+
+        500 Internal Server Error
+            => 데이터 베이스 오류(이메일 중복)
+            => 이메일 전송 실패가 발생
 
   `curl --request POST --data 'email=thomas_mannotmail.com&name=Tom' http://127.0.0.1:8000/subscriptions --verbose`
 
-      400 Bad Request
-          => 필드에 유효하지 않은 값이 있음
+        400 Bad Request
+            => 잘못된 형식의 요청
 
   `curl --request POST --data 'email=thomas_mann@hotmail.com' http://127.0.0.1:8000/subscriptions --verbose`
 
-      422 Unprocessable Entity
-          => 필드에 필요한 요소가 누락
+        422 Unprocessable Entity
+            => 필드에 필요한 요소가 누락
 
 - /subscriptions/confirm
-- `curl 'http://127.0.0.1:8000/subscriptions/confirm?subscription_token=token' --verbose`
 
-      200 OK
-          => 정상 작동
+  `curl 'http://127.0.0.1:8000/subscriptions/confirm?subscription_token=token' --verbose`
 
-      401 Unauthorized
-          => 유효하지 않은 토큰
+        200 OK
 
-      500 Internal Server Eror
-          => 내부 서버 오류(데이터베이스 등)
+        401 Unauthorized
+            => 유효하지 않은 토큰
 
-- `curl 'http://127.0.0.1:8000/subscriptions/confirm?subscriptions_token=token' --verbose`
+        500 Internal Server Eror
+            => 내부 서버 오류(데이터베이스 등)
 
-      400 Bad Request
-          => 쿼리 전달 오류
+  `curl 'http://127.0.0.1:8000/subscriptions/confirm?subscriptions_token=token' --verbose`
+
+        400 Bad Request
+            => 잘못된 형식의 요청
 
 ## /scripts
 

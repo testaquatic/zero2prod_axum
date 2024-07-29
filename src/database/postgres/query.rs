@@ -2,6 +2,8 @@ use chrono::Utc;
 use sqlx::{postgres::PgQueryResult, PgExecutor};
 use uuid::Uuid;
 
+use crate::database::ConfirmedSubscriber;
+
 pub async fn pg_insert_subscriber(
     pg_executor: impl PgExecutor<'_>,
     email: &str,
@@ -66,4 +68,19 @@ pub async fn pg_get_subscriber_id_from_token(
     .fetch_optional(pg_executor)
     .await?;
     Ok(result.map(|r| r.subscriber_id))
+}
+
+pub async fn pg_get_confirmed_subscribers(
+    pg_executor: impl PgExecutor<'_>,
+) -> Result<Vec<ConfirmedSubscriber>, sqlx::Error> {
+    sqlx::query_as!(
+        ConfirmedSubscriber,
+        r#"
+        SELECT email
+        FROM subscriptions
+        WHERE status = 'confirmed';
+        "#
+    )
+    .fetch_all(pg_executor)
+    .await
 }

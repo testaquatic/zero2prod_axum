@@ -80,11 +80,7 @@ impl Server {
             // POST /subscriptions 요청에 대한 라우팅 테이블의 새 엔트리 포인트
             .route(
                 "/subscriptions",
-                routing::post(subscribe).layer(
-                    ServiceBuilder::new()
-                        .layer(Extension(email_client.clone()))
-                        .layer(Extension(base_url)),
-                ),
+                routing::post(subscribe).layer(ServiceBuilder::new().layer(Extension(base_url))),
             )
             .route("/subscriptions/confirm", routing::get(confirm))
             .layer(
@@ -94,6 +90,7 @@ impl Server {
                     .on_failure(DefaultOnFailure::new().level(Level::ERROR))
                     .on_response(DefaultOnResponse::new().level(Level::INFO)),
             )
+            .layer(Extension(email_client.clone()))
             .layer(Extension(pool.clone()));
 
         tracing::info!(name: "server", status = "Starting the server now", addr = ?self.tcp_listener.local_addr());
@@ -112,7 +109,7 @@ impl MakeSpan<Body> for AddRequestID {
     fn make_span(&mut self, request: &Request<Body>) -> Span {
         tracing::span!(
             Level::ERROR,
-            "request",
+            "Z2PA",
             request_id = %uuid::Uuid::new_v4().to_string(),
             error = tracing::field::Empty,
             error_detail = tracing::field::Empty,

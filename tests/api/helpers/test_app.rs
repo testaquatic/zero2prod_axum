@@ -131,17 +131,17 @@ impl TestApp {
     pub async fn post_subscriptions(
         &self,
         body: &'static str,
-    ) -> Result<reqwest::Response, Z2PAError> {
+    ) -> Result<reqwest::Response, anyhow::Error> {
         reqwest::Client::new()
-            .post(self.get_subscriptions_uri()?)
+            .post(self.subscriptions_uri()?)
             .header(
-                reqwest::header::CONTENT_TYPE,
+                http::header::CONTENT_TYPE,
                 "application/x-www-form-urlencoded",
             )
             .body(body)
             .send()
             .await
-            .map_err(Z2PAError::ReqwestError)
+            .context("Failed to execute request.")
     }
 
     // 이메일 API에 대한 요청에 포함된 확인 링크를 추출한다.
@@ -176,7 +176,19 @@ impl TestApp {
         Ok(ConfirmationLinks { html, plain_text })
     }
 
-    pub fn get_uri(&self) -> Result<Url, url::ParseError> {
+    pub async fn post_newsletters(
+        &self,
+        body: serde_json::Value,
+    ) -> Result<reqwest::Response, anyhow::Error> {
+        reqwest::Client::new()
+            .post(self.newsletters_uri()?)
+            .json(&body)
+            .send()
+            .await
+            .context("Failed to execute request.")
+    }
+
+    pub fn uri(&self) -> Result<Url, url::ParseError> {
         Url::parse(&format!(
             "http://{}/",
             self.settings.application.get_address()
@@ -184,11 +196,15 @@ impl TestApp {
     }
 
     // /subscriptions의 주소를 얻는다.
-    pub fn get_subscriptions_uri(&self) -> Result<Url, url::ParseError> {
-        self.get_uri()?.join("subscriptions")
+    pub fn subscriptions_uri(&self) -> Result<Url, url::ParseError> {
+        self.uri()?.join("subscriptions")
     }
 
-    pub fn get_subscriptions_confirm_uri(&self) -> Result<Url, url::ParseError> {
-        self.get_uri()?.join("subscriptions/confirm")
+    pub fn subscriptions_confirm_uri(&self) -> Result<Url, url::ParseError> {
+        self.uri()?.join("subscriptions/confirm")
+    }
+
+    pub fn newsletters_uri(&self) -> Result<Url, url::ParseError> {
+        self.uri()?.join("newsletters")
     }
 }

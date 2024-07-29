@@ -13,12 +13,12 @@ async fn health_check_works() -> Result<(), anyhow::Error> {
 
     //실행
     let response = client
-        .get(test_app.get_uri()?.join("health_check")?)
+        .get(test_app.uri()?.join("health_check")?)
         .send()
         .await?;
     // 확인
     // 응답 상태 코드가 OK인지 확인한다.
-    assert_eq!(response.status(), reqwest::StatusCode::OK);
+    assert_eq!(response.status(), http::StatusCode::OK);
     // 응답 본문의 길이가 0인지 확인한다.
     assert_eq!(Some(0), response.content_length());
 
