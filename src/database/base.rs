@@ -1,7 +1,7 @@
 use crate::{
     domain::NewSubscriber,
     settings::DatabaseSettings,
-    utils::{error_chain_fmt, Credentials, SubscriptionToken},
+    utils::{error_chain_fmt, SubscriptionToken},
 };
 use sqlx::{Database, Pool};
 use uuid::Uuid;
@@ -59,6 +59,7 @@ pub trait Z2PADB: AsRef<Pool<Self::DB>> + Sized {
 
     async fn validate_credentials(
         &self,
-        credentials: Credentials,
+        username: &str,
+        password_hash: &str,
     ) -> Result<Option<Uuid>, Z2PADBError>;
 }

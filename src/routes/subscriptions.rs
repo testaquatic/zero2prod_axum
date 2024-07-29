@@ -30,43 +30,44 @@ impl TryFrom<FormData> for NewSubscriber {
     }
 }
 
+#[allow(clippy::enum_variant_names)]
 #[derive(thiserror::Error)]
 pub enum SubscribeError {
     #[error("{0}")]
-    ValidationError(String),
+    ValidationErr(String),
     #[error("Failed to aqcuire a Postgres connection from the pool.")]
-    PoolError(sqlx::Error),
+    PoolErr(sqlx::Error),
     #[error("Failed to insert new subscriber in the database.")]
-    InsertSubscriberError(sqlx::Error),
+    InsertSubscriberErr(sqlx::Error),
     #[error("Failed to commit SQL transaction to store a new subscriber.")]
-    TransactionError(sqlx::Error),
+    TransactionErr(sqlx::Error),
     #[error("Failed to store the confirmation token for a new subscriber.")]
-    StoreTokenError(sqlx::Error),
+    StoreTokenErr(sqlx::Error),
     #[error("Failed to send a confirmation email.")]
-    SendEmailError(EmailClientError),
+    SendEmailErr(EmailClientError),
     #[error("{1}")]
-    UnexpectedError(anyhow::Error, String),
+    UnexpectedErr(anyhow::Error, String),
 }
 
 impl From<Z2PAError> for SubscribeError {
     fn from(e: Z2PAError) -> Self {
         match e {
-            Z2PAError::SubscriberEmailError(s) => SubscribeError::ValidationError(s),
-            Z2PAError::SubscriberNameError(s) => SubscribeError::ValidationError(s),
-            Z2PAError::EmailClientError(e) => SubscribeError::SendEmailError(e),
+            Z2PAError::SubscriberEmailError(s) => SubscribeError::ValidationErr(s),
+            Z2PAError::SubscriberNameError(s) => SubscribeError::ValidationErr(s),
+            Z2PAError::EmailClientError(e) => SubscribeError::SendEmailErr(e),
             Z2PAError::DatabaseError(db_error) => match db_error {
-                Z2PADBError::PoolError(e) => SubscribeError::PoolError(e),
-                Z2PADBError::InsertSubscriberError(e) => SubscribeError::InsertSubscriberError(e),
-                Z2PADBError::StoreTokenError(e) => SubscribeError::StoreTokenError(e),
-                Z2PADBError::TransactionError(e) => SubscribeError::TransactionError(e),
+                Z2PADBError::PoolError(e) => SubscribeError::PoolErr(e),
+                Z2PADBError::InsertSubscriberError(e) => SubscribeError::InsertSubscriberErr(e),
+                Z2PADBError::StoreTokenError(e) => SubscribeError::StoreTokenErr(e),
+                Z2PADBError::TransactionError(e) => SubscribeError::TransactionErr(e),
                 Z2PADBError::SqlxError(e) => {
                     let s = e.to_string();
-                    SubscribeError::UnexpectedError(e.into(), s)
+                    SubscribeError::UnexpectedErr(e.into(), s)
                 }
             },
             e => {
                 let s = e.to_string();
-                SubscribeError::UnexpectedError(e.into(), s)
+                SubscribeError::UnexpectedErr(e.into(), s)
             }
         }
     }
@@ -82,11 +83,11 @@ impl IntoResponse for SubscribeError {
     fn into_response(self) -> Response {
         tracing::error!(error = %self, error_detail = ?self);
         tracing::Span::current()
-            .record("error", &tracing::field::display(&self))
-            .record("error_detail", &tracing::field::debug(&self));
+            .record("error", tracing::field::display(&self))
+            .record("error_detail", tracing::field::debug(&self));
         match self {
             // `form`이 유효하지 않으면 400을 빠르게 반환한다.
-            SubscribeError::ValidationError(_) => http::StatusCode::BAD_REQUEST,
+            SubscribeError::ValidationErr(_) => http::StatusCode::BAD_REQUEST,
             _ => http::StatusCode::INTERNAL_SERVER_ERROR,
         }
         .into_response()
@@ -120,7 +121,7 @@ pub async fn subscribe(
     // `Result`는 `Ok`와 `Err`라는 두개의 변형을 갖는다.
     // 첫 번째는 성공, 두 번째는 실패를 의미한다.
     // `match` 구문을 사용해서 결과에 따라 무엇을 수행할지 선택한다.
-    let new_subscriber = form.try_into().map_err(SubscribeError::ValidationError)?;
+    let new_subscriber = form.try_into().map_err(SubscribeError::ValidationErr)?;
 
     // `?` 연산자는 투명하게 `Into` 트레이트를 호출한다.
     let subscription_token = pool

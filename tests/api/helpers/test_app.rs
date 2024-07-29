@@ -1,6 +1,7 @@
 use std::sync::Once;
 
 use anyhow::Context;
+use sha3::Digest;
 use tokio::net::TcpListener;
 use tracing::{level_filters::LevelFilter, Subscriber};
 use url::Url;
@@ -19,12 +20,39 @@ use super::DefaultDBPoolTestExt;
 pub struct TestApp {
     pub settings: Settings,
     pub email_mock_server: MockServer,
+    pub test_user: TestUser,
 }
 
 /// 이메일 API에 대한 요청에 포함된 확인 링크
 pub struct ConfirmationLinks {
     pub html: reqwest::Url,
     pub plain_text: reqwest::Url,
+}
+
+pub struct TestUser {
+    pub user_id: Uuid,
+    pub username: String,
+    pub password: String,
+}
+
+impl TestUser {
+    pub fn generate() -> TestUser {
+        Self {
+            user_id: Uuid::new_v4(),
+            username: Uuid::new_v4().to_string(),
+            password: Uuid::new_v4().to_string(),
+        }
+    }
+
+    async fn store(
+        &self,
+        pool: &DefaultDBPool,
+    ) -> Result<sqlx::postgres::PgQueryResult, Z2PADBError> {
+        let password_hash = sha3::Sha3_256::digest(self.password.as_bytes());
+        let password_hash = format!("{password_hash:x}");
+        pool.store_test_user(&self.user_id, &self.username, &password_hash)
+            .await
+    }
 }
 
 impl TestApp {
@@ -63,9 +91,13 @@ impl TestApp {
         let email_mock_server = MockServer::start().await;
         settings.email_client.base_url = email_mock_server.uri();
 
+        // `TestUser`를 생성한다.
+        let test_user = TestUser::generate();
+
         let test_app = TestApp {
             settings,
             email_mock_server,
+            test_user,
         };
 
         Ok(test_app)
@@ -116,7 +148,8 @@ impl TestApp {
         // 데이터베이스를 마이그레이션 한다.
         let pool = self.settings.database.get_pool::<DefaultDBPool>().await?;
         pool.migrate().await?;
-        pool.add_test_user().await?;
+        // `TestUser`를 DB에 저장한다.
+        self.test_user.store(&pool).await?;
 
         Ok(pool)
     }
@@ -180,18 +213,11 @@ impl TestApp {
         &self,
         body: serde_json::Value,
     ) -> Result<reqwest::Response, anyhow::Error> {
-        let (username, password) = self
-            .settings
-            .database
-            .get_pool::<DefaultDBPool>()
-            .await?
-            .test_user()
-            .await?;
         reqwest::Client::new()
             .post(self.newsletters_uri()?)
             // 더 이상 무작위로 생성하지 않는다.
             // `reqwest`가 인코딩/포매팅 업무를 처리한다.
-            .basic_auth(username, Some(password))
+            .basic_auth(&self.test_user.username, Some(&self.test_user.password))
             .json(&body)
             .send()
             .await

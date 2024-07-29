@@ -187,7 +187,7 @@ async fn subscribe_fails_if_there_is_a_fatal_database_error() -> Result<(), anyh
         .database
         .get_pool::<DefaultDBPool>()
         .await?;
-    sqlx::query("ALTER TABLE subscriptions DROP COLUMN email;")
+    sqlx::query!("ALTER TABLE subscriptions DROP COLUMN email;")
         .execute(pool.as_ref())
         .await?;
 

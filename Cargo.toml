@@ -53,6 +53,7 @@ anyhow = { version = "1" }
 # https://docs.rs/crate/rand/latest/features
 rand = { version = "0.8" }
 base64 = "0.22"
+sha3 = "0.10"
 
 # 테이블과 유사한 toml 구문을 사용해서 긴 코드 행을 줄이자.
 [dependencies.sqlx]

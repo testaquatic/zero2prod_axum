@@ -114,9 +114,10 @@ impl Z2PADB for PostgresPool {
 
     async fn validate_credentials(
         &self,
-        credentials: crate::utils::Credentials,
+        username: &str,
+        password_hash: &str,
     ) -> Result<Option<Uuid>, Z2PADBError> {
-        pg_validate_credentials(self.as_ref(), &credentials.username, credentials.password)
+        pg_validate_credentials(self.as_ref(), username, password_hash)
             .await
             .map_err(Z2PADBError::SqlxError)
     }

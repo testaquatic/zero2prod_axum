@@ -88,7 +88,7 @@ async fn clicking_on_the_confirmation_link_confirms_a_subscriber() -> Result<(),
         name: String,
         status: String,
     }
-    let subscriber: Subscriber = sqlx::query_as("SELECT email, name, status FROM subscriptions;")
+    let subscriber = sqlx::query_as!(Subscriber, "SELECT email, name, status FROM subscriptions;")
         .fetch_one(pool.as_ref())
         .await?;
 
