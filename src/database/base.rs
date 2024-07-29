@@ -1,7 +1,7 @@
 use crate::{
     domain::NewSubscriber,
     settings::DatabaseSettings,
-    utils::{error_chain_fmt, SubscriptionToken},
+    utils::{error_chain_fmt, Credentials, SubscriptionToken},
 };
 use sqlx::{Database, Pool};
 use uuid::Uuid;
@@ -17,8 +17,9 @@ pub enum Z2PADBError {
     InsertSubscriberError(#[source] sqlx::Error),
     #[error("Z2PADB: Transaction Error")]
     TransactionError(#[source] sqlx::Error),
-    #[error("Z2PADB: Confirm Subscriber Error")]
-    SqlxError(#[source] sqlx::Error),
+    // 그밖의 자세히 구분할 필요가 없는 오류들
+    #[error(transparent)]
+    SqlxError(sqlx::Error),
 }
 
 impl std::fmt::Debug for Z2PADBError {
@@ -27,6 +28,7 @@ impl std::fmt::Debug for Z2PADBError {
     }
 }
 
+#[derive(sqlx::FromRow)]
 pub struct ConfirmedSubscriber {
     pub email: String,
 }
@@ -53,5 +55,10 @@ pub trait Z2PADB: AsRef<Pool<Self::DB>> + Sized {
         subscription_token: &str,
     ) -> Result<Option<Uuid>, Z2PADBError>;
 
-    async fn get_confirmed_subscribers(&self) -> Result<Vec<ConfirmedSubscriber>, sqlx::Error>;
+    async fn get_confirmed_subscribers(&self) -> Result<Vec<ConfirmedSubscriber>, Z2PADBError>;
+
+    async fn validate_credentials(
+        &self,
+        credentials: Credentials,
+    ) -> Result<Option<Uuid>, Z2PADBError>;
 }

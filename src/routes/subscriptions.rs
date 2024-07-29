@@ -82,8 +82,8 @@ impl IntoResponse for SubscribeError {
     fn into_response(self) -> Response {
         tracing::error!(error = %self, error_detail = ?self);
         tracing::Span::current()
-            .record("error", self.to_string())
-            .record("error_detail", format!("{:?}", self));
+            .record("error", &tracing::field::display(&self))
+            .record("error_detail", &tracing::field::debug(&self));
         match self {
             // `form`이 유효하지 않으면 400을 빠르게 반환한다.
             SubscribeError::ValidationError(_) => http::StatusCode::BAD_REQUEST,

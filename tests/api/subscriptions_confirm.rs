@@ -1,12 +1,11 @@
 use anyhow::Context;
-use sqlx::FromRow;
 use wiremock::{
     matchers::{method, path},
     Mock, ResponseTemplate,
 };
 use zero2prod_axum::settings::DefaultDBPool;
 
-use crate::helpers::{DefaultDBPoolTestExt, TestApp};
+use crate::helpers::TestApp;
 
 #[tokio::test]
 async fn confirmations_without_token_are_rejected_with_a_400() -> Result<(), anyhow::Error> {
@@ -77,12 +76,10 @@ async fn clicking_on_the_confirmation_link_confirms_a_subscriber() -> Result<(),
         .error_for_status()?;
 
     // 확인
-    let saved = test_app
+    let pool = test_app
         .settings
         .database
         .get_pool::<DefaultDBPool>()
-        .await?
-        .fetch_one("SELECT email, name, status FROM subscriptions;")
         .await?;
 
     #[derive(sqlx::FromRow)]
@@ -91,8 +88,9 @@ async fn clicking_on_the_confirmation_link_confirms_a_subscriber() -> Result<(),
         name: String,
         status: String,
     }
-
-    let subscriber = Subscriber::from_row(&saved)?;
+    let subscriber: Subscriber = sqlx::query_as("SELECT email, name, status FROM subscriptions;")
+        .fetch_one(pool.as_ref())
+        .await?;
 
     assert_eq!(subscriber.email, "ursula_le_guin@gmail.com");
     assert_eq!(subscriber.name, "le guin");

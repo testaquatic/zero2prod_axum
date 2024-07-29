@@ -7,15 +7,13 @@ use axum::{
     response::{IntoResponse, Response},
     Extension,
 };
-use base64::Engine;
-use secrecy::Secret;
 
 use crate::{
     database::Z2PADB,
     domain::SubscriberEmail,
     email_client::EmailClient,
     settings::{DefaultDBPool, DefaultEmailClient},
-    utils::error_chain_fmt,
+    utils::{basic_authentication, error_chain_fmt, Credentials},
 };
 
 #[derive(serde::Deserialize)]
@@ -50,8 +48,8 @@ impl std::fmt::Debug for PublishError {
 impl IntoResponse for PublishError {
     fn into_response(self) -> Response {
         tracing::Span::current()
-            .record("error", format!("{}", &self))
-            .record("error_detail", format!("{:?}", &self));
+            .record("error", tracing::field::display(&self))
+            .record("error_detail", tracing::field::debug(&self));
 
         match self {
             PublishError::SubscriberEmailError(err) => {
@@ -77,6 +75,8 @@ impl IntoResponse for PublishError {
     }
 }
 
+#[tracing::instrument(name = "Publish a newsletter issue", skip_all, fields(username = tracing::field::Empty, user_id = tracing::field::Empty)
+)]
 // 뉴스레터 발송을 담당하는 엔드포인트
 pub async fn publish_newsletter(
     Extension(pool): Extension<Arc<DefaultDBPool>>,
@@ -86,6 +86,12 @@ pub async fn publish_newsletter(
 ) -> Result<Response, PublishError> {
     // 오류를 부풀리고 필요한 반환을 수행한다.
     let credentials = basic_authentication(&headers).map_err(PublishError::AuthError)?;
+    tracing::Span::current().record("username", &tracing::field::display(&credentials.username));
+    // 발신자의 uuid를 확인한다.
+    let user_id = validate_credentials(credentials, &pool).await?;
+    tracing::Span::current().record("user_id", &tracing::field::display(&user_id));
+
+    // 이메일을 보낼 구독자 목록을 생성한다.
     let subscribers = pool
         .get_confirmed_subscribers()
         .await
@@ -107,44 +113,18 @@ pub async fn publish_newsletter(
     Ok(http::StatusCode::OK.into_response())
 }
 
-struct Credentials {
-    username: String,
-    password: Secret<String>,
-}
+// 발신자를 확인하고 발신자의 uuid를 반환한다.
+async fn validate_credentials(
+    credentials: Credentials,
+    pool: &DefaultDBPool,
+) -> Result<uuid::Uuid, PublishError> {
+    let user_id = pool
+        .validate_credentials(credentials)
+        .await
+        .context("Failed to perform a query to validate credentials.")
+        .map_err(PublishError::UnexpectedError)?;
 
-fn basic_authentication(headers: &http::HeaderMap) -> Result<Credentials, anyhow::Error> {
-    // 헤더값이 존재한다면 유효한 UTF8 문자열이어야 한다.
-    let header_value = headers
-        .get(http::header::AUTHORIZATION)
-        .context("The 'Authorization' header was missing.")?
-        .to_str()
-        .context("The `Authorization` header was not a valid UTF8 string.")?;
-    let base64encoded_segment = header_value
-        .strip_prefix("Basic ")
-        .context("The authorization scheme was not 'Basic'.")?;
-    let decoded_bytes = base64::engine::general_purpose::STANDARD
-        .decode(base64encoded_segment)
-        .context("Failed to base64-decode 'Basic' credentials.")?;
-    let decoded_credentials = String::from_utf8(decoded_bytes)
-        .context("The decoded credential string is not valid UTF8.")?;
-
-    // `:` 구분자를 사용해서 두 개의 세그먼트로 나눈다.
-    let mut credentials = decoded_credentials.splitn(2, ':');
-    let username = credentials
-        .next()
-        .ok_or(anyhow::anyhow!(
-            "A username must be provide in 'Basic' auth."
-        ))?
-        .to_string();
-    let password = credentials
-        .next()
-        .ok_or(anyhow::anyhow!(
-            "A password must be provided in 'Basic' auth."
-        ))?
-        .to_string();
-
-    Ok(Credentials {
-        username,
-        password: Secret::new(password),
-    })
+    user_id
+        .ok_or(anyhow::anyhow!("Invalid username or password."))
+        .map_err(PublishError::AuthError)
 }

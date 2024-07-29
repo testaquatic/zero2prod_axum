@@ -1,6 +1,5 @@
-use crate::helpers::{DefaultDBPoolTestExt, TestApp};
+use crate::helpers::TestApp;
 use anyhow::Context;
-use sqlx::FromRow;
 use wiremock::{
     matchers::{method, path},
     Mock, ResponseTemplate,
@@ -46,12 +45,10 @@ async fn subscribe_persists_the_new_subscriber() -> Result<(), anyhow::Error> {
     test_app.post_subscriptions(body).await?;
 
     // 확인
-    let row = test_app
+    let pool = test_app
         .settings
         .database
         .get_pool::<DefaultDBPool>()
-        .await?
-        .fetch_one("SELECT email, name, status FROM subscriptions;")
         .await?;
     #[derive(sqlx::FromRow)]
     struct Saved {
@@ -59,7 +56,9 @@ async fn subscribe_persists_the_new_subscriber() -> Result<(), anyhow::Error> {
         name: String,
         status: String,
     }
-    let saved = Saved::from_row(&row)?;
+    let saved: Saved = sqlx::query_as("SELECT email, name, status FROM subscriptions;")
+        .fetch_one(pool.as_ref())
+        .await?;
     assert_eq!(saved.email, "ursula_le_guin@gmail.com");
     assert_eq!(saved.name, "le guin");
     assert_eq!(saved.status, "pending_confirmation");
@@ -188,7 +187,8 @@ async fn subscribe_fails_if_there_is_a_fatal_database_error() -> Result<(), anyh
         .database
         .get_pool::<DefaultDBPool>()
         .await?;
-    pool.execute("ALTER TABLE subscriptions DROP COLUMN email;")
+    sqlx::query("ALTER TABLE subscriptions DROP COLUMN email;")
+        .execute(pool.as_ref())
         .await?;
 
     // 실행

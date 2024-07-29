@@ -107,16 +107,16 @@ impl TestApp {
     }
 
     // 테스트 `DefaultDBPool`을 생성한다.
-    // 데이터 마이그레이션을 수행한다.
+    // 데이터 마이그레이션과 테스트에 필요한 데이터를 DB에 저장한다.
     async fn get_test_db_pool(&mut self) -> Result<DefaultDBPool, Z2PADBError> {
         // 임의의 DB 이름을 생성한다.
         self.settings.database.database_name = Uuid::new_v4().to_string();
         // 데이터베이스를 생성한다.
-        let pool = DefaultDBPool::connect_without_db(&self.settings.database).await?;
-        pool.create_db(&self.settings.database).await?;
+        DefaultDBPool::create_db(&self.settings.database).await?;
         // 데이터베이스를 마이그레이션 한다.
         let pool = self.settings.database.get_pool::<DefaultDBPool>().await?;
         pool.migrate().await?;
+        pool.add_test_user().await?;
 
         Ok(pool)
     }
@@ -180,11 +180,18 @@ impl TestApp {
         &self,
         body: serde_json::Value,
     ) -> Result<reqwest::Response, anyhow::Error> {
+        let (username, password) = self
+            .settings
+            .database
+            .get_pool::<DefaultDBPool>()
+            .await?
+            .test_user()
+            .await?;
         reqwest::Client::new()
             .post(self.newsletters_uri()?)
-            // 무작위 크리덴셜
+            // 더 이상 무작위로 생성하지 않는다.
             // `reqwest`가 인코딩/포매팅 업무를 처리한다.
-            .basic_auth(Uuid::new_v4(), Some(Uuid::new_v4()))
+            .basic_auth(username, Some(password))
             .json(&body)
             .send()
             .await

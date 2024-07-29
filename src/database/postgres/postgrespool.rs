@@ -17,7 +17,7 @@ use crate::{
 
 use super::query::{
     pg_confirm_subscriber, pg_get_confirmed_subscribers, pg_get_subscriber_id_from_token,
-    pg_insert_subscriber, pg_store_token,
+    pg_insert_subscriber, pg_store_token, pg_validate_credentials,
 };
 
 pub struct PostgresPool {
@@ -106,8 +106,19 @@ impl Z2PADB for PostgresPool {
     }
 
     #[tracing::instrument(name = "Get confirmed subscribers", skip_all)]
-    async fn get_confirmed_subscribers(&self) -> Result<Vec<ConfirmedSubscriber>, sqlx::Error> {
-        pg_get_confirmed_subscribers(self.as_ref()).await
+    async fn get_confirmed_subscribers(&self) -> Result<Vec<ConfirmedSubscriber>, Z2PADBError> {
+        pg_get_confirmed_subscribers(self.as_ref())
+            .await
+            .map_err(Z2PADBError::SqlxError)
+    }
+
+    async fn validate_credentials(
+        &self,
+        credentials: crate::utils::Credentials,
+    ) -> Result<Option<Uuid>, Z2PADBError> {
+        pg_validate_credentials(self.as_ref(), &credentials.username, credentials.password)
+            .await
+            .map_err(Z2PADBError::SqlxError)
     }
 }
 
