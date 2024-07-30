@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use anyhow::Context;
+use argon2::{Argon2, PasswordHash, PasswordVerifier};
 use axum::{
     body::Body,
     extract::{self},
@@ -8,7 +9,6 @@ use axum::{
     Extension,
 };
 use secrecy::ExposeSecret;
-use sha3::Digest;
 
 use crate::{
     database::Z2PADB,
@@ -122,16 +122,30 @@ async fn validate_credentials(
     credentials: &Credentials,
     pool: &DefaultDBPool,
 ) -> Result<uuid::Uuid, PublishError> {
-    let password_hash = sha3::Sha3_256::digest(credentials.password.expose_secret().as_bytes());
-    // 소문자 16진수 인코딩
-    let password_hash = format!("{password_hash:x}");
-    let user_id = pool
-        .validate_credentials(&credentials.username, &password_hash)
+    // `https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html#argon2id`를 보고 설정했다.
+
+    let stored_credentials = pool
+        .get_user_credentials(&credentials.username)
         .await
-        .context("Failed to perform a query to validate credentials.")
+        .context("Failed to perform a query to retrieve stored credentials")
         .map_err(PublishError::UnexpectedErr)?;
 
-    user_id
-        .ok_or(anyhow::anyhow!("Invalid username or password."))
-        .map_err(PublishError::AuthError)
+    let (expected_password_hash, user_id) = match stored_credentials {
+        Some(stored_credentials) => (stored_credentials.password_hash, stored_credentials.user_id),
+        None => return Err(PublishError::AuthError(anyhow::anyhow!("Unknown usernae."))),
+    };
+
+    let expected_password_hash = PasswordHash::new(&expected_password_hash)
+        .context("Failed to parse hash in PHC string format.")
+        .map_err(PublishError::UnexpectedErr)?;
+
+    Argon2::default()
+        .verify_password(
+            credentials.password.expose_secret().as_bytes(),
+            &expected_password_hash,
+        )
+        .context("Invalid password.")
+        .map_err(PublishError::AuthError)?;
+
+    Ok(user_id)
 }

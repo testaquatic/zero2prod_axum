@@ -1,15 +1,13 @@
 use std::sync::Once;
 
 use anyhow::Context;
-use sha3::Digest;
+use argon2::{password_hash::SaltString, Argon2, PasswordHasher};
 use tokio::net::TcpListener;
 use tracing::{level_filters::LevelFilter, Subscriber};
 use url::Url;
 use uuid::Uuid;
 use wiremock::MockServer;
 use zero2prod_axum::{
-    database::Z2PADBError,
-    error::Z2PAError,
     settings::{DefaultDBPool, Settings},
     startup::Server,
     telemetry::{get_tracing_subscriber, init_tracing_subscriber},
@@ -47,18 +45,24 @@ impl TestUser {
     async fn store(
         &self,
         pool: &DefaultDBPool,
-    ) -> Result<sqlx::postgres::PgQueryResult, Z2PADBError> {
-        let password_hash = sha3::Sha3_256::digest(self.password.as_bytes());
-        let password_hash = format!("{password_hash:x}");
+    ) -> Result<sqlx::postgres::PgQueryResult, anyhow::Error> {
+        let salt = SaltString::generate(&mut rand::thread_rng());
+        // 정확한 Argon2 파라미터에 관해서는 신경쓰지 않는다.
+        // 이들은 테스트 목적이기 때문이다.
+
+        let password_hash = Argon2::default()
+            .hash_password(self.password.as_bytes(), &salt)?
+            .to_string();
         pool.store_test_user(&self.user_id, &self.username, &password_hash)
             .await
+            .context("Failed to store user credentials.")
     }
 }
 
 impl TestApp {
     /// 애플리케이션 인스턴스를 새로 실행하고 그 주소를 반환한다.
     // 백그라운드에서 애플리케이션을 구동한다.
-    pub async fn spawn_app() -> Result<Self, Z2PAError> {
+    pub async fn spawn_app() -> Result<Self, anyhow::Error> {
         Self::set_tracing();
         let mut test_app = Self::init().await?;
 
@@ -104,12 +108,9 @@ impl TestApp {
     }
 
     // 테스트 서버를 만든다.
-    async fn build_test_server(&mut self) -> Result<Server, Z2PAError> {
+    async fn build_test_server(&mut self) -> Result<Server, anyhow::Error> {
         let tcp_listener = self.get_test_tcp_listener().await?;
-        let pool = self
-            .get_test_db_pool()
-            .await
-            .map_err(Z2PAError::DatabaseError)?;
+        let pool = self.get_test_db_pool().await?;
         // 새로운 이메일 클라이언트를 만든다.
         let email_client = self.settings.email_client.get_email_client()?;
         let base_url = self.settings.application.base_url.clone();
@@ -140,7 +141,7 @@ impl TestApp {
 
     // 테스트 `DefaultDBPool`을 생성한다.
     // 데이터 마이그레이션과 테스트에 필요한 데이터를 DB에 저장한다.
-    async fn get_test_db_pool(&mut self) -> Result<DefaultDBPool, Z2PADBError> {
+    async fn get_test_db_pool(&mut self) -> Result<DefaultDBPool, anyhow::Error> {
         // 임의의 DB 이름을 생성한다.
         self.settings.database.database_name = Uuid::new_v4().to_string();
         // 데이터베이스를 생성한다.

@@ -2,7 +2,7 @@ use chrono::Utc;
 use sqlx::{postgres::PgQueryResult, PgExecutor};
 use uuid::Uuid;
 
-use crate::database::ConfirmedSubscriber;
+use crate::database::{ConfirmedSubscriber, UserCredential};
 
 pub async fn pg_insert_subscriber(
     pg_executor: impl PgExecutor<'_>,
@@ -100,4 +100,21 @@ pub async fn pg_validate_credentials(
     .fetch_optional(pg_executor)
     .await?;
     Ok(user_id.map(|row| row.user_id))
+}
+
+pub async fn pg_get_user_credential(
+    pg_executor: impl PgExecutor<'_>,
+    username: &str,
+) -> Result<Option<UserCredential>, sqlx::Error> {
+    sqlx::query_as!(
+        UserCredential,
+        r#"
+        SELECT user_id, password_hash
+        FROM users
+        WHERE username = $1
+        "#,
+        username
+    )
+    .fetch_optional(pg_executor)
+    .await
 }

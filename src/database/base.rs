@@ -33,6 +33,11 @@ pub struct ConfirmedSubscriber {
     pub email: String,
 }
 
+pub struct UserCredential {
+    pub user_id: Uuid,
+    pub password_hash: String,
+}
+
 #[trait_variant::make(Send)]
 pub trait Z2PADB: AsRef<Pool<Self::DB>> + Sized {
     type Z2PADBPool: Z2PADB<DB = Self::DB>;
@@ -62,4 +67,9 @@ pub trait Z2PADB: AsRef<Pool<Self::DB>> + Sized {
         username: &str,
         password_hash: &str,
     ) -> Result<Option<Uuid>, Z2PADBError>;
+
+    async fn get_user_credentials(
+        &self,
+        username: &str,
+    ) -> Result<Option<UserCredential>, Z2PADBError>;
 }

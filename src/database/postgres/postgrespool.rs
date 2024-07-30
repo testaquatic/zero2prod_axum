@@ -1,3 +1,4 @@
+use futures_util::TryFutureExt;
 use secrecy::ExposeSecret;
 use sqlx::{
     postgres::{PgConnectOptions, PgPoolOptions, PgQueryResult, PgSslMode},
@@ -8,7 +9,7 @@ use uuid::Uuid;
 use crate::{
     database::{
         base::{Z2PADBError, Z2PADB},
-        ConfirmedSubscriber,
+        ConfirmedSubscriber, UserCredential,
     },
     domain::NewSubscriber,
     settings::DatabaseSettings,
@@ -17,7 +18,7 @@ use crate::{
 
 use super::query::{
     pg_confirm_subscriber, pg_get_confirmed_subscribers, pg_get_subscriber_id_from_token,
-    pg_insert_subscriber, pg_store_token, pg_validate_credentials,
+    pg_get_user_credential, pg_insert_subscriber, pg_store_token, pg_validate_credentials,
 };
 
 pub struct PostgresPool {
@@ -120,6 +121,15 @@ impl Z2PADB for PostgresPool {
         pg_validate_credentials(self.as_ref(), username, password_hash)
             .await
             .map_err(Z2PADBError::SqlxError)
+    }
+
+    async fn get_user_credentials(
+        &self,
+        username: &str,
+    ) -> Result<Option<UserCredential>, Z2PADBError> {
+        pg_get_user_credential(self.as_ref(), username)
+            .map_err(Z2PADBError::SqlxError)
+            .await
     }
 }
 
