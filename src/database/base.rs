@@ -3,6 +3,7 @@ use crate::{
     settings::DatabaseSettings,
     utils::{error_chain_fmt, SubscriptionToken},
 };
+use secrecy::Secret;
 use sqlx::{Database, Pool};
 use uuid::Uuid;
 
@@ -35,7 +36,7 @@ pub struct ConfirmedSubscriber {
 
 pub struct UserCredential {
     pub user_id: Uuid,
-    pub password_hash: String,
+    pub password_hash: Secret<String>,
 }
 
 #[trait_variant::make(Send)]
@@ -65,7 +66,7 @@ pub trait Z2PADB: AsRef<Pool<Self::DB>> + Sized {
     async fn validate_credentials(
         &self,
         username: &str,
-        password_hash: &str,
+        password_hash: Secret<String>,
     ) -> Result<Option<Uuid>, Z2PADBError>;
 
     async fn get_user_credentials(

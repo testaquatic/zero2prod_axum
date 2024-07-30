@@ -1,4 +1,5 @@
 use chrono::Utc;
+use secrecy::{ExposeSecret, Secret};
 use sqlx::{postgres::PgQueryResult, PgExecutor};
 use uuid::Uuid;
 
@@ -86,7 +87,7 @@ pub async fn pg_get_confirmed_subscribers(
 pub async fn pg_validate_credentials(
     pg_executor: impl PgExecutor<'_>,
     username: &str,
-    password_hash: &str,
+    password_hash: Secret<String>,
 ) -> Result<Option<Uuid>, sqlx::Error> {
     let user_id = sqlx::query!(
         r#"
@@ -95,7 +96,7 @@ pub async fn pg_validate_credentials(
         WHERE username = $1 AND password_hash = $2;
         "#,
         username,
-        password_hash,
+        password_hash.expose_secret(),
     )
     .fetch_optional(pg_executor)
     .await?;

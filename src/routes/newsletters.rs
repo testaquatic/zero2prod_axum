@@ -15,6 +15,7 @@ use crate::{
     domain::SubscriberEmail,
     email_client::EmailClient,
     settings::{DefaultDBPool, DefaultEmailClient},
+    telemetry::spawn_blocking,
     utils::{basic_authentication, error_chain_fmt, Credentials},
 };
 
@@ -92,7 +93,7 @@ pub async fn publish_newsletter(
     let credentials = basic_authentication(&headers).map_err(PublishError::AuthError)?;
     tracing::Span::current().record("username", tracing::field::display(&credentials.username));
     // 발신자의 uuid를 확인한다.
-    let user_id = validate_credentials(&credentials, &pool).await?;
+    let user_id = validate_credentials(credentials, &pool).await?;
     tracing::Span::current().record("user_id", tracing::field::display(&user_id));
 
     // 이메일을 보낼 구독자 목록을 생성한다.
@@ -118,8 +119,9 @@ pub async fn publish_newsletter(
 }
 
 // 발신자를 확인하고 발신자의 uuid를 반환한다.
+#[tracing::instrument(name = "Validate credentials", skip_all)]
 async fn validate_credentials(
-    credentials: &Credentials,
+    credentials: Credentials,
     pool: &DefaultDBPool,
 ) -> Result<uuid::Uuid, PublishError> {
     // `https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html#argon2id`를 보고 설정했다.
@@ -132,20 +134,36 @@ async fn validate_credentials(
 
     let (expected_password_hash, user_id) = match stored_credentials {
         Some(stored_credentials) => (stored_credentials.password_hash, stored_credentials.user_id),
-        None => return Err(PublishError::AuthError(anyhow::anyhow!("Unknown usernae."))),
+        None => {
+            return Err(PublishError::AuthError(anyhow::anyhow!(
+                "Unknown username."
+            )))
+        }
     };
 
-    let expected_password_hash = PasswordHash::new(&expected_password_hash)
-        .context("Failed to parse hash in PHC string format.")
-        .map_err(PublishError::UnexpectedErr)?;
+    // 이 부분은 책의 접근 방향과 같이 함수로 작게 쪼개는 것이 맞다고 생각한다.
+    // 단순히 다른 방향으로 구현해보고 싶었다.
+    spawn_blocking(move || {
+        // 그 뒤 스레드의 소유권을 클로저에 전달하고, 그 스코프 안에서 명시적으로 모든 계산을 실행한다.
+        let expected_password_hash = PasswordHash::new(expected_password_hash.expose_secret())
+            .context("Failed to parse hash in PHC string format.")
+            .map_err(PublishError::UnexpectedErr)?;
 
-    Argon2::default()
-        .verify_password(
-            credentials.password.expose_secret().as_bytes(),
-            &expected_password_hash,
-        )
-        .context("Invalid password.")
-        .map_err(PublishError::AuthError)?;
+        tracing::info_span!("Verify password hash").in_scope(|| {
+            Argon2::default()
+                .verify_password(
+                    credentials.password.expose_secret().as_bytes(),
+                    &expected_password_hash,
+                )
+                .context("Invalid password.")
+                .map_err(PublishError::AuthError)
+        })
+    })
+    .await
+    // spawn_blocking은 실패할 수 있다.
+    // 중첩된 Result를 갖는다.
+    .context("Failed to spawn blocking tast.")
+    .map_err(PublishError::UnexpectedErr)??;
 
     Ok(user_id)
 }

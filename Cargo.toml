@@ -54,6 +54,7 @@ anyhow = { version = "1" }
 rand = { version = "0.8" }
 base64 = { version = "0.22" }
 argon2 = { version = "0.5", features = ["std"] }
+tracing-bunyan-formatter = { version = "0.3" }
 
 # 테이블과 유사한 toml 구문을 사용해서 긴 코드 행을 줄이자.
 [dependencies.sqlx]

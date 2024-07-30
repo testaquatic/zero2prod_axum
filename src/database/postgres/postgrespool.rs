@@ -1,5 +1,5 @@
 use futures_util::TryFutureExt;
-use secrecy::ExposeSecret;
+use secrecy::{ExposeSecret, Secret};
 use sqlx::{
     postgres::{PgConnectOptions, PgPoolOptions, PgQueryResult, PgSslMode},
     PgPool, Postgres,
@@ -116,13 +116,14 @@ impl Z2PADB for PostgresPool {
     async fn validate_credentials(
         &self,
         username: &str,
-        password_hash: &str,
+        password_hash: Secret<String>,
     ) -> Result<Option<Uuid>, Z2PADBError> {
         pg_validate_credentials(self.as_ref(), username, password_hash)
             .await
             .map_err(Z2PADBError::SqlxError)
     }
 
+    #[tracing::instrument(name = "Get stored credentials", skip_all)]
     async fn get_user_credentials(
         &self,
         username: &str,
