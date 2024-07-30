@@ -1,17 +1,17 @@
 use std::sync::Arc;
 
 use anyhow::Context;
-use argon2::{Argon2, PasswordHash, PasswordVerifier};
+use argon2::{Argon2, Params, PasswordHash, PasswordVerifier};
 use axum::{
     body::Body,
     extract::{self},
     response::{IntoResponse, Response},
     Extension,
 };
-use secrecy::ExposeSecret;
+use secrecy::{ExposeSecret, Secret};
 
 use crate::{
-    database::Z2PADB,
+    database::{UserCredential, Z2PADB},
     domain::SubscriberEmail,
     email_client::EmailClient,
     settings::{DefaultDBPool, DefaultEmailClient},
@@ -124,22 +124,21 @@ async fn validate_credentials(
     credentials: Credentials,
     pool: &DefaultDBPool,
 ) -> Result<uuid::Uuid, PublishError> {
-    // `https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html#argon2id`를 보고 설정했다.
+    let mut user_id = None;
+    let mut expected_password_hash = Secret::new("$argon2id$v=19$m=19456,t=2,p=1$cmJVaVRsOGZYb3dlTU5wVFNHSjBBUQ$56EcHYIpKszJENI7/rULkhHM/R7AJYViFnhFDaJp9TY".to_string());
 
-    let stored_credentials = pool
+    if let Some(UserCredential {
+        user_id: stored_user_id,
+        password_hash: stored_password_hash,
+    }) = pool
         .get_user_credentials(&credentials.username)
         .await
         .context("Failed to perform a query to retrieve stored credentials")
-        .map_err(PublishError::UnexpectedErr)?;
-
-    let (expected_password_hash, user_id) = match stored_credentials {
-        Some(stored_credentials) => (stored_credentials.password_hash, stored_credentials.user_id),
-        None => {
-            return Err(PublishError::AuthError(anyhow::anyhow!(
-                "Unknown username."
-            )))
-        }
-    };
+        .map_err(PublishError::UnexpectedErr)?
+    {
+        user_id = Some(stored_user_id);
+        expected_password_hash = stored_password_hash;
+    }
 
     // 이 부분은 책의 접근 방향과 같이 함수로 작게 쪼개는 것이 맞다고 생각한다.
     // 단순히 다른 방향으로 구현해보고 싶었다.
@@ -150,13 +149,20 @@ async fn validate_credentials(
             .map_err(PublishError::UnexpectedErr)?;
 
         tracing::info_span!("Verify password hash").in_scope(|| {
-            Argon2::default()
-                .verify_password(
-                    credentials.password.expose_secret().as_bytes(),
-                    &expected_password_hash,
-                )
-                .context("Invalid password.")
-                .map_err(PublishError::AuthError)
+            // `https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html#argon2id`를 보고 설정했다.
+            Argon2::new(
+                argon2::Algorithm::Argon2id,
+                argon2::Version::V0x13,
+                Params::new(19456, 2, 1, None)
+                    .context("Failed to create prams.")
+                    .map_err(PublishError::UnexpectedErr)?,
+            )
+            .verify_password(
+                credentials.password.expose_secret().as_bytes(),
+                &expected_password_hash,
+            )
+            .context("Invalid password.")
+            .map_err(PublishError::AuthError)
         })
     })
     .await
@@ -165,5 +171,9 @@ async fn validate_credentials(
     .context("Failed to spawn blocking tast.")
     .map_err(PublishError::UnexpectedErr)??;
 
-    Ok(user_id)
+    // 저장소에서 크리덴셜을 찾으면 `Some`으로만 설정된다.
+    // 따라서 기본 비밀번호가 제공된 비밀번호와 매칭하더라도 존재하지 않는 사용자는 인증하지 않는다.
+    user_id.ok_or(PublishError::AuthError(anyhow::anyhow!(
+        "Unknown username."
+    )))
 }

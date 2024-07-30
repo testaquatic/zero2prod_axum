@@ -1,7 +1,7 @@
 use std::sync::Once;
 
 use anyhow::Context;
-use argon2::{password_hash::SaltString, Argon2, PasswordHasher};
+use argon2::{password_hash::SaltString, Argon2, Params, PasswordHasher};
 use tokio::net::TcpListener;
 use tracing::{level_filters::LevelFilter, Subscriber};
 use url::Url;
@@ -50,9 +50,14 @@ impl TestUser {
         // 정확한 Argon2 파라미터에 관해서는 신경쓰지 않는다.
         // 이들은 테스트 목적이기 때문이다.
 
-        let password_hash = Argon2::default()
-            .hash_password(self.password.as_bytes(), &salt)?
-            .to_string();
+        // 기본 비밀번호의 파라미터를 매칭한다.
+        let password_hash = Argon2::new(
+            argon2::Algorithm::Argon2id,
+            argon2::Version::V0x13,
+            Params::new(19456, 2, 1, None).context("Failed to create prams.")?,
+        )
+        .hash_password(self.password.as_bytes(), &salt)?
+        .to_string();
         pool.store_test_user(&self.user_id, &self.username, &password_hash)
             .await
             .context("Failed to store user credentials.")
