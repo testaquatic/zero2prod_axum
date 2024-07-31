@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::{
     email_client::Postmark,
     error::Z2PAError,
-    routes::{confirm, health_check, home, publish_newsletter, subscribe},
+    routes::{confirm, health_check, home, login, login_form, publish_newsletter, subscribe},
     settings::{DefaultDBPool, Settings},
 };
 use axum::{
@@ -76,6 +76,7 @@ impl Server {
         let app = Router::new()
             .route("/", routing::get(home))
             .route("/health_check", routing::get(health_check))
+            .route("/login", routing::get(login_form).post(login))
             .route("/newsletters", routing::post(publish_newsletter))
             // POST /subscriptions 요청에 대한 라우팅 테이블의 새 엔트리 포인트
             .route(
@@ -88,7 +89,11 @@ impl Server {
                     .make_span_with(AddRequestID)
                     .on_request(DefaultOnRequest::new().level(Level::INFO))
                     .on_failure(DefaultOnFailure::new().level(Level::ERROR))
-                    .on_response(DefaultOnResponse::new().level(Level::INFO)),
+                    .on_response(
+                        DefaultOnResponse::new()
+                            .level(Level::INFO)
+                            .include_headers(true),
+                    ),
             )
             .layer(Extension(email_client.clone()))
             .layer(Extension(pool.clone()));
@@ -107,17 +112,30 @@ struct AddRequestID;
 
 impl MakeSpan<Body> for AddRequestID {
     fn make_span(&mut self, request: &Request<Body>) -> Span {
-        tracing::span!(
-            Level::ERROR,
-            "Z2PA",
-            request_id = %uuid::Uuid::new_v4().to_string(),
-            error = tracing::field::Empty,
-            error_detail = tracing::field::Empty,
-            method = %request.method(),
-            uri = %request.uri(),
-            version = ?request.version(),
-            headers = ?request.headers(),
-        )
-        .make_span(request)
+        if let Some(from) = request.headers().get("host") {
+            tracing::span!(
+                Level::INFO,
+                "Z2PA",
+                from = ?from,
+                request_id = %uuid::Uuid::new_v4(),
+                error = tracing::field::Empty,
+                error_detail = tracing::field::Empty,
+                method = %request.method(),
+                uri = %request.uri(),
+                version = ?request.version(),
+            )
+        } else {
+            tracing::span!(
+                Level::INFO,
+                "Z2PA",
+                from = "Empty",
+                request_id = %uuid::Uuid::new_v4(),
+                error = tracing::field::Empty,
+                error_detail = tracing::field::Empty,
+                method = %request.method(),
+                uri = %request.uri(),
+                version = ?request.version(),
+            )
+        }
     }
 }

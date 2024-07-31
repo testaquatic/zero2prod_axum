@@ -20,18 +20,6 @@ actix-web 대신 axum ( https://docs.rs/axum/latest/axum/ )으로 작성했다.
 
 `docker run -p 8000:8000 zero2prod_axum`
 
-## phc_generator
-
-Go로 작성한 PHC String 생성기
-
-### 실행
-
-`go run ./phc_generator.go`
-
-### 세부 스위치 확인
-
-`go run ./phc_generator.go --help`
-
 ## 엔드포인트
 
 - /health_check
@@ -114,3 +102,17 @@ Go로 작성한 PHC String 생성기
 
     테스트 로그를 출력한다.  
     `TEST_LOG=true cargo test health_check_works`
+
+## phc_generator
+
+Go로 작성한 PHC String 생성기
+
+### 실행
+
+```
+cd phc_generator && go get -u && go run phc_generator.go && cd ..
+```
+
+### 세부 스위치 확인
+
+`go run phc_generator.go --help`

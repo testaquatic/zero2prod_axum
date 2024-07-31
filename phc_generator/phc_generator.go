@@ -56,13 +56,22 @@ func main() {
 		params.password = password
 	}
 
-	passwordHash := argon2.IDKey([]byte(params.password), []byte(params.salt), uint32(params.t), uint32(params.m), uint8(params.p), uint32(params.outpu_len))
+	passwordHash := argon2.IDKey(
+		[]byte(params.password),
+		[]byte(params.salt),
+		uint32(params.t),
+		uint32(params.m),
+		uint8(params.p),
+		uint32(params.outpu_len),
+	)
 	passwordHashBase64 := base64.RawStdEncoding.EncodeToString(passwordHash)
 	saltBase64 := base64.RawStdEncoding.EncodeToString([]byte(params.salt))
 
 	fmt.Println("password   :", params.password)
 	fmt.Println("salt       :", params.salt)
-	fmt.Printf("PHC String : $argon2id$v=19$m=%d,t=%d,p=%d$%s$%s\n", params.m, params.t, params.p, saltBase64, passwordHashBase64)
+	fmt.Printf("PHC String : $argon2id$v=19$m=%d,t=%d,p=%d$%s$%s\n",
+		params.m, params.t, params.p, saltBase64, passwordHashBase64,
+	)
 }
 
 func generatePassword(len int) (string, error) {
