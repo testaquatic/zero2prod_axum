@@ -1,8 +1,8 @@
 # zero2prod_axum
 
-"제로부터 시작하는 러스트 백엔드 프로그래밍"( https://github.com/LukeMathWalker/zero-to-production ) 연습용 저장소이다.
+"제로부터 시작하는 러스트 백엔드 프로그래밍"( <https://github.com/LukeMathWalker/zero-to-production> ) 연습용 저장소이다.
 
-actix-web 대신 axum ( https://docs.rs/axum/latest/axum/ )으로 작성했다.
+actix-web 대신 axum ( <https://docs.rs/axum/latest/axum/> )으로 작성했다.
 
 ## 준비물
 
@@ -28,7 +28,7 @@ actix-web 대신 axum ( https://docs.rs/axum/latest/axum/ )으로 작성했다.
 
   `curl http://127.0.0.1:8000/health_check --verbose`
 
-        200 OK
+  - 200 OK
 
 - /subscriptions
 
@@ -36,16 +36,16 @@ actix-web 대신 axum ( https://docs.rs/axum/latest/axum/ )으로 작성했다.
 
   `curl --request POST --data 'email=thomas_mann@hotmail.com&name=Tom' http://127.0.0.1:8000/subscriptions --verbose`
 
-        200 OK
+  - 200 OK
 
-        500 Internal Server Error
-            => 데이터 베이스 오류(이메일 중복)
-            => 이메일 전송 실패가 발생
+  - 500 Internal Server Error\
+    => 데이터 베이스 오류(이메일 중복)\
+    => 이메일 전송 실패가 발생
 
   `curl --request POST --data 'email=thomas_mannotmail.com&name=Tom' http://127.0.0.1:8000/subscriptions --verbose`
 
-        400 Bad Request
-            => 잘못된 형식의 요청
+  - 400 Bad Request\
+    => 잘못된 형식의 요청
 
 - /subscriptions/confirm
 
@@ -53,18 +53,18 @@ actix-web 대신 axum ( https://docs.rs/axum/latest/axum/ )으로 작성했다.
 
   `curl 'http://127.0.0.1:8000/subscriptions/confirm?subscription_token=token' --verbose`
 
-        200 OK
+  - 200 OK
 
-        401 Unauthorized
-            => 유효하지 않은 토큰
+  - 401 Unauthorized\
+    => 유효하지 않은 토큰
 
-        500 Internal Server Erorr
-            => 내부 서버 오류(데이터베이스 등)
+  - 500 Internal Server Erorr\
+    => 내부 서버 오류(데이터베이스 등)
 
   `curl 'http://127.0.0.1:8000/subscriptions/confirm?subscriptions_token=token' --verbose`
 
-        400 Bad Request
-            => 잘못된 형식의 요청
+  - 400 Bad Request\
+    => 잘못된 형식의 요청
 
 - /newsletters
 
@@ -72,10 +72,14 @@ actix-web 대신 axum ( https://docs.rs/axum/latest/axum/ )으로 작성했다.
 
   `curl --request POST --header 'Content-Type: application/json' --data '{"title": "title", "content": {"html": "<p>html</p>", "text": "text"}}' 'http://127.0.0.1:8000/newsletters' --verbose`
 
-        200 OK
+  - 200 OK
 
-        500 Internal Server Error
-            => 내부 서버 오류(데이터베이스 오류, 잘못된 이메일 주소, 이메일 전송 실패)
+  - 500 Internal Server Error\
+    => 내부 서버 오류(데이터베이스 오류, 잘못된 이메일 주소, 이메일 전송 실패)
+
+- /login
+
+  웹 브라우저로 접근 가능
 
 ## /scripts
 
@@ -85,7 +89,7 @@ actix-web 대신 axum ( https://docs.rs/axum/latest/axum/ )으로 작성했다.
   `./scripts/init_db.sh`
 
   - 환경변수:
-    - `SKIP_DOCKER`
+    - `SKIP_DOCKER`\
       도커 생성을 건너 뛴다.  
        `SKIP_DOCKER=true ./scripts/init_db.sh`
 
@@ -94,7 +98,7 @@ actix-web 대신 axum ( https://docs.rs/axum/latest/axum/ )으로 작성했다.
 - 테스트용 docker compose를 실행한다.  
   `./scripts/docker-compose.sh`
 
-## /tests
+## tests
 
 - 환경변수
 

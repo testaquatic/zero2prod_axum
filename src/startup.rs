@@ -12,6 +12,7 @@ use axum::{
     Extension, Router,
 };
 use http::Request;
+use secrecy::Secret;
 use tokio::net::TcpListener;
 use tower::ServiceBuilder;
 use tower_http::trace::{
@@ -19,11 +20,15 @@ use tower_http::trace::{
 };
 use tracing::{Level, Span};
 
+#[derive(Clone)]
+pub struct HmacSecret(pub Secret<String>);
+
 pub struct Server {
     tcp_listener: TcpListener,
     pool: DefaultDBPool,
     email_client: Postmark,
     base_url: String,
+    hmac_secret: HmacSecret,
 }
 
 // 래퍼 타입을 정의해서 `subscriber` 핸들러에서 URL을 꺼낸다.
@@ -35,12 +40,14 @@ impl Server {
         pool: DefaultDBPool,
         email_client: Postmark,
         base_url: String,
+        hmac_secret: HmacSecret,
     ) -> Self {
         Self {
             tcp_listener,
             pool,
             email_client,
             base_url,
+            hmac_secret,
         }
     }
 
@@ -53,12 +60,14 @@ impl Server {
             .map_err(Z2PAError::DatabaseError)?;
         // `settings`를 사용해서 `EmailClient`를 만든다.
         let email_client = settings.email_client.get_email_client::<Postmark>()?;
+        let hmac_secret = HmacSecret(settings.application.hmac_secret.clone());
 
         let server = Server::new(
             tcp_listener,
             pool,
             email_client,
             settings.application.base_url.clone(),
+            hmac_secret,
         );
 
         Ok(server)
@@ -76,7 +85,12 @@ impl Server {
         let app = Router::new()
             .route("/", routing::get(home))
             .route("/health_check", routing::get(health_check))
-            .route("/login", routing::get(login_form).post(login))
+            .route(
+                "/login",
+                routing::get(login_form)
+                    .post(login)
+                    .layer(ServiceBuilder::new().layer(Extension(self.hmac_secret.clone()))),
+            )
             .route("/newsletters", routing::post(publish_newsletter))
             // POST /subscriptions 요청에 대한 라우팅 테이블의 새 엔트리 포인트
             .route(

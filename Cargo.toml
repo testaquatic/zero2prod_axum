@@ -18,49 +18,36 @@ path = "src/main.rs"
 name = "zero2prod_axum"
 
 [dependencies]
+anyhow = { version = "1" }
+argon2 = { version = "0.5", features = ["std"] }
 axum = { version = "0.7", features = ["http2"] }
-tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+base64 = { version = "0.22" }
+bytes = { version = "1" }
+config = { version = "0.14" }
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+hex = { version = "0.4" }
+hmac = { version = "0.12", features = ["std"] }
+htmlescape = { version = "0.3" }
+# `std_rand`는 `default`에 이미 포함됐다.
+# https://docs.rs/crate/rand/latest/features
+http = { version = "1" }
+http-body-util = { version = "0.1" }
+futures-util = { version = "0.3" }
+rand = { version = "0.8" }
+reqwest = { version = "0.12", default-features = false, features = [
+    "json",
+    "rustls-tls",
+    "http2",
+] }
+secrecy = { version = "0.8", features = ["serde"] }
 # 옵셔널 `derive` 피처를 사용해야 `serde`의 절차적 매크로인 `#[derive(serde::Deserialize)]`를 사용할 수 있다.
 # 이 피처는 기본으로 활성화되어 있지 않다.
 # 프로젝트에 불필요한 의존성을 사용하지 않기 위해서다.
 serde = { version = "1", features = ["derive"] }
-config = { version = "0.14" }
-trait-variant = { version = "0.1" }
-uuid = { version = "1", features = ["v4"] }
-tower = { version = "0.4" }
-tower-http = { version = "0.5", features = ["full"] }
-tracing = { version = "0.1" }
-tracing-subscriber = { version = "0.3", features = [
-    "fmt",
-    "env-filter",
-    "json",
-] }
-tracing-log = { version = "0.2" }
-secrecy = { version = "0.8", features = ["serde"] }
-http = { version = "1" }
-http-body-util = { version = "0.1" }
-bytes = { version = "1" }
-serde_json = { version = "1" }
-futures-util = { version = "0.3" }
 serde-aux = { version = "4" }
-unicode-segmentation = { version = "1" }
-validator = { version = "0.18" }
-url = { version = "2" }
-# anyhow = { version = "1" }
-thiserror = { version = "1" }
-anyhow = { version = "1" }
-# `std_rand`는 `default`에 이미 포함됐다.
-# https://docs.rs/crate/rand/latest/features
-rand = { version = "0.8" }
-base64 = { version = "0.22" }
-argon2 = { version = "0.5", features = ["std"] }
-tracing-bunyan-formatter = { version = "0.3" }
-
-# 테이블과 유사한 toml 구문을 사용해서 긴 코드 행을 줄이자.
-[dependencies.sqlx]
-version = "0.7"
-default-features = false
-features = [
+serde_json = { version = "1" }
+sha3 = { version = "0.10" }
+sqlx = { version = "0.7", default-features = false, features = [
     "runtime-tokio-rustls",
     "postgres",
     "macros",
@@ -69,18 +56,27 @@ features = [
     "migrate",
     # "offline"은 필요하지 않다.
     # 참고 : https://github.com/launchbadge/sqlx/blob/main/sqlx-cli/README.md#enable-building-in-offline-mode-with-query
-]
-[dependencies.chrono]
-version = "0.4"
-default-features = false
-features = ["clock"]
+] }
+thiserror = { version = "1" }
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+tracing-log = { version = "0.2" }
+trait-variant = { version = "0.1" }
+unicode-segmentation = { version = "1" }
+url = { version = "2" }
+urlencoding = "2"
+uuid = { version = "1", features = ["v4"] }
+validator = { version = "0.18" }
+tower = { version = "0.4" }
+tower-http = { version = "0.5", features = ["full"] }
+tracing = { version = "0.1" }
+tracing-bunyan-formatter = { version = "0.3" }
+tracing-subscriber = { version = "0.3", features = [
+    "fmt",
+    "env-filter",
+    "json",
+] }
 
-[dependencies.reqwest]
-version = "0.12"
-default-features = false
 # JSON 페이로드를 직렬화/역직렬화 하기 위해 `json` 기능 플래그를 사용한다.
-features = ["json", "rustls-tls", "http2"]
-
 # `dev-dependencies`는 테스트나 예시를 실행할 때만 사용된다.
 # 최종 애플리케이션 바이너리에는 포함되지 않는다.
 [dev-dependencies]

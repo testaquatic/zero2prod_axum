@@ -6,11 +6,13 @@ use axum::{
     response::{IntoResponse, Response},
     Extension, Form,
 };
-use secrecy::Secret;
+use hmac::{Hmac, Mac};
+use secrecy::{ExposeSecret, Secret};
 
 use crate::{
     authentication::{AuthError, Credentials},
     settings::DefaultDBPool,
+    startup::HmacSecret,
     utils::error_chain_fmt,
 };
 
@@ -38,18 +40,14 @@ impl std::fmt::Debug for LoginError {
 
 impl IntoResponse for LoginError {
     fn into_response(self) -> Response {
-        let status_code = match self {
+        tracing::Span::current()
+            .record("error", tracing::field::display(&self))
+            .record("error_detail", tracing::field::debug(&self));
+        match self {
             LoginError::AuthError(_) => http::StatusCode::UNAUTHORIZED,
             LoginError::UnexpectedError(_) => http::StatusCode::INTERNAL_SERVER_ERROR,
-        };
-        let http_body = Body::new(format!(
-            include_str!("login_failed.html"),
-            error_message = self
-        ));
-        Response::builder()
-            .status(status_code)
-            .body(http_body)
-            .unwrap_or(http::StatusCode::INTERNAL_SERVER_ERROR.into_response())
+        }
+        .into_response()
     }
 }
 
@@ -63,26 +61,53 @@ impl IntoResponse for LoginError {
 // `DefaultDBPool`을 주입해서 데이터베이스로부터 저장된 크리덴셜을 꺼낸다.
 pub async fn login(
     Extension(pool): Extension<Arc<DefaultDBPool>>,
+    Extension(hmac_secret): Extension<HmacSecret>,
     Form(form): Form<FormData>,
-) -> Result<impl IntoResponse, LoginError> {
+) -> axum::response::Result<impl IntoResponse> {
     let credentials = Credentials {
         username: form.username,
         password: form.password,
     };
     tracing::Span::current().record("username", tracing::field::display(&credentials.username));
 
-    let user_id = credentials
-        .validate_credentials(&pool)
-        .await
-        .map_err(|e| match e {
-            AuthError::InvalidCredentials(_) => LoginError::AuthError(e.into()),
-            AuthError::UnexpectedError(_) => LoginError::UnexpectedError(e.into()),
-        })?;
-    tracing::Span::current().record("user_id", tracing::field::display(&user_id));
+    match credentials.validate_credentials(&pool).await {
+        Ok(user_id) => {
+            tracing::Span::current().record("user_id", tracing::field::display(&user_id));
+            let response = Response::builder()
+                .status(http::StatusCode::SEE_OTHER)
+                .header(http::header::LOCATION, "/")
+                .body(Body::empty())
+                .context("Failed to create response.")
+                .map_err(LoginError::UnexpectedError)?;
+            Ok(response)
+        }
+        Err(e) => {
+            let e = match e {
+                AuthError::InvalidCredentials(_) => LoginError::AuthError(e.into()),
+                AuthError::UnexpectedError(_) => LoginError::UnexpectedError(e.into()),
+            };
+            let encoded_error = urlencoding::Encoded::new(e.to_string());
+            let query_string = format!("error={}", encoded_error);
+            let hmac_tag = {
+                let mut mac = Hmac::<sha3::Sha3_256>::new_from_slice(
+                    hmac_secret.0.expose_secret().as_bytes(),
+                )
+                .context("Failed to create Hmac.")
+                .map_err(|e| LoginError::UnexpectedError(e.into()))?;
+                mac.update(query_string.as_bytes());
+                mac.finalize().into_bytes()
+            };
+            let response = Response::builder()
+                .status(http::StatusCode::SEE_OTHER)
+                .header(
+                    http::header::LOCATION,
+                    format!("/login?{}&tag={:x}", query_string, hmac_tag),
+                )
+                .body(Body::empty())
+                .context("Failed to create Response.")
+                .map_err(LoginError::UnexpectedError)?;
 
-    Ok(Response::builder()
-        .header(http::header::LOCATION, "/")
-        .body(Body::empty())
-        .context("Failed to build Response.")
-        .map_err(LoginError::UnexpectedError)?)
+            Err(response.into())
+        }
+    }
 }
