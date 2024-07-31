@@ -93,7 +93,7 @@ pub async fn login(
                     hmac_secret.0.expose_secret().as_bytes(),
                 )
                 .context("Failed to create Hmac.")
-                .map_err(|e| LoginError::UnexpectedError(e.into()))?;
+                .map_err(LoginError::UnexpectedError)?;
                 mac.update(query_string.as_bytes());
                 mac.finalize().into_bytes()
             };
