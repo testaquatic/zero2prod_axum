@@ -9,7 +9,7 @@ use axum::{
 use secrecy::Secret;
 
 use crate::{
-    authentication::{validate_credentials, AuthError, Credentials},
+    authentication::{AuthError, Credentials},
     settings::DefaultDBPool,
     utils::error_chain_fmt,
 };
@@ -38,12 +38,18 @@ impl std::fmt::Debug for LoginError {
 
 impl IntoResponse for LoginError {
     fn into_response(self) -> Response {
-        match self {
-            LoginError::AuthError(_) => http::StatusCode::UNAUTHORIZED.into_response(),
-            LoginError::UnexpectedError(_) => {
-                http::StatusCode::INTERNAL_SERVER_ERROR.into_response()
-            }
-        }
+        let status_code = match self {
+            LoginError::AuthError(_) => http::StatusCode::UNAUTHORIZED,
+            LoginError::UnexpectedError(_) => http::StatusCode::INTERNAL_SERVER_ERROR,
+        };
+        let http_body = Body::new(format!(
+            include_str!("login_failed.html"),
+            error_message = self
+        ));
+        Response::builder()
+            .status(status_code)
+            .body(http_body)
+            .unwrap_or(http::StatusCode::INTERNAL_SERVER_ERROR.into_response())
     }
 }
 
@@ -65,7 +71,8 @@ pub async fn login(
     };
     tracing::Span::current().record("username", tracing::field::display(&credentials.username));
 
-    let user_id = validate_credentials(credentials, &pool)
+    let user_id = credentials
+        .validate_credentials(&pool)
         .await
         .map_err(|e| match e {
             AuthError::InvalidCredentials(_) => LoginError::AuthError(e.into()),

@@ -9,7 +9,7 @@ use axum::{
 };
 
 use crate::{
-    authentication::{basic_authentication, validate_credentials, AuthError}, database::Z2PADB, domain::SubscriberEmail, email_client::EmailClient, settings::{DefaultDBPool, DefaultEmailClient}, utils::error_chain_fmt
+    authentication::{basic_authentication, AuthError}, database::Z2PADB, domain::SubscriberEmail, email_client::EmailClient, settings::{DefaultDBPool, DefaultEmailClient}, utils::error_chain_fmt
 };
 
 #[derive(serde::Deserialize)]
@@ -85,7 +85,7 @@ pub async fn publish_newsletter(
     let credentials = basic_authentication(&headers).map_err(PublishError::AuthError)?;
     tracing::Span::current().record("username", tracing::field::display(&credentials.username));
     // 발신자의 uuid를 확인한다.
-    let user_id = validate_credentials(credentials, &pool).await
+    let user_id = credentials.validate_credentials( &pool).await
     // `AuthError`의 variant는 매핑했지만 전체 오류는 `PublishError` variant의 생성자들에 전달한다.
     // 이를 통해 미들웨어에 의해 오류가 기독될 때 톱레벨 래퍼의 컨텍스트가 유지되도록 보장한다.
     .map_err(|e| match e {
