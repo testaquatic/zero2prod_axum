@@ -1,7 +1,7 @@
 use crate::{
-    database::{Z2PADBError, Z2PADB},
+    database::Z2PADB,
     domain::{NewSubscriber, SubscriberEmail, SubscriberName},
-    email_client::{EmailClient, EmailClientError, Postmark},
+    email_client::{EmailClient, Postmark},
     error::Z2PAError,
     settings::DefaultDBPool,
     startup::ApplicationBaseUrl,
@@ -35,18 +35,8 @@ impl TryFrom<FormData> for NewSubscriber {
 pub enum SubscribeError {
     #[error("{0}")]
     ValidationErr(String),
-    #[error("Failed to aqcuire a Postgres connection from the pool.")]
-    PoolErr(sqlx::Error),
-    #[error("Failed to insert new subscriber in the database.")]
-    InsertSubscriberErr(sqlx::Error),
-    #[error("Failed to commit SQL transaction to store a new subscriber.")]
-    TransactionErr(sqlx::Error),
-    #[error("Failed to store the confirmation token for a new subscriber.")]
-    StoreTokenErr(sqlx::Error),
-    #[error("Failed to send a confirmation email.")]
-    SendEmailErr(EmailClientError),
-    #[error("{1}")]
-    UnexpectedErr(anyhow::Error, String),
+    #[error("transparent")]
+    UnexpectedErr(anyhow::Error),
 }
 
 impl From<Z2PAError> for SubscribeError {
@@ -54,21 +44,7 @@ impl From<Z2PAError> for SubscribeError {
         match e {
             Z2PAError::SubscriberEmailError(s) => SubscribeError::ValidationErr(s),
             Z2PAError::SubscriberNameError(s) => SubscribeError::ValidationErr(s),
-            Z2PAError::EmailClientError(e) => SubscribeError::SendEmailErr(e),
-            Z2PAError::DatabaseError(db_error) => match db_error {
-                Z2PADBError::PoolError(e) => SubscribeError::PoolErr(e),
-                Z2PADBError::InsertSubscriberError(e) => SubscribeError::InsertSubscriberErr(e),
-                Z2PADBError::StoreTokenError(e) => SubscribeError::StoreTokenErr(e),
-                Z2PADBError::TransactionError(e) => SubscribeError::TransactionErr(e),
-                Z2PADBError::SqlxError(e) => {
-                    let s = e.to_string();
-                    SubscribeError::UnexpectedErr(e.into(), s)
-                }
-            },
-            e => {
-                let s = e.to_string();
-                SubscribeError::UnexpectedErr(e.into(), s)
-            }
+            _ => SubscribeError::UnexpectedErr(e.into()),
         }
     }
 }

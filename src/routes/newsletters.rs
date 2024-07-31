@@ -1,22 +1,15 @@
 use std::sync::Arc;
 
 use anyhow::Context;
-use argon2::{Argon2, Params, PasswordHash, PasswordVerifier};
 use axum::{
     body::Body,
     extract::{self},
     response::{IntoResponse, Response},
     Extension,
 };
-use secrecy::{ExposeSecret, Secret};
 
 use crate::{
-    database::{UserCredential, Z2PADB},
-    domain::SubscriberEmail,
-    email_client::EmailClient,
-    settings::{DefaultDBPool, DefaultEmailClient},
-    telemetry::spawn_blocking,
-    utils::{basic_authentication, error_chain_fmt, Credentials},
+    authentication::{basic_authentication, validate_credentials, AuthError}, database::Z2PADB, domain::SubscriberEmail, email_client::EmailClient, settings::{DefaultDBPool, DefaultEmailClient}, utils::error_chain_fmt
 };
 
 #[derive(serde::Deserialize)]
@@ -33,10 +26,8 @@ pub struct Content {
 
 #[derive(thiserror::Error)]
 pub enum PublishError {
-    #[error("{0}")]
-    SubscriberEmailErr(String),
     #[error(transparent)]
-    UnexpectedErr(#[from] anyhow::Error),
+    UnexpectedError(#[from] anyhow::Error),
     #[error("Authentication failed.")]
     AuthError(#[source] anyhow::Error),
 }
@@ -56,12 +47,7 @@ impl IntoResponse for PublishError {
 
         match self {
             // => 500
-            PublishError::SubscriberEmailErr(err) => {
-                tracing::warn!("A confirmed subscriber is using an invalid email address.\n{err}");
-                http::StatusCode::INTERNAL_SERVER_ERROR.into_response()
-            }
-            // => 500
-            PublishError::UnexpectedErr(err) => {
+            PublishError::UnexpectedError(err) => {
                 tracing::error!(target : "Z2PA", error = %err, error_detail = ?err);
                 http::StatusCode::INTERNAL_SERVER_ERROR.into_response()
             }
@@ -80,7 +66,13 @@ impl IntoResponse for PublishError {
     }
 }
 
-#[tracing::instrument(name = "Publish a newsletter issue", skip_all, fields(username = tracing::field::Empty, user_id = tracing::field::Empty)
+#[tracing::instrument(
+    name = "Publish a newsletter issue",
+    skip_all, 
+    fields(
+        username = tracing::field::Empty,
+        user_id = tracing::field::Empty
+    )
 )]
 // 뉴스레터 발송을 담당하는 엔드포인트
 pub async fn publish_newsletter(
@@ -93,7 +85,13 @@ pub async fn publish_newsletter(
     let credentials = basic_authentication(&headers).map_err(PublishError::AuthError)?;
     tracing::Span::current().record("username", tracing::field::display(&credentials.username));
     // 발신자의 uuid를 확인한다.
-    let user_id = validate_credentials(credentials, &pool).await?;
+    let user_id = validate_credentials(credentials, &pool).await
+    // `AuthError`의 variant는 매핑했지만 전체 오류는 `PublishError` variant의 생성자들에 전달한다.
+    // 이를 통해 미들웨어에 의해 오류가 기독될 때 톱레벨 래퍼의 컨텍스트가 유지되도록 보장한다.
+    .map_err(|e| match e {
+        AuthError::InvalidCredentials(_) => PublishError::AuthError(e.into()),
+        AuthError::UnexpectedError(_) => PublishError::UnexpectedError(e.into())
+    })?;
     tracing::Span::current().record("user_id", tracing::field::display(&user_id));
 
     // 이메일을 보낼 구독자 목록을 생성한다.
@@ -104,7 +102,7 @@ pub async fn publish_newsletter(
 
     for subscriber in subscribers {
         let subscriber_email = SubscriberEmail::try_from(subscriber.email.clone())
-            .map_err(PublishError::SubscriberEmailErr)?;
+            .map_err(|e| PublishError::UnexpectedError(anyhow::anyhow!("Invalid subscriberemail: {}", e)))?;
         email_client
             .send_email(
                 &subscriber_email,
@@ -118,62 +116,3 @@ pub async fn publish_newsletter(
     Ok(http::StatusCode::OK.into_response())
 }
 
-// 발신자를 확인하고 발신자의 uuid를 반환한다.
-#[tracing::instrument(name = "Validate credentials", skip_all)]
-async fn validate_credentials(
-    credentials: Credentials,
-    pool: &DefaultDBPool,
-) -> Result<uuid::Uuid, PublishError> {
-    let mut user_id = None;
-    let mut expected_password_hash = Secret::new("$argon2id$v=19$m=19456,t=2,p=1$cmJVaVRsOGZYb3dlTU5wVFNHSjBBUQ$56EcHYIpKszJENI7/rULkhHM/R7AJYViFnhFDaJp9TY".to_string());
-
-    if let Some(UserCredential {
-        user_id: stored_user_id,
-        password_hash: stored_password_hash,
-    }) = pool
-        .get_user_credentials(&credentials.username)
-        .await
-        .context("Failed to perform a query to retrieve stored credentials")
-        .map_err(PublishError::UnexpectedErr)?
-    {
-        user_id = Some(stored_user_id);
-        expected_password_hash = stored_password_hash;
-    }
-
-    // 이 부분은 책의 접근 방향과 같이 함수로 작게 쪼개는 것이 맞다고 생각한다.
-    // 단순히 다른 방향으로 구현해보고 싶었다.
-    spawn_blocking(move || {
-        // 그 뒤 스레드의 소유권을 클로저에 전달하고, 그 스코프 안에서 명시적으로 모든 계산을 실행한다.
-        let expected_password_hash = PasswordHash::new(expected_password_hash.expose_secret())
-            .context("Failed to parse hash in PHC string format.")
-            .map_err(PublishError::UnexpectedErr)?;
-
-        tracing::info_span!("Verify password hash").in_scope(|| {
-            // `https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html#argon2id`를 보고 설정했다.
-            Argon2::new(
-                argon2::Algorithm::Argon2id,
-                argon2::Version::V0x13,
-                Params::new(19456, 2, 1, None)
-                    .context("Failed to create prams.")
-                    .map_err(PublishError::UnexpectedErr)?,
-            )
-            .verify_password(
-                credentials.password.expose_secret().as_bytes(),
-                &expected_password_hash,
-            )
-            .context("Invalid password.")
-            .map_err(PublishError::AuthError)
-        })
-    })
-    .await
-    // spawn_blocking은 실패할 수 있다.
-    // 중첩된 Result를 갖는다.
-    .context("Failed to spawn blocking tast.")
-    .map_err(PublishError::UnexpectedErr)??;
-
-    // 저장소에서 크리덴셜을 찾으면 `Some`으로만 설정된다.
-    // 따라서 기본 비밀번호가 제공된 비밀번호와 매칭하더라도 존재하지 않는 사용자는 인증하지 않는다.
-    user_id.ok_or(PublishError::AuthError(anyhow::anyhow!(
-        "Unknown username."
-    )))
-}
