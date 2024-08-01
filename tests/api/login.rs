@@ -1,4 +1,3 @@
-use anyhow::Context;
 use http::HeaderValue;
 
 use crate::helpers::TestApp;
@@ -22,14 +21,7 @@ async fn an_error_flash_message_is_set_on_failure() -> Result<(), anyhow::Error>
         Some(&HeaderValue::from_str("/login")?)
     );
 
-    let flash_cookies = response
-        .cookies()
-        .find(|c| c.name() == "_flash")
-        .context("No Cookie No Life.")?;
-    assert_eq!(
-        flash_cookies.value(),
-        urlencoding::encode("Authentication failed.")
-    );
+    // 쿠키와 관련한 내용은 어서션할 필요가 없다.
 
     // 실행 - 2단계 - 리다이렉트를 따른다.
     let html_page = test_app.get_login_html().await?;

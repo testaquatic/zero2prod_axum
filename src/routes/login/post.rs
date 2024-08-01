@@ -6,7 +6,7 @@ use axum::{
     response::{IntoResponse, Response},
     Form,
 };
-use axum_extra::extract::{cookie::Cookie, CookieJar};
+use axum_flash::Flash;
 use secrecy::Secret;
 
 use crate::{
@@ -59,6 +59,7 @@ impl IntoResponse for LoginError {
 )]
 // `DefaultDBPool`을 주입해서 데이터베이스로부터 저장된 크리덴셜을 꺼낸다.
 pub async fn login(
+    flash: Flash,
     State(pool): State<Arc<DefaultDBPool>>,
     // `HmacSecret`은 더 이상 필요하지 않다.
     Form(form): Form<FormData>,
@@ -87,12 +88,10 @@ pub async fn login(
             };
             tracing::warn!(error.login = %e);
 
-            let cookie = Cookie::build(("_flash", e.to_string()));
-            let jar = CookieJar::new().add(cookie);
             let response = (
                 http::StatusCode::SEE_OTHER,
+                flash.error(e.to_string()),
                 [(http::header::LOCATION, "/login")],
-                jar,
                 Body::empty(),
             );
 

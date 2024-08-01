@@ -14,13 +14,18 @@ use axum::{
 };
 use base64::Engine;
 use http::Request;
-use secrecy::ExposeSecret;
+use secrecy::{ExposeSecret, Secret};
 use tokio::net::TcpListener;
 use tower_http::trace::{
     DefaultOnFailure, DefaultOnRequest, DefaultOnResponse, MakeSpan, TraceLayer,
 };
 use tracing::{Level, Span};
 
+// 래퍼 타입을 정의해서 `subscriber` 핸들러에서 URL을 꺼낸다.
+pub struct ApplicationBaseUrl(pub String);
+
+// `app`의 정적인 상태를 표시한다.
+// 동적인 것인 `Extension`을 사용한다.
 #[derive(Clone)]
 pub struct AppState {
     flash_config: axum_flash::Config,
@@ -55,21 +60,56 @@ impl FromRef<AppState> for Arc<ApplicationBaseUrl> {
 
 impl AppState {
     pub fn new(
-        flash_config_key: &str,
+        flash_config_key: &Secret<String>,
         pool: DefaultDBPool,
         email_client: DefaultEmailClient,
-        base_url: String,
+        base_url: &str,
     ) -> Result<AppState, base64::DecodeError> {
         let key = axum_flash::Key::from(
-            &base64::engine::general_purpose::STANDARD_NO_PAD.decode(flash_config_key)?,
+            &base64::engine::general_purpose::STANDARD_NO_PAD
+                .decode(flash_config_key.expose_secret())?,
         );
         let flash_config = axum_flash::Config::new(key);
         Ok(AppState {
             flash_config,
             pool: Arc::new(pool),
             email_client: Arc::new(email_client),
-            base_url: Arc::new(ApplicationBaseUrl(base_url)),
+            base_url: Arc::new(ApplicationBaseUrl(base_url.to_string())),
         })
+    }
+}
+
+// https://docs.rs/tower-http/0.5.2/src/tower_http/trace/make_span.rs.html#65-68의 코드를 참조했음
+#[derive(Clone)]
+struct AddRequestID;
+
+impl MakeSpan<Body> for AddRequestID {
+    fn make_span(&mut self, request: &Request<Body>) -> Span {
+        if let Some(from) = request.headers().get("host") {
+            tracing::span!(
+                Level::INFO,
+                "Z2PA",
+                from = ?from,
+                request_id = %uuid::Uuid::new_v4(),
+                error = tracing::field::Empty,
+                error_detail = tracing::field::Empty,
+                method = %request.method(),
+                uri = %request.uri(),
+                version = ?request.version(),
+            )
+        } else {
+            tracing::span!(
+                Level::INFO,
+                "Z2PA",
+                from = tracing::field::Empty,
+                request_id = %uuid::Uuid::new_v4(),
+                error = tracing::field::Empty,
+                error_detail = tracing::field::Empty,
+                method = %request.method(),
+                uri = %request.uri(),
+                version = ?request.version(),
+            )
+        }
     }
 }
 
@@ -77,9 +117,6 @@ pub struct Server {
     tcp_listener: TcpListener,
     app_state: AppState,
 }
-
-// 래퍼 타입을 정의해서 `subscriber` 핸들러에서 URL을 꺼낸다.
-pub struct ApplicationBaseUrl(pub String);
 
 impl Server {
     pub fn new(tcp_listener: TcpListener, app_state: AppState) -> Self {
@@ -100,10 +137,10 @@ impl Server {
         let email_client = settings.email_client.get_email_client::<Postmark>()?;
 
         let app_state = AppState::new(
-            settings.application.hmac_secret.expose_secret(),
+            &settings.application.hmac_secret,
             pool,
             email_client,
-            settings.application.base_url.clone(),
+            &settings.application.base_url,
         )?;
 
         let server = Server::new(tcp_listener, app_state);
@@ -141,39 +178,5 @@ impl Server {
         tracing::info!(name: "server", status = "Server closed");
 
         Ok(())
-    }
-}
-
-// https://docs.rs/tower-http/0.5.2/src/tower_http/trace/make_span.rs.html#65-68의 코드를 참조했음
-#[derive(Clone)]
-struct AddRequestID;
-
-impl MakeSpan<Body> for AddRequestID {
-    fn make_span(&mut self, request: &Request<Body>) -> Span {
-        if let Some(from) = request.headers().get("host") {
-            tracing::span!(
-                Level::INFO,
-                "Z2PA",
-                from = ?from,
-                request_id = %uuid::Uuid::new_v4(),
-                error = tracing::field::Empty,
-                error_detail = tracing::field::Empty,
-                method = %request.method(),
-                uri = %request.uri(),
-                version = ?request.version(),
-            )
-        } else {
-            tracing::span!(
-                Level::INFO,
-                "Z2PA",
-                from = tracing::field::Empty,
-                request_id = %uuid::Uuid::new_v4(),
-                error = tracing::field::Empty,
-                error_detail = tracing::field::Empty,
-                method = %request.method(),
-                uri = %request.uri(),
-                version = ?request.version(),
-            )
-        }
     }
 }

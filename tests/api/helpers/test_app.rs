@@ -2,7 +2,6 @@ use std::sync::Once;
 
 use anyhow::Context;
 use argon2::{password_hash::SaltString, Argon2, Params, PasswordHasher};
-use secrecy::ExposeSecret;
 use tokio::net::TcpListener;
 use tracing::{level_filters::LevelFilter, Subscriber};
 use url::Url;
@@ -122,13 +121,12 @@ impl TestApp {
         let pool = self.create_test_db_pool().await?;
         // 새로운 이메일 클라이언트를 만든다.
         let email_client = self.settings.email_client.get_email_client()?;
-        let base_url = self.settings.application.base_url.clone();
 
         let app_state = AppState::new(
-            &self.settings.application.hmac_secret.expose_secret(),
+            &self.settings.application.hmac_secret,
             pool,
             email_client,
-            base_url,
+            &self.settings.application.base_url,
         )?;
 
         // 새로운 클라이언트를 `Server`에 전달한다.
