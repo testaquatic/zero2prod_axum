@@ -8,7 +8,6 @@ use crate::helpers::TestApp;
 async fn health_check_works() -> Result<(), anyhow::Error> {
     // 준비
     let test_app = TestApp::spawn_app().await?;
-    // `reqwest`를 사용해서 애플리케이션에 대한 HTTP 요청을 수행한다.
     let client = reqwest::Client::new();
 
     //실행

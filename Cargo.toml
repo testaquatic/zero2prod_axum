@@ -21,13 +21,11 @@ name = "zero2prod_axum"
 anyhow = { version = "1" }
 argon2 = { version = "0.5", features = ["std"] }
 axum = { version = "0.7", features = ["http2"] }
+axum-extra = { version = "0.9", features = ["cookie"] }
 base64 = { version = "0.22" }
 bytes = { version = "1" }
 config = { version = "0.14" }
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
-hex = { version = "0.4" }
-hmac = { version = "0.12", features = ["std"] }
-htmlescape = { version = "0.3" }
 # `std_rand`는 `default`에 이미 포함됐다.
 # https://docs.rs/crate/rand/latest/features
 http = { version = "1" }
@@ -38,6 +36,7 @@ reqwest = { version = "0.12", default-features = false, features = [
     "json",
     "rustls-tls",
     "http2",
+    "cookies",
 ] }
 secrecy = { version = "0.8", features = ["serde"] }
 # 옵셔널 `derive` 피처를 사용해야 `serde`의 절차적 매크로인 `#[derive(serde::Deserialize)]`를 사용할 수 있다.
@@ -46,7 +45,6 @@ secrecy = { version = "0.8", features = ["serde"] }
 serde = { version = "1", features = ["derive"] }
 serde-aux = { version = "4" }
 serde_json = { version = "1" }
-sha3 = { version = "0.10" }
 sqlx = { version = "0.7", default-features = false, features = [
     "runtime-tokio-rustls",
     "postgres",
@@ -59,22 +57,22 @@ sqlx = { version = "0.7", default-features = false, features = [
 ] }
 thiserror = { version = "1" }
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
-tracing-log = { version = "0.2" }
-trait-variant = { version = "0.1" }
-unicode-segmentation = { version = "1" }
-url = { version = "2" }
-urlencoding = "2"
-uuid = { version = "1", features = ["v4"] }
-validator = { version = "0.18" }
 tower = { version = "0.4" }
 tower-http = { version = "0.5", features = ["full"] }
 tracing = { version = "0.1" }
 tracing-bunyan-formatter = { version = "0.3" }
+tracing-log = { version = "0.2" }
 tracing-subscriber = { version = "0.3", features = [
     "fmt",
     "env-filter",
     "json",
 ] }
+trait-variant = { version = "0.1" }
+unicode-segmentation = { version = "1" }
+url = { version = "2" }
+uuid = { version = "1", features = ["v4"] }
+validator = { version = "0.18" }
+
 
 # JSON 페이로드를 직렬화/역직렬화 하기 위해 `json` 기능 플래그를 사용한다.
 # `dev-dependencies`는 테스트나 예시를 실행할 때만 사용된다.
@@ -83,8 +81,9 @@ tracing-subscriber = { version = "0.3", features = [
 claim = { version = "0.5" }
 # 이 목록에서 `reqwest` 엔트리를 제거한다.
 fake = { version = "2" }
+linkify = { version = "0.10" }
 quickcheck = { version = "1" }
 quickcheck_macros = { version = "1" }
-wiremock = { version = "0.6" }
 serde_json = { version = "1" }
-linkify = { version = "0.10" }
+urlencoding = { version = "2" }
+wiremock = { version = "0.6" }

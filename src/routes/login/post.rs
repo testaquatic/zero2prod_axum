@@ -6,13 +6,12 @@ use axum::{
     response::{IntoResponse, Response},
     Extension, Form,
 };
-use hmac::{Hmac, Mac};
-use secrecy::{ExposeSecret, Secret};
+use axum_extra::extract::{cookie::Cookie, CookieJar};
+use secrecy::Secret;
 
 use crate::{
     authentication::{AuthError, Credentials},
     settings::DefaultDBPool,
-    startup::HmacSecret,
     utils::error_chain_fmt,
 };
 
@@ -61,7 +60,7 @@ impl IntoResponse for LoginError {
 // `DefaultDBPool`을 주입해서 데이터베이스로부터 저장된 크리덴셜을 꺼낸다.
 pub async fn login(
     Extension(pool): Extension<Arc<DefaultDBPool>>,
-    Extension(hmac_secret): Extension<HmacSecret>,
+    // `HmacSecret`은 더 이상 필요하지 않다.
     Form(form): Form<FormData>,
 ) -> axum::response::Result<impl IntoResponse> {
     let credentials = Credentials {
@@ -86,26 +85,16 @@ pub async fn login(
                 AuthError::InvalidCredentials(_) => LoginError::AuthError(e.into()),
                 AuthError::UnexpectedError(_) => LoginError::UnexpectedError(e.into()),
             };
-            let encoded_error = urlencoding::Encoded::new(e.to_string());
-            let query_string = format!("error={}", encoded_error);
-            let hmac_tag = {
-                let mut mac = Hmac::<sha3::Sha3_256>::new_from_slice(
-                    hmac_secret.0.expose_secret().as_bytes(),
-                )
-                .context("Failed to create Hmac.")
-                .map_err(LoginError::UnexpectedError)?;
-                mac.update(query_string.as_bytes());
-                mac.finalize().into_bytes()
-            };
-            let response = Response::builder()
-                .status(http::StatusCode::SEE_OTHER)
-                .header(
-                    http::header::LOCATION,
-                    format!("/login?{}&tag={:x}", query_string, hmac_tag),
-                )
-                .body(Body::empty())
-                .context("Failed to create Response.")
-                .map_err(LoginError::UnexpectedError)?;
+            tracing::warn!(error.login = %e);
+
+            let jar = CookieJar::new();
+            let jar = jar.add(Cookie::new("_flash", e.to_string()));
+            let response = (
+                http::StatusCode::SEE_OTHER,
+                [(http::header::LOCATION, "/login")],
+                jar,
+                Body::empty(),
+            );
 
             Err(response.into())
         }

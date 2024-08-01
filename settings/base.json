@@ -1,7 +1,6 @@
 {
   "application": {
-    "port": 8000,
-    "hmac_secret": "hmac_secret_test"
+    "port": 8000
   },
   "database": {
     "host": "127.0.0.1",

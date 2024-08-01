@@ -81,7 +81,7 @@ actix-web 대신 axum ( <https://docs.rs/axum/latest/axum/> )으로 작성했다
 
   웹 브라우저로 접근 가능
 
-## /scripts
+## scripts
 
 ### init_db.sh
 
