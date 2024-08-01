@@ -2,6 +2,7 @@ use std::sync::Once;
 
 use anyhow::Context;
 use argon2::{password_hash::SaltString, Argon2, Params, PasswordHasher};
+use secrecy::ExposeSecret;
 use tokio::net::TcpListener;
 use tracing::{level_filters::LevelFilter, Subscriber};
 use url::Url;
@@ -9,7 +10,7 @@ use uuid::Uuid;
 use wiremock::MockServer;
 use zero2prod_axum::{
     settings::{DefaultDBPool, Settings},
-    startup::Server,
+    startup::{AppState, Server},
     telemetry::{get_tracing_subscriber, init_tracing_subscriber},
 };
 
@@ -123,8 +124,15 @@ impl TestApp {
         let email_client = self.settings.email_client.get_email_client()?;
         let base_url = self.settings.application.base_url.clone();
 
+        let app_state = AppState::new(
+            &self.settings.application.hmac_secret.expose_secret(),
+            pool,
+            email_client,
+            base_url,
+        )?;
+
         // 새로운 클라이언트를 `Server`에 전달한다.
-        let server = Server::new(tcp_listener, pool, email_client, base_url);
+        let server = Server::new(tcp_listener, app_state);
         // 서버를 백그라운드로 구동한다.
         // tokio::spawn은 생성된 퓨처에 대한 핸들을 반환한다.
         // 하지만 여기에서는 사용하지 않으므로 let을 바인딩하지 않는다.

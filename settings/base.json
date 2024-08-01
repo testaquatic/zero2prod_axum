@@ -1,6 +1,7 @@
 {
   "application": {
-    "port": 8000
+    "port": 8000,
+    "hmac_secret": "wXkuBascKVdODkarGs/fE1PG/4SoFIR56PZIwnOlbC1/NlXd6JDzTpG9h4vwDeFmvVpgl0iUf/t4MqAh/eX9+g"
   },
   "database": {
     "host": "127.0.0.1",

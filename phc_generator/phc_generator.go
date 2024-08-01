@@ -39,7 +39,9 @@ func initParams() Params {
 	}
 
 	if params.password == "" {
-		password, err := generatePassword(32)
+		// https://docs.rs/axum-flash/latest/axum_flash/struct.Key.html
+		// 512비트 키가 필요해서 변경
+		password, err := generatePassword(64)
 		if err != nil {
 			log.Fatal(err)
 		}

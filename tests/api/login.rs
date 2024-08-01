@@ -8,7 +8,7 @@ async fn an_error_flash_message_is_set_on_failure() -> Result<(), anyhow::Error>
     // 준비
     let test_app = TestApp::spawn_app().await?;
 
-    // 실행
+    // 실행 - 1단계 - 로그인을 시작한다.
     let login_body = serde_json::json!({
         "username": "random-username",
         "password": "random-password"
@@ -31,9 +31,13 @@ async fn an_error_flash_message_is_set_on_failure() -> Result<(), anyhow::Error>
         urlencoding::encode("Authentication failed.")
     );
 
-    // 실행 - 2단계
+    // 실행 - 2단계 - 리다이렉트를 따른다.
     let html_page = test_app.get_login_html().await?;
     assert!(html_page.contains(r#"<p><i>Authentication failed.</i></p>"#));
+
+    // 실행 - 3단계 - 로그인 페이지를 다시 로딩한다.
+    let html_page = test_app.get_login_html().await?;
+    assert!(!html_page.contains(r#"<p><i>Authentication failed.</i></p>"#));
 
     Ok(())
 }

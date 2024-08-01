@@ -7,7 +7,6 @@ use crate::{
     database::{postgres::PostgresPool, Z2PADBError, Z2PADB},
     domain::SubscriberEmail,
     email_client::{EmailClient, EmailClientError, Postmark},
-    error::Z2PAError,
     startup::Server,
 };
 // 기본으로 사용할 타입 모음
@@ -28,6 +27,7 @@ pub struct ApplicationSettings {
     pub port: u16,
     pub host: String,
     pub base_url: String,
+    pub hmac_secret: Secret<String>,
 }
 
 #[derive(serde::Deserialize)]
@@ -92,7 +92,7 @@ impl Settings {
         settings.try_deserialize::<Settings>()
     }
 
-    pub async fn build_server(&self) -> Result<Server, Z2PAError> {
+    pub async fn build_server(&self) -> Result<Server, anyhow::Error> {
         Server::build(self).await
     }
 }

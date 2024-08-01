@@ -22,6 +22,7 @@ anyhow = { version = "1" }
 argon2 = { version = "0.5", features = ["std"] }
 axum = { version = "0.7", features = ["http2"] }
 axum-extra = { version = "0.9", features = ["cookie"] }
+axum-flash = { version = "0.8" }
 base64 = { version = "0.22" }
 bytes = { version = "1" }
 config = { version = "0.14" }
@@ -56,6 +57,7 @@ sqlx = { version = "0.7", default-features = false, features = [
     # 참고 : https://github.com/launchbadge/sqlx/blob/main/sqlx-cli/README.md#enable-building-in-offline-mode-with-query
 ] }
 thiserror = { version = "1" }
+time = { version = "0.3" }
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 tower = { version = "0.4" }
 tower-http = { version = "0.5", features = ["full"] }

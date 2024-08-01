@@ -16,6 +16,7 @@ services:
       - 8000:8000
     environment:
       - APP_ENVIRONMENT=production
+      - APP_APPLICATION__HMAC_SECRET=wXkuBascKVdODkarGs/fE1PG/4SoFIR56PZIwnOlbC1/NlXd6JDzTpG9h4vwDeFmvVpgl0iUf/t4MqAh/eX9+g
       - APP_DATABASE__HOST=postgres
       - APP_DATABASE__PORT=5432
       - APP_DATABASE__USERNAME=postgres

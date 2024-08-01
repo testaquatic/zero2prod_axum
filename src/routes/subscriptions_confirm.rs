@@ -1,9 +1,8 @@
 use std::sync::Arc;
 
 use axum::{
-    extract::Query,
+    extract::{Query, State},
     response::{IntoResponse, Response, Result},
-    Extension,
 };
 
 use crate::{
@@ -48,7 +47,7 @@ impl IntoResponse for ConfrimError {
 #[tracing::instrument(name = "Confirm a pending subscriber", skip(parameters, pool))]
 pub async fn confirm(
     Query(parameters): Query<Parameters>,
-    Extension(pool): Extension<Arc<DefaultDBPool>>,
+    State(pool): State<Arc<DefaultDBPool>>,
 ) -> Result<Response, ConfrimError> {
     let id = pool
         .as_ref()

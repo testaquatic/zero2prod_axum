@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
-use anyhow::Context;
 use axum::{
     body::Body,
+    extract::State,
     response::{IntoResponse, Response},
-    Extension, Form,
+    Form,
 };
 use axum_extra::extract::{cookie::Cookie, CookieJar};
 use secrecy::Secret;
@@ -59,7 +59,7 @@ impl IntoResponse for LoginError {
 )]
 // `DefaultDBPool`을 주입해서 데이터베이스로부터 저장된 크리덴셜을 꺼낸다.
 pub async fn login(
-    Extension(pool): Extension<Arc<DefaultDBPool>>,
+    State(pool): State<Arc<DefaultDBPool>>,
     // `HmacSecret`은 더 이상 필요하지 않다.
     Form(form): Form<FormData>,
 ) -> axum::response::Result<impl IntoResponse> {
@@ -72,12 +72,12 @@ pub async fn login(
     match credentials.validate_credentials(&pool).await {
         Ok(user_id) => {
             tracing::Span::current().record("user_id", tracing::field::display(&user_id));
-            let response = Response::builder()
-                .status(http::StatusCode::SEE_OTHER)
-                .header(http::header::LOCATION, "/")
-                .body(Body::empty())
-                .context("Failed to create response.")
-                .map_err(LoginError::UnexpectedError)?;
+            let response = (
+                http::StatusCode::SEE_OTHER,
+                [(http::header::LOCATION, "/")],
+                Body::empty(),
+            );
+
             Ok(response)
         }
         Err(e) => {
@@ -87,8 +87,8 @@ pub async fn login(
             };
             tracing::warn!(error.login = %e);
 
-            let jar = CookieJar::new();
-            let jar = jar.add(Cookie::new("_flash", e.to_string()));
+            let cookie = Cookie::build(("_flash", e.to_string()));
+            let jar = CookieJar::new().add(cookie);
             let response = (
                 http::StatusCode::SEE_OTHER,
                 [(http::header::LOCATION, "/login")],

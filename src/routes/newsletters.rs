@@ -3,9 +3,8 @@ use std::sync::Arc;
 use anyhow::Context;
 use axum::{
     body::Body,
-    extract::{self},
+    extract::{self, State},
     response::{IntoResponse, Response},
-    Extension,
 };
 
 use crate::{
@@ -76,8 +75,8 @@ impl IntoResponse for PublishError {
 )]
 // 뉴스레터 발송을 담당하는 엔드포인트
 pub async fn publish_newsletter(
-    Extension(pool): Extension<Arc<DefaultDBPool>>,
-    Extension(email_client): Extension<Arc<DefaultEmailClient>>,
+    State(pool): State<Arc<DefaultDBPool>>,
+    State(email_client): State<Arc<DefaultEmailClient>>,
     headers: http::HeaderMap,
     extract::Json(body): extract::Json<BodyData>,
 ) -> Result<Response, PublishError> {

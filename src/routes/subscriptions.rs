@@ -8,8 +8,9 @@ use crate::{
     utils::error_chain_fmt,
 };
 use axum::{
+    extract::State,
     response::{IntoResponse, Response},
-    Extension, Form,
+    Form,
 };
 use std::sync::Arc;
 
@@ -86,10 +87,10 @@ impl IntoResponse for SubscribeError {
     )
 )]
 pub async fn subscribe(
-    Extension(pool): Extension<Arc<DefaultDBPool>>,
+    State(pool): State<Arc<DefaultDBPool>>,
     // 앱 콘텍스트에서 이메일 클라인트를 받는다.
-    Extension(email_client): Extension<Arc<Postmark>>,
-    Extension(base_url): Extension<Arc<ApplicationBaseUrl>>,
+    State(email_client): State<Arc<Postmark>>,
+    State(base_url): State<Arc<ApplicationBaseUrl>>,
     // axum의 특성상 Form은 마지막으로 가야 한다.
     Form(form): Form<FormData>,
 ) -> axum::response::Result<Response, SubscribeError> {
