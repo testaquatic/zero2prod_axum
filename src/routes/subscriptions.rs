@@ -36,7 +36,7 @@ impl TryFrom<FormData> for NewSubscriber {
 pub enum SubscribeError {
     #[error("{0}")]
     ValidationErr(String),
-    #[error("transparent")]
+    #[error(transparent)]
     UnexpectedErr(anyhow::Error),
 }
 

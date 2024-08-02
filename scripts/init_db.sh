@@ -36,7 +36,9 @@ docker run \
     -e POSTGRES_PASSWORD=${DB_PASSWORD} \
     -e POSTGRES_DB=${DB_NAME} \
     -p "${DB_PORT}":5432 \
-    -d postgres
+    -d \
+    --name "postgres_$(date '+%s')" \
+    postgres -N 1000
 fi
 
 # Postgres가 명령어를 받아들일 준비가 될 때까지 핑을 유지한다.

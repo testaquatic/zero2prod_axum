@@ -91,7 +91,7 @@ impl EmailClient for Postmark {
             .get_sender_email()
             .map_err(EmailClientError::SubscriberEmailError)?;
         let authorization_token = email_client_settings.authorization_token.clone();
-        let timeout = std::time::Duration::from_micros(email_client_settings.timeout_milliseconds);
+        let timeout = std::time::Duration::from_millis(email_client_settings.timeout_milliseconds);
 
         Postmark::new(base_url, sender, authorization_token, timeout)
     }
