@@ -58,9 +58,13 @@ sqlx = { version = "0.7", default-features = false, features = [
 ] }
 thiserror = { version = "1" }
 time = { version = "0.3" }
-tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal"] }
 tower = { version = "0.4" }
 tower-http = { version = "0.5", features = ["full"] }
+tower-sessions = { version = "0.12", features = ["private"] }
+tower-sessions-moka-store = { version = "0.13" }
+# 0.13은 버전 충돌이 일어난다.
+tower-sessions-sqlx-store = { version = "0.12", features = ["postgres"] }
 tracing = { version = "0.1" }
 tracing-bunyan-formatter = { version = "0.3" }
 tracing-log = { version = "0.2" }

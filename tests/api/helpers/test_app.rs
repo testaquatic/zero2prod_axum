@@ -9,7 +9,7 @@ use uuid::Uuid;
 use wiremock::MockServer;
 use zero2prod_axum::{
     settings::{DefaultDBPool, Settings},
-    startup::{AppState, Server},
+    startup::{AppState, PgSessionStorage, Server},
     telemetry::{get_tracing_subscriber, init_tracing_subscriber},
 };
 
@@ -124,13 +124,16 @@ impl TestApp {
 
         let app_state = AppState::new(
             &self.settings.application.hmac_secret,
-            pool,
+            pool.clone(),
             email_client,
             &self.settings.application.base_url,
         )?;
 
+        let session_strage =
+            PgSessionStorage::init(pool, self.settings.application.hmac_secret.clone()).await?;
+
         // 새로운 클라이언트를 `Server`에 전달한다.
-        let server = Server::new(tcp_listener, app_state);
+        let server = Server::new(tcp_listener, app_state, session_strage);
         // 서버를 백그라운드로 구동한다.
         // tokio::spawn은 생성된 퓨처에 대한 핸들을 반환한다.
         // 하지만 여기에서는 사용하지 않으므로 let을 바인딩하지 않는다.

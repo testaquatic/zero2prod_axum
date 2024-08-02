@@ -91,6 +91,7 @@ pub async fn login(
             let response = (
                 http::StatusCode::SEE_OTHER,
                 flash.error(e.to_string()),
+                // 이제 쿠키가 없다.
                 [(http::header::LOCATION, "/login")],
                 Body::empty(),
             );

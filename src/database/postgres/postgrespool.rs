@@ -21,6 +21,7 @@ use super::query::{
     pg_get_user_credential, pg_insert_subscriber, pg_store_token, pg_validate_credentials,
 };
 
+#[derive(Clone)]
 pub struct PostgresPool {
     pool: PgPool,
 }
@@ -139,6 +140,13 @@ impl AsRef<PgPool> for PostgresPool {
         // 호출자는 inner 문자열에 대한 공유 참조를 얻는다.
         // 호출자는 읽기 전용으로 접근할 수 있으며, 이는 불변량을 깨뜨리지 못한다.
         &self.pool
+    }
+}
+
+impl TryFrom<PostgresPool> for PgPool {
+    type Error = String;
+    fn try_from(value: PostgresPool) -> Result<Self, Self::Error> {
+        Ok(value.pool)
     }
 }
 

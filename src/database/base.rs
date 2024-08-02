@@ -40,7 +40,7 @@ pub struct UserCredential {
 }
 
 #[trait_variant::make(Send)]
-pub trait Z2PADB: AsRef<Pool<Self::DB>> + Sized {
+pub trait Z2PADB: AsRef<Pool<Self::DB>> + TryInto<Pool<Self::DB>> + Sized + Clone {
     type Z2PADBPool: Z2PADB<DB = Self::DB>;
     type DB: Database;
     fn connect(database_settings: &DatabaseSettings) -> Result<Self::Z2PADBPool, Z2PADBError>;
