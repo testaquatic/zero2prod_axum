@@ -4,10 +4,10 @@ use axum::{
     extract::State,
     response::{IntoResponse, Response},
 };
-use tower_sessions::Session;
-use uuid::Uuid;
 
-use crate::{database::Z2PADB, settings::DefaultDBPool, utils::error_chain_fmt};
+use crate::{
+    database::Z2PADB, session_state::TypedSession, settings::DefaultDBPool, utils::error_chain_fmt,
+};
 
 #[derive(thiserror::Error)]
 #[error(transparent)]
@@ -30,11 +30,11 @@ impl IntoResponse for AppError500 {
 }
 
 pub async fn admin_dashboard(
-    session: Session,
+    session: TypedSession,
     State(pool): State<Arc<DefaultDBPool>>,
 ) -> Result<impl IntoResponse, AppError500> {
     let username = if let Some(user_id) = session
-        .get::<Uuid>("user_id")
+        .get_user_id()
         .await
         .map_err(|e| AppError500(e.into()))?
     {

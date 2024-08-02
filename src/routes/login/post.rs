@@ -8,10 +8,10 @@ use axum::{
 };
 use axum_flash::Flash;
 use secrecy::Secret;
-use tower_sessions::Session;
 
 use crate::{
     authentication::{AuthError, Credentials},
+    session_state::TypedSession,
     settings::DefaultDBPool,
     utils::error_chain_fmt,
 };
@@ -61,7 +61,7 @@ impl IntoResponse for LoginError {
 // `DefaultDBPool`을 주입해서 데이터베이스로부터 저장된 크리덴셜을 꺼낸다.
 pub async fn login(
     flash: Flash,
-    session: Session,
+    session: TypedSession,
     State(pool): State<Arc<DefaultDBPool>>,
     // `HmacSecret`은 더 이상 필요하지 않다.
     Form(form): Form<FormData>,
@@ -79,7 +79,7 @@ pub async fn login(
                 login_redirect(LoginError::UnexpectedError(e.into()), flash.clone())
             })?;
             session
-                .insert("user_id", user_id)
+                .insert_user_id(user_id)
                 .await
                 .map_err(|e| login_redirect(LoginError::UnexpectedError(e.into()), flash))?;
 
