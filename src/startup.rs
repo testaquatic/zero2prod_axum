@@ -3,7 +3,10 @@ use std::sync::Arc;
 use crate::{
     email_client::Postmark,
     error::Z2PAError,
-    routes::{confirm, health_check, home, login, login_form, publish_newsletter, subscribe},
+    routes::{
+        admin_dashboard, confirm, health_check, home, login, login_form, publish_newsletter,
+        subscribe,
+    },
     settings::{DefaultDBPool, DefaultEmailClient, Settings},
 };
 use axum::{
@@ -226,6 +229,7 @@ impl Server {
             // POST /subscriptions 요청에 대한 라우팅 테이블의 새 엔트리 포인트
             .route("/subscriptions", routing::post(subscribe))
             .route("/subscriptions/confirm", routing::get(confirm))
+            .route("/admin/dashboard", routing::get(admin_dashboard))
             .layer(
                 TraceLayer::new_for_http()
                     .make_span_with(AddRequestID)
@@ -253,7 +257,7 @@ impl Server {
 }
 
 // https://github.com/maxcountryman/tower-sessions-stores/tree/main/sqlx-store 코드를 참조했다.
-// 종료시 세션 정리를 중단한다.
+// 종료시 정리 코드를 실행한다.
 async fn shutdown_signal(deletion_task_abort_handle: AbortHandle) {
     let ctrl_c = async {
         signal::ctrl_c()

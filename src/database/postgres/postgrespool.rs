@@ -18,7 +18,8 @@ use crate::{
 
 use super::query::{
     pg_confirm_subscriber, pg_get_confirmed_subscribers, pg_get_subscriber_id_from_token,
-    pg_get_user_credential, pg_insert_subscriber, pg_store_token, pg_validate_credentials,
+    pg_get_user_credential, pg_get_username, pg_insert_subscriber, pg_store_token,
+    pg_validate_credentials,
 };
 
 #[derive(Clone)]
@@ -130,6 +131,13 @@ impl Z2PADB for PostgresPool {
         username: &str,
     ) -> Result<Option<UserCredential>, Z2PADBError> {
         pg_get_user_credential(self.as_ref(), username)
+            .map_err(Z2PADBError::SqlxError)
+            .await
+    }
+
+    #[tracing::instrument(name = "Get username", skip(self))]
+    async fn get_username(&self, user_id: Uuid) -> Result<String, Z2PADBError> {
+        pg_get_username(self.as_ref(), user_id)
             .map_err(Z2PADBError::SqlxError)
             .await
     }

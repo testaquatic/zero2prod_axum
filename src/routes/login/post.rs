@@ -3,11 +3,12 @@ use std::sync::Arc;
 use axum::{
     body::Body,
     extract::State,
-    response::{IntoResponse, Response},
+    response::{ErrorResponse, IntoResponse, Response},
     Form,
 };
 use axum_flash::Flash;
 use secrecy::Secret;
+use tower_sessions::Session;
 
 use crate::{
     authentication::{AuthError, Credentials},
@@ -60,6 +61,7 @@ impl IntoResponse for LoginError {
 // `DefaultDBPool`을 주입해서 데이터베이스로부터 저장된 크리덴셜을 꺼낸다.
 pub async fn login(
     flash: Flash,
+    session: Session,
     State(pool): State<Arc<DefaultDBPool>>,
     // `HmacSecret`은 더 이상 필요하지 않다.
     Form(form): Form<FormData>,
@@ -73,9 +75,17 @@ pub async fn login(
     match credentials.validate_credentials(&pool).await {
         Ok(user_id) => {
             tracing::Span::current().record("user_id", tracing::field::display(&user_id));
+            session.cycle_id().await.map_err(|e| {
+                login_redirect(LoginError::UnexpectedError(e.into()), flash.clone())
+            })?;
+            session
+                .insert("user_id", user_id)
+                .await
+                .map_err(|e| login_redirect(LoginError::UnexpectedError(e.into()), flash))?;
+
             let response = (
                 http::StatusCode::SEE_OTHER,
-                [(http::header::LOCATION, "/")],
+                [(http::header::LOCATION, "/admin/dashboard")],
                 Body::empty(),
             );
 
@@ -86,17 +96,19 @@ pub async fn login(
                 AuthError::InvalidCredentials(_) => LoginError::AuthError(e.into()),
                 AuthError::UnexpectedError(_) => LoginError::UnexpectedError(e.into()),
             };
-            tracing::warn!(error.login = %e);
 
-            let response = (
-                http::StatusCode::SEE_OTHER,
-                flash.error(e.to_string()),
-                // 이제 쿠키가 없다.
-                [(http::header::LOCATION, "/login")],
-                Body::empty(),
-            );
-
-            Err(response.into())
+            Err(login_redirect(e, flash))
         }
     }
+}
+
+// 오류 메시지와 함께 login 페이지로 리다이렉트 한다.
+fn login_redirect(e: LoginError, flash: Flash) -> ErrorResponse {
+    tracing::warn!(error.login = %e, error.login.details = ?e);
+    (
+        http::StatusCode::SEE_OTHER,
+        flash.error(e.to_string()),
+        [(http::header::LOCATION, "/login")],
+    )
+        .into()
 }

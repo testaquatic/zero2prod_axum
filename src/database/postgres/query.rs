@@ -119,3 +119,21 @@ pub async fn pg_get_user_credential(
     .fetch_optional(pg_executor)
     .await
 }
+
+pub async fn pg_get_username(
+    pg_executor: impl PgExecutor<'_>,
+    user_id: Uuid,
+) -> Result<String, sqlx::Error> {
+    let row = sqlx::query!(
+        r#"
+        SELECT username
+        FROM users
+        WHERE user_id = $1;
+        "#,
+        user_id
+    )
+    .fetch_one(pg_executor)
+    .await?;
+
+    Ok(row.username)
+}

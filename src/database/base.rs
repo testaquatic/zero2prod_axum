@@ -73,4 +73,6 @@ pub trait Z2PADB: AsRef<Pool<Self::DB>> + TryInto<Pool<Self::DB>> + Sized + Clon
         &self,
         username: &str,
     ) -> Result<Option<UserCredential>, Z2PADBError>;
+
+    async fn get_username(&self, user_id: Uuid) -> Result<String, Z2PADBError>;
 }

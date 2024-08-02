@@ -271,6 +271,19 @@ impl TestApp {
         Ok(result)
     }
 
+    pub async fn get_admin_dashboard(&self) -> Result<String, anyhow::Error> {
+        let result = self
+            .api_client
+            .get(self.uri()?.join("admin/dashboard")?)
+            .send()
+            .await
+            .context("Failed to execute request.")?
+            .text()
+            .await?;
+        
+        Ok(result)
+    }
+
     pub fn uri(&self) -> Result<Url, url::ParseError> {
         Url::parse(&format!(
             "http://{}/",

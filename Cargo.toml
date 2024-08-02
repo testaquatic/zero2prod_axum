@@ -76,7 +76,7 @@ tracing-subscriber = { version = "0.3", features = [
 trait-variant = { version = "0.1" }
 unicode-segmentation = { version = "1" }
 url = { version = "2" }
-uuid = { version = "1", features = ["v4"] }
+uuid = { version = "1", features = ["v4", "serde"] }
 validator = { version = "0.18" }
 
 

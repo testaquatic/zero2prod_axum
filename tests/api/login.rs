@@ -33,3 +33,27 @@ async fn an_error_flash_message_is_set_on_failure() -> Result<(), anyhow::Error>
 
     Ok(())
 }
+
+#[tokio::test]
+async fn redirect_to_admin_dashboard_after_login_success() -> Result<(), anyhow::Error> {
+    // 준비
+    let test_app = TestApp::spawn_app().await?;
+
+    // 실행 - 1단계 - 로그인
+    let login_body = serde_json::json!({
+        "username": &test_app.test_user.username,
+        "password": &test_app.test_user.password
+    });
+    let response = test_app.post_login(&login_body).await?;
+    assert_eq!(response.status(), http::StatusCode::SEE_OTHER);
+    assert_eq!(
+        response.headers().get(http::header::LOCATION),
+        Some(&HeaderValue::from_str("/admin/dashboard")?)
+    );
+
+    // 실행 - 2단계 - 리다이렉트를 따른다.
+    let html_page = test_app.get_admin_dashboard().await?;
+    assert!(html_page.contains(&format!("Welcome {}", test_app.test_user.username)));
+
+    Ok(())
+}
