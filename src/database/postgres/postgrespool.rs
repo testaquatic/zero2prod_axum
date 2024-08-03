@@ -17,9 +17,9 @@ use crate::{
 };
 
 use super::query::{
-    pg_confirm_subscriber, pg_get_confirmed_subscribers, pg_get_subscriber_id_from_token,
-    pg_get_user_credential, pg_get_username, pg_insert_subscriber, pg_store_token,
-    pg_validate_credentials,
+    pg_change_password, pg_confirm_subscriber, pg_get_confirmed_subscribers,
+    pg_get_subscriber_id_from_token, pg_get_user_credential, pg_get_user_id, pg_get_username,
+    pg_insert_subscriber, pg_store_token,
 };
 
 #[derive(Clone)]
@@ -111,12 +111,12 @@ impl Z2PADB for PostgresPool {
             .map_err(Z2PADBError::SqlxError)
     }
 
-    async fn validate_credentials(
+    async fn get_user_id(
         &self,
         username: &str,
         password_hash: Secret<String>,
     ) -> Result<Option<Uuid>, Z2PADBError> {
-        pg_validate_credentials(self.as_ref(), username, password_hash)
+        pg_get_user_id(self.as_ref(), username, password_hash)
             .await
             .map_err(Z2PADBError::SqlxError)
     }
@@ -136,6 +136,16 @@ impl Z2PADB for PostgresPool {
         pg_get_username(self.as_ref(), user_id)
             .map_err(Z2PADBError::SqlxError)
             .await
+    }
+
+    async fn change_password(
+        &self,
+        user_id: Uuid,
+        password_hash: Secret<String>,
+    ) -> Result<PgQueryResult, Z2PADBError> {
+        pg_change_password(self.as_ref(), user_id, password_hash)
+            .await
+            .map_err(Z2PADBError::SqlxError)
     }
 }
 

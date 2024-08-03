@@ -54,7 +54,7 @@ pub trait Z2PADB: AsRef<Pool<Self::DB>> + TryInto<Pool<Self::DB>> + Sized + Clon
 
     async fn get_confirmed_subscribers(&self) -> Result<Vec<ConfirmedSubscriber>, Z2PADBError>;
 
-    async fn validate_credentials(
+    async fn get_user_id(
         &self,
         username: &str,
         password_hash: Secret<String>,
@@ -66,4 +66,10 @@ pub trait Z2PADB: AsRef<Pool<Self::DB>> + TryInto<Pool<Self::DB>> + Sized + Clon
     ) -> Result<Option<UserCredential>, Z2PADBError>;
 
     async fn get_username(&self, user_id: Uuid) -> Result<String, Z2PADBError>;
+
+    async fn change_password(
+        &self,
+        user_id: Uuid,
+        password_hash: Secret<String>,
+    ) -> Result<<Self::DB as Database>::QueryResult, Z2PADBError>;
 }

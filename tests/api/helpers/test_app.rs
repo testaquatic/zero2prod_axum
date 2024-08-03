@@ -2,6 +2,10 @@ use std::sync::Once;
 
 use anyhow::Context;
 use argon2::{password_hash::SaltString, Argon2, Params, PasswordHasher};
+use rand::{
+    distributions::{uniform::SampleRange, DistString, Standard},
+    Rng,
+};
 use reqwest::Response;
 use tokio::net::TcpListener;
 use tracing::{level_filters::LevelFilter, Subscriber};
@@ -15,6 +19,12 @@ use zero2prod_axum::{
 };
 
 use super::DefaultDBPoolTestExt;
+
+pub fn random_len_string(len: impl SampleRange<usize>) -> String {
+    let mut rng = rand::thread_rng();
+    let len = rng.gen_range(len);
+    Standard.sample_string(&mut rng, len)
+}
 
 pub struct TestApp {
     pub settings: Settings,

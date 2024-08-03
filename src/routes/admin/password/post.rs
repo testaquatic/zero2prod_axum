@@ -3,16 +3,15 @@ use std::sync::Arc;
 use axum::{
     extract::State,
     response::{self, IntoResponse},
-    Form,
+    Extension, Form,
 };
 use axum_flash::Flash;
 use secrecy::{ExposeSecret, Secret};
 use unicode_segmentation::UnicodeSegmentation;
 
 use crate::{
-    authentication::{AuthError, Credentials},
+    authentication::{AuthError, Credentials, UserId},
     database::Z2PADB,
-    session_state::TypedSession,
     settings::DefaultDBPool,
     utils::AppError500,
 };
@@ -25,16 +24,12 @@ pub struct FormData {
 }
 
 pub async fn change_password(
-    session: TypedSession,
+    // TypedSession을 더 이상 주입하지 않는다.
     flash: Flash,
     State(pool): State<Arc<DefaultDBPool>>,
+    Extension(UserId(user_id)): Extension<UserId>,
     Form(form): Form<FormData>,
 ) -> axum::response::Result<impl IntoResponse> {
-    let user_id = match session.get_user_id().await.map_err(AppError500::new)? {
-        None => return Ok(response::Redirect::to("/login").into_response()),
-        Some(user_id) => user_id,
-    };
-
     // `Secret<String>`은 `Eq`를 구현하지 않으므로 그 내부의 `String`을 비교해야 한다.
     if form.new_password.expose_secret() != form.new_password_check.expose_secret() {
         return Ok((
@@ -44,6 +39,8 @@ pub async fn change_password(
             .into_response());
     }
 
+    // 아스키 문자 이외의 문자도 받을 수 있다.
+    // 혼동을 방지하지 위해서 `char::is_ascii_graphic`을 통과하는 문자만 받는 것이 나은 선택일 것 같기도 하다.
     let new_password_len = form.new_password.expose_secret().graphemes(true).count();
     if new_password_len < 12 {
         return Ok((
@@ -81,5 +78,14 @@ pub async fn change_password(
             AuthError::UnexpectedError(_) => return Err((AppError500::new(e)).into()),
         };
     }
-    todo!()
+
+    crate::authentication::change_password(user_id, form.new_password, &pool)
+        .await
+        .map_err(AppError500::new)?;
+
+    Ok((
+        flash.error("비밀번호를 변경했습니다."),
+        response::Redirect::to("/admin/password"),
+    )
+        .into_response())
 }

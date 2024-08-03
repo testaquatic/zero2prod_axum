@@ -1,5 +1,7 @@
 use anyhow::Context;
-use argon2::{Argon2, Params, PasswordHash, PasswordVerifier};
+use argon2::{
+    password_hash::SaltString, Argon2, Params, PasswordHash, PasswordHasher, PasswordVerifier,
+};
 use base64::Engine;
 use secrecy::{ExposeSecret, Secret};
 use tokio::task::spawn_blocking;
@@ -7,6 +9,7 @@ use tokio::task::spawn_blocking;
 use crate::{
     database::{UserCredential, Z2PADB},
     settings::DefaultDBPool,
+    utils::spawn_blocking_with_tracing,
 };
 
 #[derive(thiserror::Error, Debug)]
@@ -98,7 +101,7 @@ impl Credentials {
                     argon2::Algorithm::Argon2id,
                     argon2::Version::V0x13,
                     Params::new(19456, 2, 1, None)
-                        .context("Failed to create Params.")
+                        .context("Failed to get prams")
                         .map_err(AuthError::UnexpectedError)?,
                 )
                 .verify_password(
@@ -121,4 +124,31 @@ impl Credentials {
             .ok_or(anyhow::anyhow!("Unknown username."))
             .map_err(AuthError::InvalidCredentials)
     }
+}
+
+pub fn compute_password_hash(password: Secret<String>) -> Result<Secret<String>, anyhow::Error> {
+    let salt = SaltString::generate(&mut rand::thread_rng());
+    let password_hash = Argon2::new(
+        argon2::Algorithm::Argon2id,
+        argon2::Version::V0x13,
+        Params::new(19456, 2, 1, None).context("Failed to get prams")?,
+    )
+    .hash_password(password.expose_secret().as_bytes(), &salt)?
+    .to_string();
+
+    Ok(Secret::new(password_hash))
+}
+
+#[tracing::instrument(name = "Change password", skip(password, pool))]
+pub async fn change_password(
+    user_id: uuid::Uuid,
+    password: Secret<String>,
+    pool: &DefaultDBPool,
+) -> Result<(), anyhow::Error> {
+    let password_hash = spawn_blocking_with_tracing(move || compute_password_hash(password))
+        .await?
+        .context("Failed to hash password.")?;
+    pool.change_password(user_id, password_hash).await?;
+
+    Ok(())
 }

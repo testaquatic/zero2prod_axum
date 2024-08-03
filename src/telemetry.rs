@@ -1,6 +1,5 @@
 use std::{str::FromStr, sync::Once};
 
-use tokio::task::JoinHandle;
 use tracing::{dispatcher::set_global_default, level_filters::LevelFilter, Subscriber};
 use tracing_bunyan_formatter::{BunyanFormattingLayer, JsonStorageLayer};
 use tracing_log::LogTracer;
@@ -45,15 +44,4 @@ pub fn init_tracing_subscriber(tracing_subscriber: impl Subscriber + Send + Sync
         set_global_default(tracing_subscriber.into()).expect("Failed to set subscriber.");
         LogTracer::builder().init().expect("Failed to set logger.");
     })
-}
-
-// `spawn_blocking`으로부터 트레이트 바운드와 시그니처를 복사했다.
-pub fn spawn_blocking<F, R>(f: F) -> JoinHandle<R>
-where
-    F: FnOnce() -> R + Send + 'static,
-    R: Send + 'static,
-{
-    // 이것이 실행된 후 새로운 스레드를 실행한다.
-    let current_span = tracing::Span::current();
-    tokio::task::spawn_blocking(move || current_span.in_scope(f))
 }

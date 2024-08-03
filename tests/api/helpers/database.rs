@@ -1,3 +1,4 @@
+use anyhow::Context;
 use sqlx::{postgres::PgQueryResult, Database};
 use uuid::Uuid;
 use zero2prod_axum::{
@@ -15,7 +16,7 @@ pub trait DefaultDBPoolTestExt: Z2PADB {
         database_settings: &DatabaseSettings,
     ) -> Result<<Self::DB as Database>::QueryResult, Z2PADBError>;
 
-    async fn migrate(&self) -> Result<(), Z2PADBError>;
+    async fn migrate(&self) -> Result<(), anyhow::Error>;
 
     async fn store_test_user(
         &self,
@@ -48,12 +49,11 @@ impl DefaultDBPoolTestExt for PostgresPool {
         .map_err(Z2PADBError::SqlxError)
     }
 
-    async fn migrate(&self) -> Result<(), Z2PADBError> {
+    async fn migrate(&self) -> Result<(), anyhow::Error> {
         sqlx::migrate!("./migrations")
             .run(self.as_ref())
             .await
-            .expect("Failed to migrate database.");
-        Ok(())
+            .context("Failed to migrate database.")
     }
 
     async fn store_test_user(

@@ -20,7 +20,7 @@ actix-web 대신 axum ( <https://docs.rs/axum/latest/axum/> )으로 작성했다
 
 `docker run -p 8000:8000 zero2prod_axum`
 
-## 엔드포인트
+## API
 
 - /health_check
 
@@ -37,15 +37,11 @@ actix-web 대신 axum ( <https://docs.rs/axum/latest/axum/> )으로 작성했다
   `curl --request POST --data 'email=thomas_mann@hotmail.com&name=Tom' http://127.0.0.1:8000/subscriptions --verbose`
 
   - 200 OK
-
-  - 500 Internal Server Error\
-    => 데이터 베이스 오류(이메일 중복)\
-    => 이메일 전송 실패가 발생
+  - 500 Internal Server Error
 
   `curl --request POST --data 'email=thomas_mannotmail.com&name=Tom' http://127.0.0.1:8000/subscriptions --verbose`
 
-  - 400 Bad Request\
-    => 잘못된 형식의 요청
+  - 400 Bad Request
 
 - /subscriptions/confirm
 
@@ -54,17 +50,12 @@ actix-web 대신 axum ( <https://docs.rs/axum/latest/axum/> )으로 작성했다
   `curl 'http://127.0.0.1:8000/subscriptions/confirm?subscription_token=token' --verbose`
 
   - 200 OK
-
-  - 401 Unauthorized\
-    => 유효하지 않은 토큰
-
-  - 500 Internal Server Erorr\
-    => 내부 서버 오류(데이터베이스 등)
+  - 401 Unauthorized
+  - 500 Internal Server Erorr
 
   `curl 'http://127.0.0.1:8000/subscriptions/confirm?subscriptions_token=token' --verbose`
 
-  - 400 Bad Request\
-    => 잘못된 형식의 요청
+  - 400 Bad Request
 
 - /newsletters
 
@@ -73,21 +64,50 @@ actix-web 대신 axum ( <https://docs.rs/axum/latest/axum/> )으로 작성했다
   `curl --request POST --header 'Content-Type: application/json' --data '{"title": "title", "content": {"html": "<p>html</p>", "text": "text"}}' 'http://127.0.0.1:8000/newsletters' --verbose`
 
   - 200 OK
+  - 500 Internal Server Error
 
-  - 500 Internal Server Error\
-    => 내부 서버 오류(데이터베이스 오류, 잘못된 이메일 주소, 이메일 전송 실패)
+## Web
 
 - /login
 
-  웹 브라우저로 접근 가능\
-   ID: admin\
-   password : everythinghastostartsomewhere
+  로그인을 한다.
+
+  ID: admin\
+  비밀번호: everythinghastostartsomewhere
 
   - 303 See Other -> /admin/dashboard\
-     => 로그인 성공
+    => 로그인 성공
 
   - 303 See Other -> /login\
-     => 로그인 실패("Authentication failed."가 표시됨)
+    => "사용자 확인을 실패했습니다."
+
+  - 500 Internal SErver Error
+
+- /admin/dashboard
+
+  대시보드
+
+  - 200 OK
+
+  - 303 See Other -> /login\
+    => 로그인하지 않고 접속
+
+  - 303 See Other -> /admin/password\
+    => "새로운 비밀번호가 일치하지 않습니다."\
+    => "비밀번호는 12자 이상이어야 합니다."\
+    => "비밀번호는 128자 이하이어야 합니다."\
+    => "비밀번호를 잘못 입력했습니다."
+
+  - 500 Internal Server Error
+
+- /admin/password
+
+  비밀번호를 변경한다.
+
+  - 200 OK
+
+  - 303 See Other -> /login\
+    => 로그인하지 않고 접속
 
 ## scripts
 
@@ -117,12 +137,23 @@ actix-web 대신 axum ( <https://docs.rs/axum/latest/axum/> )으로 작성했다
 
 ## phc_generator
 
-Go로 작성한 PHC String 생성기
+Go로 작성한 PHC String, uuid 생성기
 
 ### 실행
 
+go 컴파일러가 필요하다.
+
 ```
 cd phc_generator && go get -u && go run phc_generator.go && cd ..
+```
+
+실행 결과 예시
+
+```
+uuid       : c30fd24a-250b-4855-bdee-156c7c833ae0
+password   : 7AqcMm2UDmDu7m4I9aLvqyt7uczwS0w4UfjDqGS78iQznFEk2/aolRmCmdzMTl8iGel/MUiUcoEczW47oFpjZw
+salt       : oqzMpf3z27gThieg//vo/g
+PHC string : $argon2id$v=19$m=19456,t=2,p=1$b3F6TXBmM3oyN2dUaGllZy8vdm8vZw$WurnVz18P2lm3hd7Vj5n9aPz5ZJYXbFcXLYFhXlysDc
 ```
 
 ### 세부 스위치 확인

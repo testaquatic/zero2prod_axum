@@ -1,5 +1,3 @@
-use std::str::FromStr;
-
 use http::HeaderValue;
 
 use crate::helpers::TestApp;

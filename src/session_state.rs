@@ -3,6 +3,7 @@ use http::{request::Parts, StatusCode};
 use tower_sessions::Session;
 use uuid::Uuid;
 
+#[derive(Clone)]
 pub struct TypedSession {
     session: Session,
 }

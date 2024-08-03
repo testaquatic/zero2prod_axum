@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use crate::{
+    authentication::reject_anonymous_users,
     email_client::Postmark,
     error::Z2PAError,
     routes::{
@@ -12,6 +13,7 @@ use crate::{
 use axum::{
     body::Body,
     extract::FromRef,
+    middleware::{self},
     routing::{self},
     Router,
 };
@@ -225,15 +227,20 @@ impl Server {
             .route("/", routing::get(home))
             .route("/health_check", routing::get(health_check))
             .route("/login", routing::get(login_form).post(login))
-            .route("/admin/logout", routing::post(log_out))
             .route("/newsletters", routing::post(publish_newsletter))
             // POST /subscriptions 요청에 대한 라우팅 테이블의 새 엔트리 포인트
             .route("/subscriptions", routing::post(subscribe))
             .route("/subscriptions/confirm", routing::get(confirm))
-            .route("/admin/dashboard", routing::get(admin_dashboard))
-            .route(
-                "/admin/password",
-                routing::get(change_password_form).post(change_password),
+            .nest(
+                "/admin",
+                Router::new()
+                    .route("/logout", routing::post(log_out))
+                    .route("/dashboard", routing::get(admin_dashboard))
+                    .route(
+                        "/password",
+                        routing::get(change_password_form).post(change_password),
+                    )
+                    .layer(middleware::from_fn(reject_anonymous_users)),
             )
             .layer(
                 TraceLayer::new_for_http()

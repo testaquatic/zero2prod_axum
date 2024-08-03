@@ -1,25 +1,16 @@
 use axum::response::{self, ErrorResponse, IntoResponse, Response};
 use axum_flash::IncomingFlashes;
+use std::fmt::Write;
 
-use crate::{session_state::TypedSession, utils::AppError500};
+use crate::utils::AppError500;
 
 pub async fn change_password_form(
-    session: TypedSession,
     flash_messages: IncomingFlashes,
 ) -> Result<Response, ErrorResponse> {
-    if session
-        .get_user_id()
-        .await
-        .map_err(AppError500::new)?
-        .is_none()
-    {
-        return Ok(response::Redirect::to("/login").into_response());
+    let mut msg_html = String::new();
+    for (_, msg) in flash_messages.iter() {
+        write!(msg_html, "<p><i>{}</i></p>", msg).map_err(AppError500::new)?;
     }
-
-    let msg_html = flash_messages
-        .iter()
-        .map(|s| format!("<p><i>{}</i></p>\n", s.1))
-        .collect::<String>();
 
     Ok((
         flash_messages,

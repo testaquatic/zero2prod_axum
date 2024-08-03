@@ -84,7 +84,7 @@ pub async fn pg_get_confirmed_subscribers(
     .await
 }
 
-pub async fn pg_validate_credentials(
+pub async fn pg_get_user_id(
     pg_executor: impl PgExecutor<'_>,
     username: &str,
     password_hash: Secret<String>,
@@ -136,4 +136,22 @@ pub async fn pg_get_username(
     .await?;
 
     Ok(row.username)
+}
+
+pub async fn pg_change_password(
+    pg_executor: impl PgExecutor<'_>,
+    user_id: Uuid,
+    password_hash: Secret<String>,
+) -> Result<PgQueryResult, sqlx::Error> {
+    sqlx::query!(
+        "
+        UPDATE users
+        SET password_hash = $1
+        WHERE user_id = $2
+        ",
+        password_hash.expose_secret(),
+        user_id
+    )
+    .execute(pg_executor)
+    .await
 }

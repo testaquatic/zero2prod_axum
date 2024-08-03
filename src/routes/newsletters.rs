@@ -7,7 +7,7 @@ use axum::{
 };
 
 use crate::{
-    authentication::{basic_authentication, AuthError}, database::Z2PADB, domain::SubscriberEmail, email_client::EmailClient, settings::{DefaultDBPool, DefaultEmailClient}, utils::error_chain_fmt
+    authentication::{basic_authentication,  AuthError}, database::Z2PADB, domain::SubscriberEmail, email_client::EmailClient, settings::{DefaultDBPool, DefaultEmailClient}, utils::error_chain_fmt
 };
 
 #[derive(serde::Deserialize)]

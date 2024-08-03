@@ -1,7 +1,6 @@
-use std::error::Error;
-
 use axum::response::{IntoResponse, Response};
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
+use tokio::task::JoinHandle;
 
 pub struct SubscriptionToken {
     subscription_token: String,
@@ -61,7 +60,18 @@ impl IntoResponse for AppError500 {
 }
 
 impl AppError500 {
-    pub fn new(error: impl Error + Send + Sync + 'static) -> Self {
+    pub fn new(error: impl Into<anyhow::Error>) -> Self {
         AppError500(error.into())
     }
+}
+
+// `spawn_blocking`으로부터 트레이트 바운드와 시그니처를 복사했다.
+pub fn spawn_blocking_with_tracing<F, R>(f: F) -> JoinHandle<R>
+where
+    F: FnOnce() -> R + Send + 'static,
+    R: Send + 'static,
+{
+    // 이것이 실행된 후 새로운 스레드를 실행한다.
+    let current_span = tracing::Span::current();
+    tokio::task::spawn_blocking(move || current_span.in_scope(f))
 }
