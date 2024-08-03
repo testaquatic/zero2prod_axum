@@ -1,6 +1,6 @@
 use crate::{
     database::Z2PADB,
-    domain::{NewSubscriber, SubscriberEmail, SubscriberName},
+    domain::{InvalidNewSubscriber, NewSubscriber, SubscriberEmail, SubscriberName},
     email_client::{EmailClient, Postmark},
     error::Z2PAError,
     settings::DefaultDBPool,
@@ -21,7 +21,7 @@ pub struct FormData {
 }
 
 impl TryFrom<FormData> for NewSubscriber {
-    type Error = String;
+    type Error = InvalidNewSubscriber;
     fn try_from(form_data: FormData) -> Result<Self, Self::Error> {
         let new_subscriber = NewSubscriber::new(
             SubscriberEmail::try_from(form_data.email)?,
@@ -34,8 +34,8 @@ impl TryFrom<FormData> for NewSubscriber {
 #[allow(clippy::enum_variant_names)]
 #[derive(thiserror::Error)]
 pub enum SubscribeError {
-    #[error("{0}")]
-    ValidationErr(String),
+    #[error(transparent)]
+    ValidationErr(anyhow::Error),
     #[error(transparent)]
     UnexpectedErr(anyhow::Error),
 }
@@ -43,8 +43,7 @@ pub enum SubscribeError {
 impl From<Z2PAError> for SubscribeError {
     fn from(e: Z2PAError) -> Self {
         match e {
-            Z2PAError::SubscriberEmailError(s) => SubscribeError::ValidationErr(s),
-            Z2PAError::SubscriberNameError(s) => SubscribeError::ValidationErr(s),
+            Z2PAError::InvalidNewSubscriber(e) => SubscribeError::ValidationErr(e.into()),
             _ => SubscribeError::UnexpectedErr(e.into()),
         }
     }
@@ -98,7 +97,8 @@ pub async fn subscribe(
     // `Result`는 `Ok`와 `Err`라는 두개의 변형을 갖는다.
     // 첫 번째는 성공, 두 번째는 실패를 의미한다.
     // `match` 구문을 사용해서 결과에 따라 무엇을 수행할지 선택한다.
-    let new_subscriber = form.try_into().map_err(SubscribeError::ValidationErr)?;
+    let new_subscriber = TryFrom::try_from(form)
+        .map_err(|e: InvalidNewSubscriber| SubscribeError::ValidationErr(e.into()))?;
 
     // `?` 연산자는 투명하게 `Into` 트레이트를 호출한다.
     let subscription_token = pool

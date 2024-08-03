@@ -1,5 +1,5 @@
 use crate::{
-    domain::{NewSubscriber, SubscriberEmail},
+    domain::{InvalidNewSubscriber, NewSubscriber, SubscriberEmail},
     settings::EmailClientSettings,
     utils::{error_chain_fmt, SubscriptionToken},
 };
@@ -11,7 +11,7 @@ pub enum EmailClientError {
     #[error("EmailClient: Reqwest Error")]
     ReqwestError(#[from] reqwest::Error),
     #[error("EmailClient: SubscriberEmail Error")]
-    SubscriberEmailError(String),
+    SubscriberEmailError(InvalidNewSubscriber),
 }
 
 impl std::fmt::Debug for EmailClientError {

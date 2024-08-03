@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/google/uuid"
 	"golang.org/x/crypto/argon2"
 )
 
@@ -20,7 +21,7 @@ type Params struct {
 	password string
 }
 
-func initParams() Params {
+func initParams() (Params, error) {
 	params := Params{}
 	flag.UintVar(&params.m, "m", 19456, "[m]emory")
 	flag.UintVar(&params.t, "t", 2, "i[t]erations")
@@ -30,25 +31,22 @@ func initParams() Params {
 	flag.StringVar(&params.salt, "salt", "", "[salt] (Optional)")
 	flag.Parse()
 
+	var err error
 	if params.salt == "" {
-		salt, err := generatePassword(16)
-		if err != nil {
-			log.Fatal(err)
+		if params.salt, err = generatePassword(16); err != nil {
+			return Params{}, err
 		}
-		params.salt = salt
 	}
 
 	if params.password == "" {
 		// https://docs.rs/axum-flash/latest/axum_flash/struct.Key.html
 		// 512비트 키가 필요해서 변경
-		password, err := generatePassword(64)
-		if err != nil {
-			log.Fatal(err)
+		if params.password, err = generatePassword(64); err != nil {
+			return Params{}, err
 		}
-		params.password = password
 	}
 
-	return params
+	return params, nil
 }
 
 func (params *Params) GeneratePHC() string {
@@ -86,8 +84,16 @@ func init() {
 }
 
 func main() {
-	params := initParams()
+	params, err := initParams()
+	if err != nil {
+		log.Fatal(err)
+	}
+	uuid, err := uuid.NewRandom()
+	if err != nil {
+		log.Fatal(err)
+	}
 
+	fmt.Println("uuid       :", uuid)
 	fmt.Println("password   :", params.password)
 	fmt.Println("salt       :", params.salt)
 	fmt.Println("PHC string :", params.GeneratePHC())

@@ -48,11 +48,7 @@ impl Z2PADB for PostgresPool {
         &self,
         new_subscriber: &NewSubscriber,
     ) -> Result<SubscriptionToken, Z2PADBError> {
-        let mut pg_transaction = self
-            .pool
-            .begin()
-            .await
-            .map_err(Z2PADBError::TransactionError)?;
+        let mut pg_transaction = self.pool.begin().await.map_err(Z2PADBError::SqlxError)?;
         let subscriber_id = pg_insert_subscriber(
             pg_transaction.as_mut(),
             // 이제 `as_ref`를 사용한다.
@@ -62,7 +58,7 @@ impl Z2PADB for PostgresPool {
         .await
         .map_err(|e| {
             tracing::error!("Failed to execute query: {:?}", e);
-            Z2PADBError::InsertSubscriberError(e)
+            Z2PADBError::SqlxError(e)
         })?;
 
         let subscription_token = SubscriptionToken::generate_subscription_token();
@@ -74,13 +70,13 @@ impl Z2PADB for PostgresPool {
         .await
         .map_err(|e| {
             tracing::error!("Failed to execute query: {:?}", e);
-            Z2PADBError::StoreTokenError(e)
+            Z2PADBError::SqlxError(e)
         })?;
 
         pg_transaction
             .commit()
             .await
-            .map_err(Z2PADBError::TransactionError)?;
+            .map_err(Z2PADBError::SqlxError)?;
 
         Ok(subscription_token)
     }

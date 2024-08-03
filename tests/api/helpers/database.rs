@@ -32,7 +32,7 @@ impl DefaultDBPoolTestExt for PostgresPool {
         let connect_options = database_settings.connect_options_without_db();
         let pool = sqlx::PgPool::connect_with(connect_options)
             .await
-            .map_err(Z2PADBError::PoolError)?;
+            .map_err(Z2PADBError::SqlxError)?;
         Ok(Self::new(pool))
     }
 

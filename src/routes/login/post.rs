@@ -1,9 +1,8 @@
 use std::sync::Arc;
 
 use axum::{
-    body::Body,
     extract::State,
-    response::{ErrorResponse, IntoResponse, Response},
+    response::{self, ErrorResponse, IntoResponse},
     Form,
 };
 use axum_flash::Flash;
@@ -35,19 +34,6 @@ pub enum LoginError {
 impl std::fmt::Debug for LoginError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         error_chain_fmt(self, f)
-    }
-}
-
-impl IntoResponse for LoginError {
-    fn into_response(self) -> Response {
-        tracing::Span::current()
-            .record("error", tracing::field::display(&self))
-            .record("error_detail", tracing::field::debug(&self));
-        match self {
-            LoginError::AuthError(_) => http::StatusCode::UNAUTHORIZED,
-            LoginError::UnexpectedError(_) => http::StatusCode::INTERNAL_SERVER_ERROR,
-        }
-        .into_response()
     }
 }
 
@@ -83,13 +69,7 @@ pub async fn login(
                 .await
                 .map_err(|e| login_redirect(LoginError::UnexpectedError(e.into()), flash))?;
 
-            let response = (
-                http::StatusCode::SEE_OTHER,
-                [(http::header::LOCATION, "/admin/dashboard")],
-                Body::empty(),
-            );
-
-            Ok(response)
+            Ok(response::Redirect::to("/admin/dashboard"))
         }
         Err(e) => {
             let e = match e {
@@ -105,10 +85,5 @@ pub async fn login(
 // 오류 메시지와 함께 login 페이지로 리다이렉트 한다.
 fn login_redirect(e: LoginError, flash: Flash) -> ErrorResponse {
     tracing::warn!(error.login = %e, error.login.details = ?e);
-    (
-        http::StatusCode::SEE_OTHER,
-        flash.error(e.to_string()),
-        [(http::header::LOCATION, "/login")],
-    )
-        .into()
+    (flash, response::Redirect::to("/login")).into()
 }

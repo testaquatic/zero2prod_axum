@@ -79,7 +79,15 @@ actix-web 대신 axum ( <https://docs.rs/axum/latest/axum/> )으로 작성했다
 
 - /login
 
-  웹 브라우저로 접근 가능
+  웹 브라우저로 접근 가능\
+   ID: admin\
+   password : everythinghastostartsomewhere
+
+  - 303 See Other -> /admin/dashboard\
+     => 로그인 성공
+
+  - 303 See Other -> /login\
+     => 로그인 실패("Authentication failed."가 표시됨)
 
 ## scripts
 

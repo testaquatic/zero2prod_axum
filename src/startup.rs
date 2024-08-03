@@ -4,8 +4,8 @@ use crate::{
     email_client::Postmark,
     error::Z2PAError,
     routes::{
-        admin_dashboard, confirm, health_check, home, login, login_form, publish_newsletter,
-        subscribe,
+        admin_dashboard, change_password, change_password_form, confirm, health_check, home, login,
+        login_form, publish_newsletter, subscribe,
     },
     settings::{DefaultDBPool, DefaultEmailClient, Settings},
 };
@@ -230,6 +230,10 @@ impl Server {
             .route("/subscriptions", routing::post(subscribe))
             .route("/subscriptions/confirm", routing::get(confirm))
             .route("/admin/dashboard", routing::get(admin_dashboard))
+            .route(
+                "/admin/password",
+                routing::get(change_password_form).post(change_password),
+            )
             .layer(
                 TraceLayer::new_for_http()
                     .make_span_with(AddRequestID)

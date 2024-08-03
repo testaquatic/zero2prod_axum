@@ -2,6 +2,7 @@ use std::sync::Once;
 
 use anyhow::Context;
 use argon2::{password_hash::SaltString, Argon2, Params, PasswordHasher};
+use reqwest::Response;
 use tokio::net::TcpListener;
 use tracing::{level_filters::LevelFilter, Subscriber};
 use url::Url;
@@ -271,17 +272,50 @@ impl TestApp {
         Ok(result)
     }
 
-    pub async fn get_admin_dashboard(&self) -> Result<String, anyhow::Error> {
+    pub async fn get_admin_dashboard(&self) -> Result<Response, anyhow::Error> {
         let result = self
             .api_client
             .get(self.uri()?.join("admin/dashboard")?)
             .send()
             .await
-            .context("Failed to execute request.")?
-            .text()
-            .await?;
-        
+            .context("Failed to execute request.")?;
+
         Ok(result)
+    }
+
+    pub async fn get_admin_dashboard_html(&self) -> Result<String, anyhow::Error> {
+        let html = self.get_admin_dashboard().await?.text().await?;
+
+        Ok(html)
+    }
+
+    pub async fn get_change_password(&self) -> Result<reqwest::Response, anyhow::Error> {
+        self.api_client
+            .get(self.admin_password_uri()?)
+            .send()
+            .await
+            .context("Failed to execute reqwest")
+    }
+
+    pub async fn get_change_password_html(&self) -> Result<String, anyhow::Error> {
+        let html = self.get_change_password().await?.text().await?;
+
+        Ok(html)
+    }
+
+    pub async fn post_change_password<Body>(
+        &self,
+        body: &Body,
+    ) -> Result<reqwest::Response, anyhow::Error>
+    where
+        Body: serde::Serialize,
+    {
+        self.api_client
+            .post(self.admin_password_uri()?)
+            .form(body)
+            .send()
+            .await
+            .context("Failed to execute request.")
     }
 
     pub fn uri(&self) -> Result<Url, url::ParseError> {
@@ -306,5 +340,9 @@ impl TestApp {
 
     pub fn login_uri(&self) -> Result<Url, url::ParseError> {
         self.uri()?.join("login")
+    }
+
+    pub fn admin_password_uri(&self) -> Result<Url, url::ParseError> {
+        self.uri()?.join("admin/password")
     }
 }

@@ -1,15 +1,20 @@
 use validator::ValidateEmail;
 
+use super::new_subscriber::InvalidNewSubscriber;
+
 #[derive(Debug)]
 pub struct SubscriberEmail(String);
 
 impl TryFrom<String> for SubscriberEmail {
-    type Error = String;
-    fn try_from(s: String) -> Result<SubscriberEmail, String> {
+    type Error = InvalidNewSubscriber;
+    fn try_from(s: String) -> Result<SubscriberEmail, Self::Error> {
         if s.validate_email() {
             Ok(Self(s))
         } else {
-            Err(format!("{} is not a valid subscriber email.", s))
+            Err(InvalidNewSubscriber::InvalidSubscriberEmail(format!(
+                "{} is not a valid subscriber email.",
+                s
+            )))
         }
     }
 }

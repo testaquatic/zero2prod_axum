@@ -10,17 +10,8 @@ use uuid::Uuid;
 // DB 변경을 쉽게 하기 위한 트레이트
 #[derive(thiserror::Error)]
 pub enum Z2PADBError {
-    #[error("Z2PADB: Store Token Error")]
-    StoreTokenError(#[source] sqlx::Error),
-    #[error("Z2PADB: Pool Error")]
-    PoolError(#[source] sqlx::Error),
-    #[error("Z2PADB: Insert Subscriber Error")]
-    InsertSubscriberError(#[source] sqlx::Error),
-    #[error("Z2PADB: Transaction Error")]
-    TransactionError(#[source] sqlx::Error),
-    // 그밖의 자세히 구분할 필요가 없는 오류들
-    #[error(transparent)]
-    SqlxError(sqlx::Error),
+    #[error("SqlxError: {0}")]
+    SqlxError(#[from] sqlx::Error),
 }
 
 impl std::fmt::Debug for Z2PADBError {

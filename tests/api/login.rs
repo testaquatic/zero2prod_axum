@@ -52,8 +52,8 @@ async fn redirect_to_admin_dashboard_after_login_success() -> Result<(), anyhow:
     );
 
     // 실행 - 2단계 - 리다이렉트를 따른다.
-    let html_page = test_app.get_admin_dashboard().await?;
-    assert!(html_page.contains(&format!("Welcome {}", test_app.test_user.username)));
+    let html_page = test_app.get_admin_dashboard_html().await?;
+    assert!(html_page.contains(&format!("로그인한 사용자: {}", test_app.test_user.username)));
 
     Ok(())
 }

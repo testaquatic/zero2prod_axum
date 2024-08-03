@@ -5,7 +5,7 @@ use tokio::net::TcpListener;
 
 use crate::{
     database::{postgres::PostgresPool, Z2PADBError, Z2PADB},
-    domain::SubscriberEmail,
+    domain::{InvalidNewSubscriber, SubscriberEmail},
     email_client::{EmailClient, EmailClientError, Postmark},
     startup::Server,
 };
@@ -114,7 +114,7 @@ impl DatabaseSettings {
 }
 
 impl EmailClientSettings {
-    pub fn get_sender_email(&self) -> Result<SubscriberEmail, String> {
+    pub fn get_sender_email(&self) -> Result<SubscriberEmail, InvalidNewSubscriber> {
         SubscriberEmail::try_from(self.sender_email.clone())
     }
 
