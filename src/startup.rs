@@ -4,8 +4,8 @@ use crate::{
     email_client::Postmark,
     error::Z2PAError,
     routes::{
-        admin_dashboard, change_password, change_password_form, confirm, health_check, home, login,
-        login_form, publish_newsletter, subscribe,
+        admin_dashboard, change_password, change_password_form, confirm, health_check, home,
+        log_out, login, login_form, publish_newsletter, subscribe,
     },
     settings::{DefaultDBPool, DefaultEmailClient, Settings},
 };
@@ -81,7 +81,7 @@ impl AppState {
                 .decode(flash_config_key.expose_secret())?,
         );
 
-        let flash_config = axum_flash::Config::new(key);
+        let flash_config = axum_flash::Config::new(key).use_secure_cookies(true);
         Ok(AppState {
             flash_config,
             pool: Arc::new(pool),
@@ -225,6 +225,7 @@ impl Server {
             .route("/", routing::get(home))
             .route("/health_check", routing::get(health_check))
             .route("/login", routing::get(login_form).post(login))
+            .route("/admin/logout", routing::post(log_out))
             .route("/newsletters", routing::post(publish_newsletter))
             // POST /subscriptions 요청에 대한 라우팅 테이블의 새 엔트리 포인트
             .route("/subscriptions", routing::post(subscribe))

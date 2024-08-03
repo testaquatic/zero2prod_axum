@@ -5,13 +5,8 @@ use axum_flash::IncomingFlashes;
 pub async fn login_form(flashes: IncomingFlashes) -> impl IntoResponse {
     let error_html = flashes
         .iter()
-        .filter_map(|(l, e)| {
-            if l == axum_flash::Level::Error {
-                Some(format!("<p><i>{}</i></p>", e))
-            } else {
-                None
-            }
-        })
+        // 오류뿐 아니라 모든 레벨의 메시지를 표시한다.
+        .map(|(_, e)| format!("<p><i>{}</i></p>", e))
         .collect::<String>();
 
     (

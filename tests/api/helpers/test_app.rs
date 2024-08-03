@@ -318,6 +318,14 @@ impl TestApp {
             .context("Failed to execute request.")
     }
 
+    pub async fn post_logout(&self) -> Result<reqwest::Response, anyhow::Error> {
+        self.api_client
+            .post(self.uri()?.join("/admin/logout")?)
+            .send()
+            .await
+            .context("Failed to execute request.")
+    }
+
     pub fn uri(&self) -> Result<Url, url::ParseError> {
         Url::parse(&format!(
             "http://{}/",

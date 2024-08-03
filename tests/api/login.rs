@@ -25,11 +25,11 @@ async fn an_error_flash_message_is_set_on_failure() -> Result<(), anyhow::Error>
 
     // 실행 - 2단계 - 리다이렉트를 따른다.
     let html_page = test_app.get_login_html().await?;
-    assert!(html_page.contains(r#"<p><i>Authentication failed.</i></p>"#));
+    assert!(html_page.contains(r#"<p><i>사용자 확인을 실패했습니다.</i></p>"#));
 
     // 실행 - 3단계 - 로그인 페이지를 다시 로딩한다.
     let html_page = test_app.get_login_html().await?;
-    assert!(!html_page.contains(r#"<p><i>Authentication failed.</i></p>"#));
+    assert!(!html_page.contains(r#"<p><i>사용자 확인을 실패했습니다.</i></p>"#));
 
     Ok(())
 }

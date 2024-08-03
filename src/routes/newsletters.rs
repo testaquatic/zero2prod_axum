@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use anyhow::Context;
 use axum::{
-    body::Body,
     extract::{self, State},
     response::{IntoResponse, Response},
 };
@@ -52,14 +51,16 @@ impl IntoResponse for PublishError {
             }
             // => 401
             PublishError::AuthError(err) => {
+
                 tracing::error!(target : "Z2PA", error = %err, error_detail = ?err);
-                Response::builder()
-                    // 인증 오류에 대해 401을 반환한다.
-                    .status(http::StatusCode::UNAUTHORIZED)
+                
+                (
+                    // 인증 오류에 대해 401을 반환한다
+                    http::StatusCode::UNAUTHORIZED,
                     // http는 여러 잘 알려진 표준 HTTP 헤더의 이름에 관한 상수셋을 제공한다.
-                    .header(http::header::WWW_AUTHENTICATE, r#"Basic realm="publish""#)
-                    .body(Body::empty())
-                    .unwrap()
+                    [(http::header::WWW_AUTHENTICATE, r#"Basic realm="publish""#)],
+                ).into_response()
+
             }
         }
     }

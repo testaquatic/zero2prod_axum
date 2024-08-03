@@ -23,6 +23,10 @@ impl TypedSession {
     pub async fn get_user_id(&self) -> Result<Option<Uuid>, tower_sessions::session::Error> {
         self.session.get(Self::USER_ID_KEY).await
     }
+
+    pub async fn log_out(&self) -> Result<(), tower_sessions::session::Error> {
+        self.session.flush().await
+    }
 }
 
 // https://docs.rs/axum/0.7.5/axum/extract/index.html#accessing-other-extractors-in-fromrequest-or-fromrequestparts-implementations
