@@ -5,8 +5,9 @@ use crate::{
     email_client::Postmark,
     error::Z2PAError,
     routes::{
-        admin_dashboard, change_password, change_password_form, confirm, health_check, home,
-        log_out, login, login_form, publish_newsletter, subscribe,
+        admin_dashboard, admin_publish_newsletter_form, change_password, change_password_form,
+        confirm, health_check, home, log_out, login, login_form, publish_newsletter_basic_auth,
+        subscribe,
     },
     settings::{DefaultDBPool, DefaultEmailClient, Settings},
 };
@@ -227,7 +228,7 @@ impl Server {
             .route("/", routing::get(home))
             .route("/health_check", routing::get(health_check))
             .route("/login", routing::get(login_form).post(login))
-            .route("/newsletters", routing::post(publish_newsletter))
+            .route("/newsletters", routing::post(publish_newsletter_basic_auth))
             // POST /subscriptions 요청에 대한 라우팅 테이블의 새 엔트리 포인트
             .route("/subscriptions", routing::post(subscribe))
             .route("/subscriptions/confirm", routing::get(confirm))
@@ -240,6 +241,7 @@ impl Server {
                         "/password",
                         routing::get(change_password_form).post(change_password),
                     )
+                    .route("/newsletters", routing::get(admin_publish_newsletter_form))
                     .layer(middleware::from_fn(reject_anonymous_users)),
             )
             .layer(

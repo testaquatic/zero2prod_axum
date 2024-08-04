@@ -75,7 +75,7 @@ impl IntoResponse for PublishError {
     )
 )]
 // 뉴스레터 발송을 담당하는 엔드포인트
-pub async fn publish_newsletter(
+pub async fn publish_newsletter_basic_auth(
     State(pool): State<Arc<DefaultDBPool>>,
     State(email_client): State<Arc<DefaultEmailClient>>,
     headers: http::HeaderMap,
@@ -115,4 +115,3 @@ pub async fn publish_newsletter(
     }
     Ok(http::StatusCode::OK.into_response())
 }
-

@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>뉴스레터 전송</title>
+</head>
+<body>
+    <form action="/admin/newsletter" method="post">
+        <label>
+            <p>제목</p>
+            <textarea name="title" placeholder="제목" cols="40"></textarea>
+        </label>
+        <label>
+            <p>내용(HTML)</p>
+            <textarea name="html_content" placeholder="HTML" rows="10" cols="40"></textarea>
+        </label>
+        <label>
+            <p>내용(TEXT)</p>
+            <textarea name="text_content" placeholder="TEXT" rows="10" cols="40"></textarea>
+        </label>
+        <p>
+            <button type="submit">뉴스레터 전송</button>
+        </p>
+    </form>
+</body>
+</html>

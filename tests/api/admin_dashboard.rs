@@ -3,7 +3,7 @@ use http::HeaderValue;
 use crate::helpers::TestApp;
 
 #[tokio::test]
-async fn you_mut_be_logged_in_to_access_the_admin_dashboard() -> Result<(), anyhow::Error> {
+async fn you_must_be_logged_in_to_access_the_admin_dashboard() -> Result<(), anyhow::Error> {
     // 준비
     let test_app = TestApp::spawn_app().await?;
 

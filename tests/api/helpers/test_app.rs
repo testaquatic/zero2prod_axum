@@ -336,6 +336,14 @@ impl TestApp {
             .context("Failed to execute request.")
     }
 
+    pub async fn get_admin_newsletters(&self) -> Result<reqwest::Response, anyhow::Error> {
+        self.api_client
+            .get(self.uri()?.join("/admin/newsletters")?)
+            .send()
+            .await
+            .context("Failed to execute request.")
+    }
+
     pub fn uri(&self) -> Result<Url, url::ParseError> {
         Url::parse(&format!(
             "http://{}/",
