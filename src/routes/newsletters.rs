@@ -7,20 +7,8 @@ use axum::{
 };
 
 use crate::{
-    authentication::{basic_authentication,  AuthError}, database::Z2PADB, domain::SubscriberEmail, email_client::EmailClient, settings::{DefaultDBPool, DefaultEmailClient}, utils::error_chain_fmt
+    authentication::{basic_authentication,  AuthError}, email_client::{BodyData, EmailClient}, settings::{DefaultDBPool, DefaultEmailClient}, utils::error_chain_fmt
 };
-
-#[derive(serde::Deserialize)]
-pub struct BodyData {
-    title: String,
-    content: Content,
-}
-
-#[derive(serde::Deserialize)]
-pub struct Content {
-    html: String,
-    text: String,
-}
 
 #[derive(thiserror::Error)]
 pub enum PublishError {
@@ -94,24 +82,7 @@ pub async fn publish_newsletter_basic_auth(
     })?;
     tracing::Span::current().record("user_id", tracing::field::display(&user_id));
 
-    // 이메일을 보낼 구독자 목록을 생성한다.
-    let subscribers = pool
-        .get_confirmed_subscribers()
-        .await
-        .map_err(anyhow::Error::from)?;
+    email_client.publish_newsletter(&pool, &body).await.context("Failed to publish newsletter.").map_err(PublishError::UnexpectedError)?;
 
-    for subscriber in subscribers {
-        let subscriber_email = SubscriberEmail::try_from(subscriber.email.clone())
-            .map_err(|e| PublishError::UnexpectedError(anyhow::anyhow!("Invalid subscriberemail: {}", e)))?;
-        email_client
-            .send_email(
-                &subscriber_email,
-                &body.title,
-                &body.content.html,
-                &body.content.text,
-            )
-            .await
-            .with_context(|| format!("Failed to send newsletter issue to {}", &subscriber.email))?;
-    }
     Ok(http::StatusCode::OK.into_response())
 }
