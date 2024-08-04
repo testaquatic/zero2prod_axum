@@ -90,6 +90,15 @@ pub struct Content {
     text: String,
 }
 
+impl BodyData {
+    pub fn new(title: String, html: String, text: String) -> BodyData {
+        BodyData {
+            title,
+            content: Content { html, text },
+        }
+    }
+}
+
 // 여기에 놓는 것이 맞을 것 같기는 한데 애매하다.
 pub async fn publish_newsletter<T: EmailClient>(
     pool: &DefaultDBPool,

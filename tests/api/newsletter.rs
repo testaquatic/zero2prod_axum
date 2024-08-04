@@ -5,49 +5,7 @@ use wiremock::{
     Mock, ResponseTemplate,
 };
 
-use crate::helpers::{ConfirmationLinks, TestApp};
-
-trait TestAppNewletterExt {
-    async fn create_unconfirmed_subscriber(&self) -> Result<ConfirmationLinks, anyhow::Error>;
-    async fn create_confirmed_subscriber(&self) -> Result<(), anyhow::Error>;
-}
-
-impl TestAppNewletterExt for TestApp {
-    /// 테스트 대상 애플리케이션의 퍼블릭 API를 사용해서 확인되지 않은 구독자를 생성한다.
-    async fn create_unconfirmed_subscriber(&self) -> Result<ConfirmationLinks, anyhow::Error> {
-        let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
-
-        let _mock_guard = Mock::given(path("/email"))
-            .and(method(http::Method::POST))
-            .respond_with(ResponseTemplate::new(http::StatusCode::OK))
-            .named("Create unconfirmed subscriber.")
-            .expect(1)
-            .mount_as_scoped(&self.email_mock_server)
-            .await;
-        self.post_subscriptions(body).await?.error_for_status()?;
-        // mock Postmark 서버가 받은 요청을 확인해서 확인 링크를 추출하고 그것을 반환한다.
-        let email_request = &self
-            .email_mock_server
-            .received_requests()
-            .await
-            .unwrap()
-            .pop()
-            .unwrap();
-
-        Ok(self.get_confirmation_links(email_request)?)
-    }
-
-    async fn create_confirmed_subscriber(&self) -> Result<(), anyhow::Error> {
-        // 동일한 헬퍼를 재사용해서 해당 확인 링크를 실제로 호출하는 단계를 추가한다.
-        let confirmation_link = self.create_unconfirmed_subscriber().await?;
-        reqwest::get(confirmation_link.html)
-            .await
-            .unwrap()
-            .error_for_status()?;
-
-        Ok(())
-    }
-}
+use crate::helpers::TestApp;
 
 #[tokio::test]
 async fn newsletters_are_not_delivered_to_unconfirmed_subscriber() -> Result<(), anyhow::Error> {

@@ -6,7 +6,8 @@
     <title>뉴스레터 전송</title>
 </head>
 <body>
-    <form action="/admin/newsletter" method="post">
+    {flash_messages}
+    <form action="/admin/newsletters" method="post">
         <label>
             <p>제목</p>
             <textarea name="title" placeholder="제목" cols="40"></textarea>

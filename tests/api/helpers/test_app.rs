@@ -2,16 +2,21 @@ use std::sync::Once;
 
 use anyhow::Context;
 use argon2::{password_hash::SaltString, Argon2, Params, PasswordHasher};
+use http::HeaderValue;
 use rand::{
     distributions::{uniform::SampleRange, DistString, Standard},
     Rng,
 };
 use reqwest::Response;
+use serde::Serialize;
 use tokio::net::TcpListener;
 use tracing::{level_filters::LevelFilter, Subscriber};
 use url::Url;
 use uuid::Uuid;
-use wiremock::MockServer;
+use wiremock::{
+    matchers::{method, path},
+    Mock, MockServer, ResponseTemplate,
+};
 use zero2prod_axum::{
     settings::{DefaultDBPool, Settings},
     startup::{AppState, PgSessionStorage, Server},
@@ -238,6 +243,42 @@ impl TestApp {
             .build()
     }
 
+    /// 테스트 대상 애플리케이션의 퍼블릭 API를 사용해서 확인되지 않은 구독자를 생성한다.
+
+    pub async fn create_unconfirmed_subscriber(&self) -> Result<ConfirmationLinks, anyhow::Error> {
+        let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
+
+        let _mock_guard = Mock::given(path("/email"))
+            .and(method(http::Method::POST))
+            .respond_with(ResponseTemplate::new(http::StatusCode::OK))
+            .named("Create unconfirmed subscriber.")
+            .expect(1)
+            .mount_as_scoped(&self.email_mock_server)
+            .await;
+        self.post_subscriptions(body).await?.error_for_status()?;
+        // mock Postmark 서버가 받은 요청을 확인해서 확인 링크를 추출하고 그것을 반환한다.
+        let email_request = &self
+            .email_mock_server
+            .received_requests()
+            .await
+            .unwrap()
+            .pop()
+            .unwrap();
+
+        Ok(self.get_confirmation_links(email_request)?)
+    }
+
+    pub async fn create_confirmed_subscriber(&self) -> Result<(), anyhow::Error> {
+        // 동일한 헬퍼를 재사용해서 해당 확인 링크를 실제로 호출하는 단계를 추가한다.
+        let confirmation_link = self.create_unconfirmed_subscriber().await?;
+        reqwest::get(confirmation_link.html)
+            .await
+            .unwrap()
+            .error_for_status()?;
+
+        Ok(())
+    }
+
     pub async fn post_newsletters(
         &self,
         body: serde_json::Value,
@@ -342,6 +383,47 @@ impl TestApp {
             .send()
             .await
             .context("Failed to execute request.")
+    }
+
+    pub async fn get_admin_newsletters_html(&self) -> Result<String, anyhow::Error> {
+        let html = self.get_admin_newsletters().await?.text().await?;
+
+        Ok(html)
+    }
+
+    pub async fn login_and_get_admin_dashboard_html(&self) -> Result<String, anyhow::Error> {
+        // 로그인한다.
+        let response = self
+            .post_login(&serde_json::json!({
+                "username": &self.test_user.username,
+                "password": &self.test_user.password
+            }))
+            .await?;
+
+        assert_eq!(response.status(), http::StatusCode::SEE_OTHER);
+        assert_eq!(
+            response.headers().get(http::header::LOCATION),
+            Some(&HeaderValue::from_str("/admin/dashboard")?)
+        );
+
+        // 링크를 따른다.
+        let dashboard_html = self.get_admin_dashboard_html().await?;
+
+        Ok(dashboard_html)
+    }
+
+    pub async fn post_admin_newsletters<B: Serialize>(
+        &self,
+        form: &B,
+    ) -> Result<Response, anyhow::Error> {
+        let response = self
+            .api_client
+            .post(self.uri()?.join("/admin/newsletters")?)
+            .form(form)
+            .send()
+            .await?;
+
+        Ok(response)
     }
 
     pub fn uri(&self) -> Result<Url, url::ParseError> {

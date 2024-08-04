@@ -5,9 +5,9 @@ use crate::{
     email_client::Postmark,
     error::Z2PAError,
     routes::{
-        admin_dashboard, admin_publish_newsletter_form, change_password, change_password_form,
-        confirm, health_check, home, log_out, login, login_form, publish_newsletter_basic_auth,
-        subscribe,
+        admin_dashboard, admin_publish_newsletter, admin_publish_newsletter_form, change_password,
+        change_password_form, confirm, health_check, home, log_out, login, login_form,
+        publish_newsletter_basic_auth, subscribe,
     },
     settings::{DefaultDBPool, DefaultEmailClient, Settings},
 };
@@ -241,7 +241,10 @@ impl Server {
                         "/password",
                         routing::get(change_password_form).post(change_password),
                     )
-                    .route("/newsletters", routing::get(admin_publish_newsletter_form))
+                    .route(
+                        "/newsletters",
+                        routing::get(admin_publish_newsletter_form).post(admin_publish_newsletter),
+                    )
                     .layer(middleware::from_fn(reject_anonymous_users)),
             )
             .layer(

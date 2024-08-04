@@ -1,3 +1,4 @@
+use anyhow::Context;
 // 해야할 것
 // 완료 - 1. 핸들러 뼈대 만들기
 // 완료 - 2. 로그인한 사용자만 접근 가능하게 하기
@@ -10,30 +11,28 @@
 // 5. /newsletter와 /admin/newsletter는 많은 코드가 중복될 것으로 예상된다.
 //      코드를 EmailClient나 DBPool에 메서드로 붙여야 하는지 아니면 독립함수인지
 //      => 일단 독립 함수로 작성하고 필요한 때 둘 모두에 붙인다?
-use axum::response::{self, IntoResponse, Response};
+use axum::response::{IntoResponse, Response};
+use axum_flash::IncomingFlashes;
 
-use crate::utils::{error_chain_fmt, AppError500};
+use std::fmt::Write;
 
-#[derive(thiserror::Error)]
-pub enum AdminPublishError {
-    #[error("AdminPublishError: UnexpectedError")]
-    UnexpectedError(#[source] anyhow::Error),
-}
+use super::AdminPublishError;
 
-impl std::fmt::Debug for AdminPublishError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        error_chain_fmt(self, f)
+pub async fn admin_publish_newsletter_form(
+    incoming_flashes: IncomingFlashes,
+) -> Result<Response, AdminPublishError> {
+    let mut flash_messages = String::new();
+    for (_, message) in incoming_flashes.into_iter() {
+        write!(flash_messages, "<p><i>{}</i></p>", message)
+            .context("Flash to write to string.")
+            .map_err(AdminPublishError::UnexpectedError)?;
     }
-}
-
-impl IntoResponse for AdminPublishError {
-    fn into_response(self) -> Response {
-        match self {
-            _ => AppError500::new(self).into_response(),
-        }
-    }
-}
-
-pub async fn admin_publish_newsletter_form() -> Result<Response, AdminPublishError> {
-    Ok(response::Html(include_str!("newsletters.html")).into_response())
+    Ok((
+        incoming_flashes,
+        format!(
+            include_str!("newsletters.html"),
+            flash_messages = flash_messages
+        ),
+    )
+        .into_response())
 }
