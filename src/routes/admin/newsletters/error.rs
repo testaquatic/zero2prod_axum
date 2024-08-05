@@ -16,6 +16,7 @@ impl std::fmt::Debug for AdminPublishError {
 
 impl IntoResponse for AdminPublishError {
     fn into_response(self) -> Response {
+        tracing::error!(error = %self, error.debug = ?self);
         AppError500::new(self).into_response()
     }
 }
