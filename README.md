@@ -109,6 +109,18 @@ actix-web 대신 axum ( <https://docs.rs/axum/latest/axum/> )으로 작성했다
   - 303 See Other -> /login\
     => 로그인하지 않고 접속
 
+- /admin/newsletters
+
+  뉴스레터를 전송한다.
+
+  - 200 OK
+
+  - 303 See Other -> /login\
+
+  - 303 See Other -> /admin/newsletters\
+    => "내용을 모두 입력해야 합니다."
+    => "이메일 전송을 완료했습니다."
+
 ## scripts
 
 ### init_db.sh
