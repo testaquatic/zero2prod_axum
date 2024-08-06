@@ -17,7 +17,7 @@ use crate::{
 };
 
 use super::query::{
-    pg_change_password, pg_confirm_subscriber, pg_get_confirmed_subscribers,
+    pg_change_password, pg_confirm_subscriber, pg_get_confirmed_subscribers, pg_get_saved_response,
     pg_get_subscriber_id_from_token, pg_get_user_credential, pg_get_user_id, pg_get_username,
     pg_insert_subscriber, pg_store_token,
 };
@@ -146,6 +146,14 @@ impl Z2PADB for PostgresPool {
         pg_change_password(self.as_ref(), user_id, password_hash)
             .await
             .map_err(Z2PADBError::SqlxError)
+    }
+
+    async fn get_saved_response(
+        &self,
+        idempotency_key: &crate::idempotency::IdempotencyKey,
+        user_id: Uuid,
+    ) -> Result<Option<crate::database::base::SavedHttpResponse>, sqlx::Error> {
+        pg_get_saved_response(self.as_ref(), idempotency_key.as_ref(), user_id).await
     }
 }
 

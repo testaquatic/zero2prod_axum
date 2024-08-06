@@ -3,7 +3,10 @@ use secrecy::{ExposeSecret, Secret};
 use sqlx::{postgres::PgQueryResult, PgExecutor};
 use uuid::Uuid;
 
-use crate::database::{ConfirmedSubscriber, UserCredential};
+use crate::database::{
+    base::{HeaderPairRecord, SavedHttpResponse},
+    ConfirmedSubscriber, UserCredential,
+};
 
 pub async fn pg_insert_subscriber(
     pg_executor: impl PgExecutor<'_>,
@@ -153,5 +156,31 @@ pub async fn pg_change_password(
         user_id
     )
     .execute(pg_executor)
+    .await
+}
+
+pub async fn pg_get_saved_response(
+    pg_executor: impl PgExecutor<'_>,
+    idempotency_key: &str,
+    user_id: Uuid,
+) -> Result<Option<SavedHttpResponse>, sqlx::Error> {
+    sqlx::query_as!(
+        SavedHttpResponse,
+        r#"
+    SELECT
+        response_status_code,
+        response_headers as "response_headers: Vec<HeaderPairRecord>",
+        response_body
+    FROM 
+        idempotency
+    WHERE 
+        user_id = $1
+        AND
+        idempotency_key = $2
+    "#,
+        user_id,
+        idempotency_key
+    )
+    .fetch_optional(pg_executor)
     .await
 }

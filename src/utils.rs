@@ -65,6 +65,32 @@ impl AppError500 {
     }
 }
 
+#[derive(thiserror::Error)]
+#[error(transparent)]
+pub struct AppError400(anyhow::Error);
+
+impl std::fmt::Debug for AppError400 {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        error_chain_fmt(self, f)
+    }
+}
+
+impl IntoResponse for AppError400 {
+    fn into_response(self) -> Response {
+        tracing::Span::current()
+            .record("error", tracing::field::display(&self))
+            .record("error_detail", tracing::field::debug(self));
+
+        http::StatusCode::INTERNAL_SERVER_ERROR.into_response()
+    }
+}
+
+impl AppError400 {
+    pub fn new(error: impl Into<anyhow::Error>) -> Self {
+        AppError400(error.into())
+    }
+}
+
 // `spawn_blocking`으로부터 트레이트 바운드와 시그니처를 복사했다.
 pub fn spawn_blocking_with_tracing<F, R>(f: F) -> JoinHandle<R>
 where

@@ -6,6 +6,8 @@ use crate::utils::{error_chain_fmt, AppError500};
 pub enum AdminPublishError {
     #[error("AdminPublishError: UnexpectedError")]
     UnexpectedError(#[source] anyhow::Error),
+    #[error("AdminPublishError: BadRequest")]
+    BadRequest(#[source] anyhow::Error),
 }
 
 impl std::fmt::Debug for AdminPublishError {

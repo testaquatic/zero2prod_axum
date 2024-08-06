@@ -111,6 +111,7 @@ impl MakeSpan<Body> for AddRequestID {
                 method = %request.method(),
                 uri = %request.uri(),
                 version = ?request.version(),
+                header = ?request.headers(),
             )
         } else {
             tracing::span!(

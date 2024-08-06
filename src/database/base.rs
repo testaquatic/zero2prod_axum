@@ -1,8 +1,14 @@
+use std::str::FromStr;
+
 use crate::{
     domain::NewSubscriber,
+    idempotency::IdempotencyKey,
     settings::DatabaseSettings,
-    utils::{error_chain_fmt, SubscriptionToken},
+    utils::{error_chain_fmt, AppError500, SubscriptionToken},
 };
+use axum::response::{IntoResponse, Response};
+use http::{HeaderMap, HeaderName, HeaderValue};
+
 use secrecy::Secret;
 use sqlx::{Database, Pool};
 use uuid::Uuid;
@@ -28,6 +34,47 @@ pub struct ConfirmedSubscriber {
 pub struct UserCredential {
     pub user_id: Uuid,
     pub password_hash: Secret<String>,
+}
+
+#[derive(Debug, sqlx::Type)]
+#[sqlx(type_name = "header_pair")]
+pub struct HeaderPairRecord {
+    name: String,
+    value: Vec<u8>,
+}
+
+pub struct SavedHttpResponse {
+    pub response_status_code: i16,
+    pub response_headers: Vec<HeaderPairRecord>,
+    pub response_body: Vec<u8>,
+}
+
+impl IntoResponse for SavedHttpResponse {
+    fn into_response(self) -> Response {
+        let status_code = match http::StatusCode::from_u16(self.response_status_code as u16) {
+            Err(e) => {
+                tracing::error!(error = %e, error_details = ?e);
+                return AppError500::new(e).into_response();
+            }
+            Ok(status_code) => status_code,
+        };
+
+        let mut header_map = HeaderMap::new();
+        for header in self.response_headers.into_iter() {
+            let HeaderPairRecord { name, value } = header;
+            let header_name = match HeaderName::from_str(&name) {
+                Ok(header_name) => header_name,
+                Err(e) => return AppError500::new(e).into_response(),
+            };
+            let header_value = match HeaderValue::from_bytes(&value) {
+                Ok(header_value) => header_value,
+                Err(e) => return AppError500::new(e).into_response(),
+            };
+            header_map.append(header_name, header_value);
+        }
+
+        (status_code, header_map, self.response_body).into_response()
+    }
 }
 
 #[trait_variant::make(Send)]
@@ -72,4 +119,10 @@ pub trait Z2PADB: AsRef<Pool<Self::DB>> + TryInto<Pool<Self::DB>> + Sized + Clon
         user_id: Uuid,
         password_hash: Secret<String>,
     ) -> Result<<Self::DB as Database>::QueryResult, Z2PADBError>;
+
+    async fn get_saved_response(
+        &self,
+        idempotency_key: &IdempotencyKey,
+        user_id: Uuid,
+    ) -> Result<Option<SavedHttpResponse>, sqlx::Error>;
 }

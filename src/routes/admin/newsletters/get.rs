@@ -13,8 +13,8 @@ use anyhow::Context;
 //      => 일단 독립 함수로 작성하고 필요한 때 구조체에 붙인다?
 use axum::response::{self, IntoResponse, Response};
 use axum_flash::IncomingFlashes;
-
 use std::fmt::Write;
+use uuid::Uuid;
 
 use super::AdminPublishError;
 
@@ -27,11 +27,13 @@ pub async fn admin_publish_newsletter_form(
             .context("Flash to write to string.")
             .map_err(AdminPublishError::UnexpectedError)?;
     }
+    let idempotency_key = Uuid::new_v4();
     Ok((
         incoming_flashes,
         response::Html(format!(
             include_str!("newsletters.html"),
-            flash_messages = flash_messages
+            flash_messages = flash_messages,
+            idempotency_key = idempotency_key,
         )),
     )
         .into_response())

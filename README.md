@@ -118,7 +118,7 @@ actix-web 대신 axum ( <https://docs.rs/axum/latest/axum/> )으로 작성했다
   - 303 See Other -> /login\
 
   - 303 See Other -> /admin/newsletters\
-    => "내용을 모두 입력해야 합니다."
+    => "내용을 모두 입력해야 합니다."\
     => "이메일 전송을 완료했습니다."
 
 ## scripts

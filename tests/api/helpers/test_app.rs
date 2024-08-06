@@ -164,10 +164,11 @@ impl TestApp {
         let tcp_listener = self.settings.application.get_listener().await?;
         // OS가 할당한 포트 번호를 추출한다.
         // 임의의 포트가 할당되므로 설정을 변경한다.
+        self.settings.application.host = tcp_listener.local_addr()?.ip().to_string();
         self.settings.application.port = tcp_listener.local_addr()?.port();
         // url에 포트를 추가한다.
-        self.settings.application.base_url +=
-            &format!("http://{}", tcp_listener.local_addr()?.to_string());
+        self.settings.application.base_url =
+            format!("http://{}", tcp_listener.local_addr()?.to_string());
 
         Ok(tcp_listener)
     }
