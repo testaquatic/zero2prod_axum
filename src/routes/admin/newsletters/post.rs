@@ -85,9 +85,14 @@ pub async fn admin_publish_newsletter(
         .await
         .map_err(|e| AdminPublishError::UnexpectedError(e.into()))?;
 
-    Ok((
+    let response = (
         flash.info("이메일 전송을 완료했습니다."),
         response::Redirect::to("/admin/newsletters"),
     )
-        .into_response())
+        .into_response();
+    let response = pool
+        .save_response(&idempotency_key, user_id.0, response)
+        .await
+        .map_err(|e| AdminPublishError::UnexpectedError(e.into()))?;
+    Ok(response)
 }

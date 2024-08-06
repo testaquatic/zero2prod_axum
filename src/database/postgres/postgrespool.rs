@@ -1,3 +1,7 @@
+use axum::{
+    body::to_bytes,
+    response::{IntoResponse, Response},
+};
 use futures_util::TryFutureExt;
 use secrecy::{ExposeSecret, Secret};
 use sqlx::{
@@ -8,7 +12,7 @@ use uuid::Uuid;
 
 use crate::{
     database::{
-        base::{Z2PADBError, Z2PADB},
+        base::{HeaderPairRecord, Z2PADBError, Z2PADB},
         ConfirmedSubscriber, UserCredential,
     },
     domain::NewSubscriber,
@@ -19,7 +23,7 @@ use crate::{
 use super::query::{
     pg_change_password, pg_confirm_subscriber, pg_get_confirmed_subscribers, pg_get_saved_response,
     pg_get_subscriber_id_from_token, pg_get_user_credential, pg_get_user_id, pg_get_username,
-    pg_insert_subscriber, pg_store_token,
+    pg_insert_subscriber, pg_save_response, pg_store_token,
 };
 
 #[derive(Clone)]
@@ -152,8 +156,44 @@ impl Z2PADB for PostgresPool {
         &self,
         idempotency_key: &crate::idempotency::IdempotencyKey,
         user_id: Uuid,
-    ) -> Result<Option<crate::database::base::SavedHttpResponse>, sqlx::Error> {
-        pg_get_saved_response(self.as_ref(), idempotency_key.as_ref(), user_id).await
+    ) -> Result<Option<crate::database::base::SavedHttpResponse>, Z2PADBError> {
+        pg_get_saved_response(self.as_ref(), idempotency_key.as_ref(), user_id)
+            .await
+            .map_err(Z2PADBError::SqlxError)
+    }
+
+    async fn save_response(
+        &self,
+        idempotency_key: &crate::idempotency::IdempotencyKey,
+        user_id: Uuid,
+        http_response: axum::response::Response,
+    ) -> Result<Response, Z2PADBError> {
+        let (header, body) = http_response.into_parts();
+        let status_code = header.status.as_u16() as i16;
+        let headers = header
+            .headers
+            .iter()
+            .map(|(name, value)| HeaderPairRecord {
+                name: name.to_string(),
+                value: value.as_bytes().to_vec(),
+            })
+            .collect::<Vec<_>>();
+        let body = to_bytes(body, usize::MAX)
+            .await
+            .map_err(Z2PADBError::AzumCoreError)?
+            .to_vec();
+
+        pg_save_response(
+            self.as_ref(),
+            user_id,
+            idempotency_key.as_ref(),
+            status_code,
+            &headers,
+            &body,
+        )
+        .await?;
+
+        Ok((header, body).into_response())
     }
 }
 

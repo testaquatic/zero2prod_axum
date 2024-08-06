@@ -184,3 +184,33 @@ pub async fn pg_get_saved_response(
     .fetch_optional(pg_executor)
     .await
 }
+
+pub async fn pg_save_response(
+    pg_executor: impl PgExecutor<'_>,
+    user_id: Uuid,
+    idempotency_key: &str,
+    status_code: i16,
+    headers: &[HeaderPairRecord],
+    body: &[u8],
+) -> Result<PgQueryResult, sqlx::Error> {
+    sqlx::query_unchecked!(
+        r#"
+        INSERT INTO idempotency (
+        user_id,
+        idempotency_key,
+        response_status_code,
+        response_headers, 
+        response_body,
+        created_at
+        )
+        VALUES ($1, $2, $3, $4, $5, now());
+        "#,
+        user_id,
+        idempotency_key,
+        status_code,
+        headers,
+        body
+    )
+    .execute(pg_executor)
+    .await
+}

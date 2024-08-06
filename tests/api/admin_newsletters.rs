@@ -188,6 +188,7 @@ async fn newsletter_creation_is_idempotent() -> Result<(), anyhow::Error> {
 
     // 실행 - 단계 4 - 리다이렉트를 따른다.
     let html_page = test_app.get_admin_newsletters_html().await?;
+    dbg!(&html_page);
     assert!(html_page.contains("<p><i>이메일 전송을 완료했습니다.</i></p>"));
 
     Ok(())
