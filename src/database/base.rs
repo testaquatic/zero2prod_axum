@@ -1,4 +1,4 @@
-use std::{str::FromStr, usize};
+use std::str::FromStr;
 
 use crate::{
     domain::NewSubscriber,
@@ -6,14 +6,11 @@ use crate::{
     settings::DatabaseSettings,
     utils::{error_chain_fmt, AppError500, SubscriptionToken},
 };
-use axum::{
-    body::to_bytes,
-    response::{IntoResponse, Response},
-};
+use axum::response::{IntoResponse, Response};
 use http::{HeaderMap, HeaderName, HeaderValue};
 
 use secrecy::Secret;
-use sqlx::{postgres::PgHasArrayType, Database, Pool};
+use sqlx::{Database, Pool, Transaction};
 use uuid::Uuid;
 
 // DB 변경을 쉽게 하기 위한 트레이트
@@ -25,6 +22,10 @@ pub enum Z2PADBError {
     IOError(std::io::Error),
     #[error(transparent)]
     AzumCoreError(axum::Error),
+    #[error("We expected a saved response, we didn't find kt.")]
+    NoSavedResponse,
+    #[error("expected: NextAction::StartProcessing, actual: NextAction::ReturnSavedResponse")]
+    InvalidNextAction,
 }
 
 impl std::fmt::Debug for Z2PADBError {
@@ -56,11 +57,22 @@ pub struct SavedHttpResponse {
     pub response_body: Vec<u8>,
 }
 
+pub enum NextAction<'a, T>
+where
+    T: sqlx::Database,
+{
+    // 나중에 사용할 트랜잭션을 가지고 있다.
+    StartProcessing(Transaction<'a, T>),
+    ReturnSavedResponse(SavedHttpResponse),
+}
+
+/*
 impl PgHasArrayType for HeaderPairRecord {
     fn array_type_info() -> sqlx::postgres::PgTypeInfo {
         sqlx::postgres::PgTypeInfo::with_name("_header_pair")
     }
 }
+*/
 
 impl IntoResponse for SavedHttpResponse {
     fn into_response(self) -> Response {
@@ -87,32 +99,6 @@ impl IntoResponse for SavedHttpResponse {
         }
 
         (status_code, header_map, self.response_body).into_response()
-    }
-}
-
-impl TryFrom<Response> for SavedHttpResponse {
-    type Error = anyhow::Error;
-
-    fn try_from(response: Response) -> Result<Self, Self::Error> {
-        let response_status_code = response.status().as_u16() as i16;
-        let response_headers = response
-            .headers()
-            .iter()
-            .map(|(name, value)| HeaderPairRecord {
-                name: name.to_string(),
-                value: value.as_bytes().to_vec(),
-            })
-            .collect::<Vec<_>>();
-
-        let response_body = tokio::runtime::Runtime::new()?
-            .block_on(to_bytes(response.into_body(), usize::MAX))?
-            .to_vec();
-
-        Ok(SavedHttpResponse {
-            response_status_code,
-            response_headers,
-            response_body,
-        })
     }
 }
 
@@ -166,9 +152,15 @@ pub trait Z2PADB: AsRef<Pool<Self::DB>> + TryInto<Pool<Self::DB>> + Sized + Clon
     ) -> Result<Option<SavedHttpResponse>, Z2PADBError>;
 
     async fn save_response(
-        &self,
+        next_action: NextAction<'_, Self::DB>,
         idempotency_key: &IdempotencyKey,
         user_id: Uuid,
         http_response: Response,
     ) -> Result<Response, Z2PADBError>;
+
+    async fn try_processing(
+        &self,
+        idempotency_key: &IdempotencyKey,
+        user_id: Uuid,
+    ) -> Result<NextAction<'_, Self::DB>, Z2PADBError>;
 }

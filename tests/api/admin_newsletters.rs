@@ -132,9 +132,9 @@ async fn newsletters_are_delivered_to_confirmed_subscriber() -> Result<(), anyho
 
     // 실행 - 단계 2 - 링크를 따른다.
     let html = test_app.get_admin_newsletters_html().await?;
-    assert!(html.contains("<p><i>이메일 전송을 완료했습니다.</i></p>"));
+    assert!(html.contains("<p><i>이메일 전송을 예약했습니다.</i></p>"));
     let html = test_app.get_admin_newsletters_html().await?;
-    assert!(!html.contains("<p><i>이메일 전송을 완료했습니다.</i></p>"));
+    assert!(!html.contains("<p><i>이메일 전송을 예약했습니다.</i></p>"));
 
     Ok(())
     // Mock은 뉴스레터 이메일을 보냈다는 Drop을 검증한다.
@@ -174,7 +174,7 @@ async fn newsletter_creation_is_idempotent() -> Result<(), anyhow::Error> {
 
     // 실행 - 단계 2 - 리다이렉트를 따른다.
     let html_page = test_app.get_admin_newsletters_html().await?;
-    assert!(html_page.contains("<p><i>이메일 전송을 완료했습니다.</i></p>"));
+    assert!(html_page.contains("<p><i>이메일 전송을 예약했습니다.</i></p>"));
 
     // 실행 - 단계 3 - 뉴스레터 폼을 다시 제출한다.
     let response = test_app
@@ -188,9 +188,45 @@ async fn newsletter_creation_is_idempotent() -> Result<(), anyhow::Error> {
 
     // 실행 - 단계 4 - 리다이렉트를 따른다.
     let html_page = test_app.get_admin_newsletters_html().await?;
-    dbg!(&html_page);
-    assert!(html_page.contains("<p><i>이메일 전송을 완료했습니다.</i></p>"));
+    assert!(html_page.contains("<p><i>이메일 전송을 예약했습니다.</i></p>"));
 
     Ok(())
     // Mock은 뉴스레터 이메일을 한 번 보냈다는 드롭을 검증한다.
+}
+
+#[tokio::test]
+async fn concurrent_form_submission_is_handled_gracefully() -> Result<(), anyhow::Error> {
+    // 준비
+    let test_app = TestApp::spawn_app().await?;
+    test_app.create_confirmed_subscriber().await?;
+    test_app.login_and_get_admin_dashboard_html().await?;
+
+    Mock::given(path("/email"))
+        .and(method(http::Method::POST))
+        // 두 번째 요청이 첫 번째 요청이 완료되기 전에 들어오도록 충분한 지연시간을 설정한다.
+        .respond_with(
+            ResponseTemplate::new(http::StatusCode::OK)
+                .set_delay(std::time::Duration::from_secs(2)),
+        )
+        .expect(1)
+        .mount(&test_app.email_mock_server)
+        .await;
+
+    // 실행 - 두 개의 뉴스레터 폼을 동시에 제출한다.
+    let newsletter_request_body = serde_json::json!({
+        "title": "Newsletter title",
+        "text_content": "Newsletter body as plain text",
+        "html_content": "<p>Newsletter body as HTML</p>",
+        "idempotency_key": uuid::Uuid::new_v4(),
+    });
+    let response1 = test_app.post_admin_newsletters(&newsletter_request_body);
+    let response2 = test_app.post_admin_newsletters(&newsletter_request_body);
+    let (response1, response2) = tokio::join!(response1, response2);
+    let (response1, response2) = (response1?, response2?);
+
+    assert_eq!(response1.status(), response2.status());
+    assert_eq!(response1.text().await?, response2.text().await?);
+
+    Ok(())
+    // Mock은 드롭시 이메일을 한 번만 보냈음을 검증한다.
 }

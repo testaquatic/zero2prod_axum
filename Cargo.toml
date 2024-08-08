@@ -46,7 +46,7 @@ secrecy = { version = "0.8", features = ["serde"] }
 serde = { version = "1", features = ["derive"] }
 serde-aux = { version = "4" }
 serde_json = { version = "1" }
-sqlx = { version = "0.7", default-features = false, features = [
+sqlx = { version = "0.8", default-features = false, features = [
     "runtime-tokio-rustls",
     "postgres",
     "macros",
@@ -64,7 +64,8 @@ tower-http = { version = "0.5", features = ["full"] }
 tower-sessions = { version = "0.12", features = ["private"] }
 tower-sessions-moka-store = { version = "0.13" }
 # 0.13은 버전 충돌이 일어난다.
-tower-sessions-sqlx-store = { version = "0.12", features = ["postgres"] }
+# sqlx를 0.8로 변경하니 해결이 됐다.
+tower-sessions-sqlx-store = { version = "0.13", features = ["postgres"] }
 tracing = { version = "0.1" }
 tracing-bunyan-formatter = { version = "0.3" }
 tracing-log = { version = "0.2" }
@@ -93,3 +94,4 @@ quickcheck_macros = { version = "1" }
 serde_json = { version = "1" }
 urlencoding = { version = "2" }
 wiremock = { version = "0.6" }
+serde_urlencoded = { version = "0.7" }

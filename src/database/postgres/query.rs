@@ -1,4 +1,3 @@
-use chrono::Utc;
 use secrecy::{ExposeSecret, Secret};
 use sqlx::{postgres::PgQueryResult, PgExecutor};
 use uuid::Uuid;
@@ -17,12 +16,13 @@ pub async fn pg_insert_subscriber(
     sqlx::query!(
         r#"
         INSERT INTO subscriptions (id, email, name, subscribed_at, status)
-        VALUES ($1, $2, $3, $4, 'pending_confirmation');
+        -- 버그인지 `chrono::offset::Utc::now()`를 사용하면 타입 불일치 오류가 발생한다.
+        -- SQL의 내장 함수인 `now()`로 대체했다.
+        VALUES ($1, $2, $3, now(), 'pending_confirmation');
         "#,
         subscriber_id,
         email,
-        name,
-        Utc::now(),
+        name
     )
     .execute(pg_executor)
     .await?;
@@ -168,9 +168,9 @@ pub async fn pg_get_saved_response(
         SavedHttpResponse,
         r#"
     SELECT
-        response_status_code,
-        response_headers as "response_headers: Vec<HeaderPairRecord>",
-        response_body
+        response_status_code as "response_status_code!",
+        response_headers as "response_headers!: Vec<HeaderPairRecord>",
+        response_body as "response_body!"
     FROM 
         idempotency
     WHERE 
@@ -195,21 +195,45 @@ pub async fn pg_save_response(
 ) -> Result<PgQueryResult, sqlx::Error> {
     sqlx::query_unchecked!(
         r#"
-        INSERT INTO idempotency (
-        user_id,
-        idempotency_key,
-        response_status_code,
-        response_headers, 
-        response_body,
-        created_at
-        )
-        VALUES ($1, $2, $3, $4, $5, now());
+        UPDATE idempotency
+        SET 
+            response_status_code = $3,
+            response_headers = $4,
+            response_body = $5
+        WHERE 
+            user_id = $1
+            AND
+            idempotency_key = $2;
         "#,
         user_id,
         idempotency_key,
         status_code,
         headers,
         body
+    )
+    .execute(pg_executor)
+    .await
+}
+
+pub async fn pg_try_saving_idempotency_key(
+    pg_executor: impl PgExecutor<'_>,
+    idempotency_key: &str,
+    user_id: Uuid,
+) -> Result<PgQueryResult, sqlx::Error> {
+    sqlx::query!(
+        r#"
+        INSERT INTO idempotency (
+            user_id,
+            idempotency_key,
+            created_at
+        )
+        VALUES (
+            $1, $2, now()
+        )
+        ON CONFLICT DO NOTHING
+        "#,
+        user_id,
+        idempotency_key
     )
     .execute(pg_executor)
     .await

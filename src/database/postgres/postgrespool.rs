@@ -13,7 +13,7 @@ use uuid::Uuid;
 use crate::{
     database::{
         base::{HeaderPairRecord, Z2PADBError, Z2PADB},
-        ConfirmedSubscriber, UserCredential,
+        ConfirmedSubscriber, NextAction, UserCredential,
     },
     domain::NewSubscriber,
     settings::DatabaseSettings,
@@ -23,7 +23,7 @@ use crate::{
 use super::query::{
     pg_change_password, pg_confirm_subscriber, pg_get_confirmed_subscribers, pg_get_saved_response,
     pg_get_subscriber_id_from_token, pg_get_user_credential, pg_get_user_id, pg_get_username,
-    pg_insert_subscriber, pg_save_response, pg_store_token,
+    pg_insert_subscriber, pg_save_response, pg_store_token, pg_try_saving_idempotency_key,
 };
 
 #[derive(Clone)]
@@ -163,11 +163,17 @@ impl Z2PADB for PostgresPool {
     }
 
     async fn save_response(
-        &self,
+        next_action: NextAction<'_, Self::DB>,
         idempotency_key: &crate::idempotency::IdempotencyKey,
         user_id: Uuid,
         http_response: axum::response::Response,
     ) -> Result<Response, Z2PADBError> {
+        let mut transaction = match next_action {
+            NextAction::StartProcessing(transaction) => transaction,
+            NextAction::ReturnSavedResponse(_) => {
+                return Err(Z2PADBError::InvalidNextAction);
+            }
+        };
         let (header, body) = http_response.into_parts();
         let status_code = header.status.as_u16() as i16;
         let headers = header
@@ -184,7 +190,7 @@ impl Z2PADB for PostgresPool {
             .to_vec();
 
         pg_save_response(
-            self.as_ref(),
+            transaction.as_mut(),
             user_id,
             idempotency_key.as_ref(),
             status_code,
@@ -192,8 +198,31 @@ impl Z2PADB for PostgresPool {
             &body,
         )
         .await?;
+        transaction.commit().await?;
 
         Ok((header, body).into_response())
+    }
+
+    async fn try_processing(
+        &self,
+        idempotency_key: &crate::idempotency::IdempotencyKey,
+        user_id: Uuid,
+    ) -> Result<crate::database::base::NextAction<Self::DB>, Z2PADBError> {
+        let mut transaction = self.as_ref().begin().await?;
+
+        match pg_try_saving_idempotency_key(transaction.as_mut(), idempotency_key.as_ref(), user_id)
+            .await?
+            .rows_affected()
+        {
+            0 => {
+                let saved_response = self
+                    .get_saved_response(idempotency_key, user_id)
+                    .await?
+                    .ok_or(Z2PADBError::NoSavedResponse)?;
+                Ok(NextAction::ReturnSavedResponse(saved_response))
+            }
+            _ => Ok(NextAction::StartProcessing(transaction)),
+        }
     }
 }
 
