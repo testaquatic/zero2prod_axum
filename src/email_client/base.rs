@@ -1,7 +1,7 @@
 use crate::{
-    database::{Z2PADBError, Z2PADB},
+    database::Z2PADBError,
     domain::{InvalidNewSubscriber, NewSubscriber, SubscriberEmail},
-    settings::{DefaultDBPool, EmailClientSettings},
+    settings::EmailClientSettings,
     utils::{error_chain_fmt, SubscriptionToken},
 };
 
@@ -20,6 +20,27 @@ pub enum EmailClientError {
 impl std::fmt::Debug for EmailClientError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         error_chain_fmt(self, f)
+    }
+}
+
+#[derive(serde::Deserialize)]
+pub struct BodyData {
+    pub title: String,
+    pub content: Content,
+}
+
+#[derive(serde::Deserialize)]
+pub struct Content {
+    pub html: String,
+    pub text: String,
+}
+
+impl BodyData {
+    pub fn new(title: String, html: String, text: String) -> BodyData {
+        BodyData {
+            title,
+            content: Content { html, text },
+        }
     }
 }
 
@@ -67,58 +88,4 @@ where
                 .await
         }
     }
-
-    #[tracing::instrument(name = "Publish newsletter", skip_all)]
-    async fn publish_newsletter(
-        &self,
-        pool: &DefaultDBPool,
-        body: &BodyData,
-    ) -> Result<(), EmailClientError> {
-        publish_newsletter(pool, self, body)
-    }
-}
-
-#[derive(serde::Deserialize)]
-pub struct BodyData {
-    title: String,
-    content: Content,
-}
-
-#[derive(serde::Deserialize)]
-pub struct Content {
-    html: String,
-    text: String,
-}
-
-impl BodyData {
-    pub fn new(title: String, html: String, text: String) -> BodyData {
-        BodyData {
-            title,
-            content: Content { html, text },
-        }
-    }
-}
-
-// 여기에 놓는 것이 맞을 것 같기는 한데 애매하다.
-pub async fn publish_newsletter<T: EmailClient>(
-    pool: &DefaultDBPool,
-    email_client: &T,
-    body: &BodyData,
-) -> Result<(), EmailClientError> {
-    // 이메일을 보낼 구독자 목록을 생성한다.
-    let subscribers = pool.get_confirmed_subscribers().await?;
-
-    for subscriber in subscribers {
-        let subscriber_email = SubscriberEmail::try_from(subscriber.email)?;
-        email_client
-            .send_email(
-                &subscriber_email,
-                &body.title,
-                &body.content.html,
-                &body.content.text,
-            )
-            .await?;
-    }
-
-    Ok(())
 }

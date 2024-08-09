@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use crate::{
-    authentication::reject_anonymous_users,
+    authentication::{reject_anonymous_users, PgSessionStorage},
     email_client::Postmark,
     error::Z2PAError,
     routes::{
@@ -21,18 +21,11 @@ use axum::{
 use base64::Engine;
 use http::Request;
 use secrecy::{ExposeSecret, Secret};
-use tokio::{
-    net::TcpListener,
-    signal,
-    task::{AbortHandle, JoinHandle},
-    time,
-};
+use tokio::{net::TcpListener, signal, task::AbortHandle};
 use tower_http::trace::{
     DefaultOnFailure, DefaultOnRequest, DefaultOnResponse, MakeSpan, TraceLayer,
 };
-use tower_sessions::{CachingSessionStore, ExpiredDeletion, SessionManagerLayer};
-use tower_sessions_moka_store::MokaStore;
-use tower_sessions_sqlx_store::PostgresStore;
+use tower_sessions::SessionManagerLayer;
 use tracing::{Level, Span};
 
 // 래퍼 타입을 정의해서 `subscriber` 핸들러에서 URL을 꺼낸다.
@@ -133,45 +126,6 @@ pub struct Server {
     tcp_listener: TcpListener,
     app_state: AppState,
     session_storage: PgSessionStorage,
-}
-
-pub struct PgSessionStorage {
-    session_store: CachingSessionStore<MokaStore, PostgresStore>,
-    abort_handle: JoinHandle<Result<(), tower_sessions::session_store::Error>>,
-    key: Secret<String>,
-}
-
-impl PgSessionStorage {
-    pub async fn init(
-        pool: DefaultDBPool,
-        key: Secret<String>,
-    ) -> Result<PgSessionStorage, anyhow::Error> {
-        // 세션 저장소를 생성한다.
-        let pg_store = PostgresStore::new(
-            pool.try_into()
-                .map_err(|s| anyhow::anyhow!("Failed to convert to PgPool.: {}", s))?,
-        );
-        pg_store.migrate().await?;
-
-        // 60초마다 만료된 세션을 삭제한다.
-        let deletion_task = tokio::task::spawn(
-            pg_store
-                .clone()
-                .continuously_delete_expired(time::Duration::from_secs(60)),
-        );
-
-        // 확장을 염두에 둔다면 redis가 나은 선택이다.
-        // postgres가 백엔드로 작동하고 있으니 작동에 문제는 없을 듯 하다.
-        // 세션을 Moka( https://docs.rs/moka/latest/moka/ )로 캐싱한다.
-        let caching_store = CachingSessionStore::new(MokaStore::new(Some(5000)), pg_store);
-        let session_storage = PgSessionStorage {
-            session_store: caching_store,
-            abort_handle: deletion_task,
-            key,
-        };
-
-        Ok(session_storage)
-    }
 }
 
 impl Server {

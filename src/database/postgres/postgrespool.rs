@@ -13,7 +13,7 @@ use uuid::Uuid;
 use crate::{
     database::{
         base::{HeaderPairRecord, Z2PADBError, Z2PADB},
-        ConfirmedSubscriber, NextAction, UserCredential,
+        NextAction, UserCredential,
     },
     domain::NewSubscriber,
     settings::DatabaseSettings,
@@ -21,9 +21,10 @@ use crate::{
 };
 
 use super::query::{
-    pg_change_password, pg_confirm_subscriber, pg_get_confirmed_subscribers, pg_get_saved_response,
+    pg_change_password, pg_confirm_subscriber, pg_enqueue_delivery_tasks, pg_get_saved_response,
     pg_get_subscriber_id_from_token, pg_get_user_credential, pg_get_user_id, pg_get_username,
-    pg_insert_subscriber, pg_save_response, pg_store_token, pg_try_saving_idempotency_key,
+    pg_insert_newsletter_issue, pg_insert_subscriber, pg_save_response, pg_store_token,
+    pg_try_saving_idempotency_key,
 };
 
 #[derive(Clone)]
@@ -108,13 +109,6 @@ impl Z2PADB for PostgresPool {
             })
     }
 
-    #[tracing::instrument(name = "Get confirmed subscribers", skip_all)]
-    async fn get_confirmed_subscribers(&self) -> Result<Vec<ConfirmedSubscriber>, Z2PADBError> {
-        pg_get_confirmed_subscribers(self.as_ref())
-            .await
-            .map_err(Z2PADBError::SqlxError)
-    }
-
     async fn get_user_id(
         &self,
         username: &str,
@@ -168,12 +162,7 @@ impl Z2PADB for PostgresPool {
         user_id: Uuid,
         http_response: axum::response::Response,
     ) -> Result<Response, Z2PADBError> {
-        let mut transaction = match next_action {
-            NextAction::StartProcessing(transaction) => transaction,
-            NextAction::ReturnSavedResponse(_) => {
-                return Err(Z2PADBError::InvalidNextAction);
-            }
-        };
+        let mut transaction = next_action.try_get_transaction()?;
         let (header, body) = http_response.into_parts();
         let status_code = header.status.as_u16() as i16;
         let headers = header
@@ -223,6 +212,32 @@ impl Z2PADB for PostgresPool {
             }
             _ => Ok(NextAction::StartProcessing(transaction)),
         }
+    }
+
+    async fn insert_newsletter_issue(
+        next_action: &mut NextAction<'_, Self::DB>,
+        title: &str,
+        text_content: &str,
+        html_content: &str,
+    ) -> Result<Uuid, Z2PADBError> {
+        let transaction = next_action.try_get_transaction_mut_ref()?;
+
+        let uuid =
+            pg_insert_newsletter_issue(transaction.as_mut(), title, text_content, html_content)
+                .await?;
+
+        Ok(uuid)
+    }
+
+    #[tracing::instrument(skip_all)]
+    async fn enqueue_delivery_tasks(
+        next_action: &mut NextAction<'_, Self::DB>,
+        newsletter_issue_id: Uuid,
+    ) -> Result<PgQueryResult, Z2PADBError> {
+        let transaction = next_action.try_get_transaction_mut_ref()?;
+        pg_enqueue_delivery_tasks(transaction.as_mut(), newsletter_issue_id)
+            .await
+            .map_err(Z2PADBError::SqlxError)
     }
 }
 

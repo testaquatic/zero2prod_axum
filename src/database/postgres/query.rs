@@ -4,7 +4,7 @@ use uuid::Uuid;
 
 use crate::database::{
     base::{HeaderPairRecord, SavedHttpResponse},
-    ConfirmedSubscriber, UserCredential,
+    UserCredential,
 };
 
 pub async fn pg_insert_subscriber(
@@ -70,21 +70,6 @@ pub async fn pg_get_subscriber_id_from_token(
     .fetch_optional(pg_executor)
     .await?;
     Ok(result.map(|row| row.subscriber_id))
-}
-
-pub async fn pg_get_confirmed_subscribers(
-    pg_executor: impl PgExecutor<'_>,
-) -> Result<Vec<ConfirmedSubscriber>, sqlx::Error> {
-    sqlx::query_as!(
-        ConfirmedSubscriber,
-        r#"
-        SELECT email
-        FROM subscriptions
-        WHERE status = 'confirmed';
-        "#,
-    )
-    .fetch_all(pg_executor)
-    .await
 }
 
 pub async fn pg_get_user_id(
@@ -234,6 +219,55 @@ pub async fn pg_try_saving_idempotency_key(
         "#,
         user_id,
         idempotency_key
+    )
+    .execute(pg_executor)
+    .await
+}
+
+pub async fn pg_insert_newsletter_issue(
+    pg_executor: impl PgExecutor<'_>,
+    title: &str,
+    text_content: &str,
+    html_content: &str,
+) -> Result<Uuid, sqlx::Error> {
+    let newsletter_issue_id = Uuid::new_v4();
+    sqlx::query!(
+        r#"
+        INSERT INTO newsletter_issues (
+        newsletter_issue_id,
+        title,
+        text_content,
+        html_content,
+        published_at
+        )
+        VALUES ($1, $2, $3, $4, now())
+        "#,
+        newsletter_issue_id,
+        title,
+        text_content,
+        html_content,
+    )
+    .execute(pg_executor)
+    .await?;
+
+    Ok(newsletter_issue_id)
+}
+
+pub async fn pg_enqueue_delivery_tasks(
+    pg_executor: impl PgExecutor<'_>,
+    newsletter_issue_id: Uuid,
+) -> Result<PgQueryResult, sqlx::Error> {
+    sqlx::query!(
+        r#"
+        INSERT INTO issue_delivery_queue (
+        newsletter_issue_id,
+        subscriber_email
+        )
+        SELECT $1, email
+        FROM subscriptions
+        WHERE status = 'confirmed'
+        "#,
+        newsletter_issue_id
     )
     .execute(pg_executor)
     .await

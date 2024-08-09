@@ -2,6 +2,10 @@ use std::sync::Once;
 
 use anyhow::Context;
 use argon2::{password_hash::SaltString, Argon2, Params, PasswordHasher};
+use fake::{
+    faker::{internet::en::SafeEmail, name::en::Name},
+    Fake,
+};
 use http::HeaderValue;
 use rand::{
     distributions::{uniform::SampleRange, DistString, Standard},
@@ -18,8 +22,9 @@ use wiremock::{
     Mock, MockServer, ResponseTemplate,
 };
 use zero2prod_axum::{
+    authentication::PgSessionStorage,
     settings::{DefaultDBPool, Settings},
-    startup::{AppState, PgSessionStorage, Server},
+    startup::{AppState, Server},
     telemetry::{get_tracing_subscriber, init_tracing_subscriber},
 };
 
@@ -191,8 +196,9 @@ impl TestApp {
 
     pub async fn post_subscriptions(
         &self,
-        body: &'static str,
+        body: impl Into<String>,
     ) -> Result<reqwest::Response, anyhow::Error> {
+        let body = body.into();
         self.api_client
             .post(self.subscriptions_uri()?)
             .header(
@@ -247,7 +253,13 @@ impl TestApp {
     /// 테스트 대상 애플리케이션의 퍼블릭 API를 사용해서 확인되지 않은 구독자를 생성한다.
 
     pub async fn create_unconfirmed_subscriber(&self) -> Result<ConfirmationLinks, anyhow::Error> {
-        let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
+        // 이제 여러 국자들을 다루므로 충돌을 피하기 위해 구독자들을 무작위로 만들어야 한다.
+        let name = Name().fake::<String>();
+        let email = SafeEmail().fake::<String>();
+        let body = serde_urlencoded::to_string(&serde_json::json!({
+            "name": name,
+            "email": email,
+        }))?;
 
         let _mock_guard = Mock::given(path("/email"))
             .and(method(http::Method::POST))

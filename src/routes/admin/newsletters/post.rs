@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use anyhow::Context;
 use axum::{
     extract::{rejection::FormRejection, State},
     response::{self, IntoResponse, Response},
@@ -10,10 +11,8 @@ use axum_flash::Flash;
 use crate::{
     authentication::UserId,
     database::{NextAction, Z2PADB},
-    email_client::{BodyData, EmailClient},
     idempotency::IdempotencyKey,
-    settings::{DefaultDBPool, DefaultEmailClient},
-    utils::AppError500,
+    settings::DefaultDBPool,
 };
 
 use super::AdminPublishError;
@@ -28,7 +27,6 @@ pub struct FormData {
 
 #[tracing::instrument(name = "Publish newsletter by WEB interface.", skip_all)]
 pub async fn admin_publish_newsletter(
-    State(email_client): State<Arc<DefaultEmailClient>>,
     State(pool): State<Arc<DefaultDBPool>>,
     // 사용자 세션에서 추출한 사용자 id를 주입힌다.
     Extension(user_id): Extension<UserId>,
@@ -68,10 +66,9 @@ pub async fn admin_publish_newsletter(
     let idempotency_key =
         IdempotencyKey::try_from(idempotency_key).map_err(AdminPublishError::BadRequest)?;
 
-    let next_action = match pool
+    let mut next_action = match pool
         .try_processing(&idempotency_key, user_id.0)
         .await
-        .map_err(AppError500::new)
         .map_err(|e| AdminPublishError::UnexpectedError(e.into()))?
     {
         // 데이터베이스에 저장된 응답이 있다면 일찍 반환한다.
@@ -81,13 +78,15 @@ pub async fn admin_publish_newsletter(
         next_action => next_action,
     };
 
-    let body_data = BodyData::new(title, html_content, text_content);
-
-    email_client
-        .as_ref()
-        .publish_newsletter(&pool, &body_data)
-        .await
-        .map_err(|e| AdminPublishError::UnexpectedError(e.into()))?;
+    DefaultDBPool::schedule_newsletter_delivery(
+        &mut next_action,
+        &title,
+        &text_content,
+        &html_content,
+    )
+    .await
+    .context("Failed to schedule newsletter delivery")
+    .map_err(AdminPublishError::UnexpectedError)?;
 
     let response = (
         flash.info("이메일 전송을 예약했습니다."),

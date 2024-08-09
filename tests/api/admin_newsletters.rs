@@ -230,3 +230,63 @@ async fn concurrent_form_submission_is_handled_gracefully() -> Result<(), anyhow
     Ok(())
     // Mock은 드롭시 이메일을 한 번만 보냈음을 검증한다.
 }
+
+#[tokio::test]
+async fn transient_errors_do_not_cause_duplicate_deliveries_on_retries() -> Result<(), anyhow::Error>
+{
+    // 준비
+    let test_app = TestApp::spawn_app().await?;
+    let newsletter_request_body = serde_json::json!({
+        "title": "Newsletter title",
+        "text_content": "Newsletter body as plain text",
+        "html_content": "<p>Newsletter body as HTML</p>",
+        "idempotency_key": uuid::Uuid::new_v4(),
+    });
+    // 한 명의 구독자 대신 두 명의 구독자
+    test_app.create_confirmed_subscriber().await?;
+    test_app.create_confirmed_subscriber().await?;
+    test_app.login_and_get_admin_dashboard_html().await?;
+
+    // 실행 - 단계 1 - 뉴스레터 제출 폼
+    // 첫번째 구독자에 대한 이메일 전달은 성공한다.
+    Mock::given(path("/email"))
+        .and(method(http::Method::POST))
+        .respond_with(ResponseTemplate::new(http::StatusCode::OK))
+        .up_to_n_times(1)
+        .expect(1)
+        .mount(&test_app.email_mock_server)
+        .await;
+    // 두번째 구독자에 대한 이메일 전달은 실패한다.
+    Mock::given(path("/email"))
+        .and(method(http::Method::POST))
+        .respond_with(ResponseTemplate::new(
+            http::StatusCode::INTERNAL_SERVER_ERROR,
+        ))
+        .up_to_n_times(1)
+        .expect(1)
+        .mount(&test_app.email_mock_server)
+        .await;
+
+    let response = test_app
+        .post_admin_newsletters(&newsletter_request_body)
+        .await?;
+    assert_eq!(response.status(), http::StatusCode::INTERNAL_SERVER_ERROR);
+
+    // 실행 - 단계 2 - 폼 제출을 재시도한다.
+    // 이제 두명의 구독자 모두에게 이메일 전달을 성공한다.
+    Mock::given(path("/email"))
+        .and(method(http::Method::POST))
+        .respond_with(ResponseTemplate::new(http::StatusCode::OK))
+        .expect(1)
+        .named("Delivery retry")
+        .mount(&test_app.email_mock_server)
+        .await;
+    let response = test_app
+        .post_admin_newsletters(&newsletter_request_body)
+        .await?;
+    assert_eq!(response.status(), http::StatusCode::SEE_OTHER);
+
+    Ok(())
+
+    // mock은 중복된 뉴스레터를 발송하지 않았음을 검증한다.
+}

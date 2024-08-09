@@ -34,11 +34,6 @@ impl std::fmt::Debug for Z2PADBError {
     }
 }
 
-#[derive(sqlx::FromRow)]
-pub struct ConfirmedSubscriber {
-    pub email: String,
-}
-
 pub struct UserCredential {
     pub user_id: Uuid,
     pub password_hash: Secret<String>,
@@ -65,7 +60,6 @@ where
     StartProcessing(Transaction<'a, T>),
     ReturnSavedResponse(SavedHttpResponse),
 }
-
 /*
 impl PgHasArrayType for HeaderPairRecord {
     fn array_type_info() -> sqlx::postgres::PgTypeInfo {
@@ -73,6 +67,25 @@ impl PgHasArrayType for HeaderPairRecord {
     }
 }
 */
+
+impl<'a, T> NextAction<'a, T>
+where
+    T: sqlx::Database,
+{
+    pub fn try_get_transaction(self) -> Result<Transaction<'a, T>, Z2PADBError> {
+        match self {
+            NextAction::ReturnSavedResponse(_) => Err(Z2PADBError::InvalidNextAction),
+            NextAction::StartProcessing(transaction) => Ok(transaction),
+        }
+    }
+
+    pub fn try_get_transaction_mut_ref(&mut self) -> Result<&mut Transaction<'a, T>, Z2PADBError> {
+        match self {
+            NextAction::ReturnSavedResponse(_) => Err(Z2PADBError::InvalidNextAction),
+            NextAction::StartProcessing(transaction) => Ok(transaction),
+        }
+    }
+}
 
 impl IntoResponse for SavedHttpResponse {
     fn into_response(self) -> Response {
@@ -124,8 +137,6 @@ pub trait Z2PADB: AsRef<Pool<Self::DB>> + TryInto<Pool<Self::DB>> + Sized + Clon
         subscription_token: &str,
     ) -> Result<Option<Uuid>, Z2PADBError>;
 
-    async fn get_confirmed_subscribers(&self) -> Result<Vec<ConfirmedSubscriber>, Z2PADBError>;
-
     async fn get_user_id(
         &self,
         username: &str,
@@ -163,4 +174,35 @@ pub trait Z2PADB: AsRef<Pool<Self::DB>> + TryInto<Pool<Self::DB>> + Sized + Clon
         idempotency_key: &IdempotencyKey,
         user_id: Uuid,
     ) -> Result<NextAction<'_, Self::DB>, Z2PADBError>;
+
+    async fn insert_newsletter_issue(
+        next_action: &mut NextAction<'_, Self::DB>,
+        title: &str,
+        text_content: &str,
+        html_content: &str,
+    ) -> Result<Uuid, Z2PADBError>;
+
+    async fn enqueue_delivery_tasks(
+        next_action: &mut NextAction<'_, Self::DB>,
+        newsletter_issue_id: Uuid,
+    ) -> Result<<Self::DB as Database>::QueryResult, Z2PADBError>;
+
+    // 함수를 만능으로 만들지 말자
+    #[tracing::instrument(name = "Schedule newsletter delivery", skip_all)]
+    fn schedule_newsletter_delivery(
+        next_action: &mut NextAction<'_, Self::DB>,
+        title: &str,
+        text_content: &str,
+        html_content: &str,
+    ) -> impl std::future::Future<Output = Result<(), Z2PADBError>> {
+        async {
+            let issue_id =
+                Self::insert_newsletter_issue(next_action, &title, &text_content, &html_content)
+                    .await?;
+
+            Self::enqueue_delivery_tasks(next_action, issue_id).await?;
+
+            Ok(())
+        }
+    }
 }
