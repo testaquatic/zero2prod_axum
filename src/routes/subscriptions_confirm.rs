@@ -5,10 +5,7 @@ use axum::{
     response::{IntoResponse, Response, Result},
 };
 
-use crate::{
-    database::{Z2PADBError, Z2PADB},
-    settings::DefaultDBPool,
-};
+use crate::database::{postgres::PostgresPool, Z2PADBError};
 
 #[derive(serde::Deserialize)]
 pub struct Parameters {
@@ -47,7 +44,7 @@ impl IntoResponse for ConfrimError {
 #[tracing::instrument(name = "Confirm a pending subscriber", skip(parameters, pool))]
 pub async fn confirm(
     Query(parameters): Query<Parameters>,
-    State(pool): State<Arc<DefaultDBPool>>,
+    State(pool): State<Arc<PostgresPool>>,
 ) -> Result<Response, ConfrimError> {
     let id = pool
         .as_ref()

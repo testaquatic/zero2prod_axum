@@ -1,9 +1,8 @@
 use crate::{
-    database::Z2PADB,
+    database::postgres::PostgresPool,
     domain::{InvalidNewSubscriber, NewSubscriber, SubscriberEmail, SubscriberName},
-    email_client::{EmailClient, Postmark},
+    email_client::Postmark,
     error::Z2PAError,
-    settings::DefaultDBPool,
     startup::ApplicationBaseUrl,
     utils::error_chain_fmt,
 };
@@ -86,7 +85,7 @@ impl IntoResponse for SubscribeError {
     )
 )]
 pub async fn subscribe(
-    State(pool): State<Arc<DefaultDBPool>>,
+    State(pool): State<Arc<PostgresPool>>,
     // 앱 콘텍스트에서 이메일 클라인트를 받는다.
     State(email_client): State<Arc<Postmark>>,
     State(base_url): State<Arc<ApplicationBaseUrl>>,

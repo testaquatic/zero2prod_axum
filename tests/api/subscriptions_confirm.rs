@@ -3,7 +3,6 @@ use wiremock::{
     matchers::{method, path},
     Mock, ResponseTemplate,
 };
-use zero2prod_axum::settings::DefaultDBPool;
 
 use crate::helpers::TestApp;
 
@@ -76,11 +75,7 @@ async fn clicking_on_the_confirmation_link_confirms_a_subscriber() -> Result<(),
         .error_for_status()?;
 
     // 확인
-    let pool = test_app
-        .settings
-        .database
-        .get_pool::<DefaultDBPool>()
-        .await?;
+    let pool = test_app.settings.database.get_pool().await?;
 
     #[derive(sqlx::FromRow)]
     struct Subscriber {

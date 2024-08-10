@@ -23,7 +23,8 @@ use wiremock::{
 };
 use zero2prod_axum::{
     authentication::PgSessionStorage,
-    settings::{DefaultDBPool, Settings},
+    database::postgres::PostgresPool,
+    settings::Settings,
     startup::{AppState, Server},
     telemetry::{get_tracing_subscriber, init_tracing_subscriber},
 };
@@ -66,7 +67,7 @@ impl TestUser {
 
     async fn store(
         &self,
-        pool: &DefaultDBPool,
+        pool: &PostgresPool,
     ) -> Result<sqlx::postgres::PgQueryResult, anyhow::Error> {
         let salt = SaltString::generate(&mut rand::thread_rng());
         // 정확한 Argon2 파라미터에 관해서는 신경쓰지 않는다.
@@ -180,13 +181,13 @@ impl TestApp {
 
     // 테스트 `DefaultDBPool`을 생성한다.
     // 데이터 마이그레이션과 테스트에 필요한 데이터를 DB에 저장한다.
-    async fn create_test_db_pool(&mut self) -> Result<DefaultDBPool, anyhow::Error> {
+    async fn create_test_db_pool(&mut self) -> Result<PostgresPool, anyhow::Error> {
         // 임의의 DB 이름을 생성한다.
         self.settings.database.database_name = Uuid::new_v4().to_string();
         // 데이터베이스를 생성한다.
-        DefaultDBPool::create_db(&self.settings.database).await?;
+        PostgresPool::create_db(&self.settings.database).await?;
         // 데이터베이스를 마이그레이션 한다.
-        let pool = self.settings.database.get_pool::<DefaultDBPool>().await?;
+        let pool = self.settings.database.get_pool().await?;
         pool.migrate().await?;
         // `TestUser`를 DB에 저장한다.
         self.test_user.store(&pool).await?;

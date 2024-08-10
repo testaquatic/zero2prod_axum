@@ -6,19 +6,13 @@ use axum::{
     Extension,
 };
 
-use crate::{
-    authentication::UserId, database::Z2PADB, settings::DefaultDBPool, utils::AppError500,
-};
+use crate::{authentication::UserId, database::postgres::PostgresPool, utils::AppError500};
 
 pub async fn admin_dashboard(
-    State(pool): State<Arc<DefaultDBPool>>,
+    State(pool): State<Arc<PostgresPool>>,
     Extension(UserId(user_id)): Extension<UserId>,
 ) -> axum::response::Result<Response> {
-    let username = pool
-        .as_ref()
-        .get_username(user_id)
-        .await
-        .map_err(AppError500::new)?;
+    let username = pool.get_username(user_id).await.map_err(AppError500::new)?;
 
     Ok(
         response::Html(format!(include_str!("dashboard.html"), username = username))

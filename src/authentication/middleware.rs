@@ -10,7 +10,7 @@ use tower_sessions_moka_store::MokaStore;
 use tower_sessions_sqlx_store::PostgresStore;
 use uuid::Uuid;
 
-use crate::{session_state::TypedSession, settings::DefaultDBPool, utils::AppError500};
+use crate::{database::postgres::PostgresPool, session_state::TypedSession, utils::AppError500};
 
 #[derive(Clone)]
 pub struct UserId(pub Uuid);
@@ -44,7 +44,7 @@ pub struct PgSessionStorage {
 
 impl PgSessionStorage {
     pub async fn init(
-        pool: DefaultDBPool,
+        pool: PostgresPool,
         key: Secret<String>,
     ) -> Result<PgSessionStorage, anyhow::Error> {
         // 세션 저장소를 생성한다.

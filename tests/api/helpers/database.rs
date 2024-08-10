@@ -1,20 +1,18 @@
 use anyhow::Context;
-use sqlx::{postgres::PgQueryResult, Database};
+use sqlx::postgres::PgQueryResult;
 use uuid::Uuid;
 use zero2prod_axum::{
     database::{
         postgres::{DatabaseSettingsPgExt, PostgresPool},
-        Z2PADBError, Z2PADB,
+        Z2PADBError,
     },
     settings::DatabaseSettings,
 };
 
-pub trait DefaultDBPoolTestExt: Z2PADB {
+pub trait DefaultDBPoolTestExt: Sized {
     async fn connect_without_db(database_settings: &DatabaseSettings) -> Result<Self, Z2PADBError>;
 
-    async fn create_db(
-        database_settings: &DatabaseSettings,
-    ) -> Result<<Self::DB as Database>::QueryResult, Z2PADBError>;
+    async fn create_db(database_settings: &DatabaseSettings) -> Result<PgQueryResult, Z2PADBError>;
 
     async fn migrate(&self) -> Result<(), anyhow::Error>;
 
@@ -23,7 +21,7 @@ pub trait DefaultDBPoolTestExt: Z2PADB {
         uuid: &Uuid,
         username: &str,
         password_hash: &str,
-    ) -> Result<<Self::DB as Database>::QueryResult, Z2PADBError>;
+    ) -> Result<PgQueryResult, Z2PADBError>;
 }
 
 impl DefaultDBPoolTestExt for PostgresPool {

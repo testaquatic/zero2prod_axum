@@ -8,12 +8,7 @@ use axum::{
 use uuid::Uuid;
 
 use crate::{
-    authentication::{basic_authentication, AuthError},
-    database::Z2PADB,
-    email_client::BodyData,
-    idempotency::IdempotencyKey,
-    settings::DefaultDBPool,
-    utils::error_chain_fmt,
+    authentication::{basic_authentication, AuthError}, database::{postgres::PostgresPool, NextAction}, email_client::BodyData, idempotency::IdempotencyKey, utils::error_chain_fmt
 };
 
 #[derive(thiserror::Error)]
@@ -69,7 +64,7 @@ impl IntoResponse for PublishError {
 )]
 // 뉴스레터 발송을 담당하는 엔드포인트
 pub async fn publish_newsletter_basic_auth(
-    State(pool): State<Arc<DefaultDBPool>>,
+    State(pool): State<Arc<PostgresPool>>,
     headers: http::HeaderMap,
     extract::Json(body): extract::Json<BodyData>,
 ) -> Result<Response, PublishError> {
@@ -88,7 +83,7 @@ pub async fn publish_newsletter_basic_auth(
         })?;
     tracing::Span::current().record("user_id", tracing::field::display(&user_id));
 
-    let mut next_action = pool
+    let next_action = pool
         .as_ref()
         .try_processing(
             &IdempotencyKey::try_from(Uuid::new_v4().to_string())
@@ -97,8 +92,13 @@ pub async fn publish_newsletter_basic_auth(
         )
         .await
         .map_err(|e| PublishError::UnexpectedError(e.into()))?;
-    DefaultDBPool::schedule_newsletter_delivery(
-        &mut next_action,
+
+    let mut transaciton = match next_action {
+        NextAction::ReturnSavedResponse(_) => return Err(PublishError::UnexpectedError(anyhow::anyhow!("Unexpected uuid duplicate"))),
+        NextAction::StartProcessing(transaction) => transaction,
+    };
+
+    transaciton.schedule_newsletter_delivery(
         &body.title,
         &body.content.text,
         &body.content.html,

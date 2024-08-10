@@ -11,8 +11,7 @@ use unicode_segmentation::UnicodeSegmentation;
 
 use crate::{
     authentication::{AuthError, Credentials, UserId},
-    database::Z2PADB,
-    settings::DefaultDBPool,
+    database::postgres::PostgresPool,
     utils::AppError500,
 };
 
@@ -26,7 +25,7 @@ pub struct FormData {
 pub async fn change_password(
     // TypedSession을 더 이상 주입하지 않는다.
     flash: Flash,
-    State(pool): State<Arc<DefaultDBPool>>,
+    State(pool): State<Arc<PostgresPool>>,
     Extension(UserId(user_id)): Extension<UserId>,
     Form(form): Form<FormData>,
 ) -> axum::response::Result<impl IntoResponse> {

@@ -7,8 +7,7 @@ use secrecy::{ExposeSecret, Secret};
 use tokio::task::spawn_blocking;
 
 use crate::{
-    database::{UserCredential, Z2PADB},
-    settings::DefaultDBPool,
+    database::{postgres::PostgresPool, UserCredential},
     utils::spawn_blocking_with_tracing,
 };
 
@@ -66,7 +65,7 @@ pub fn basic_authentication(headers: &http::HeaderMap) -> Result<Credentials, an
 impl Credentials {
     // 발신자를 확인하고 발신자의 uuid를 반환한다.
     #[tracing::instrument(name = "Validate credentials", skip_all)]
-    pub async fn validate_credentials(self, pool: &DefaultDBPool) -> Result<uuid::Uuid, AuthError> {
+    pub async fn validate_credentials(self, pool: &PostgresPool) -> Result<uuid::Uuid, AuthError> {
         let mut user_id = None;
         let mut expected_password_hash = Secret::new(
         // password   : S+D3Jr0Mfc4/u/M5Zi1zwCJCewL7caoEkkSRDSltM5g
@@ -143,7 +142,7 @@ pub fn compute_password_hash(password: Secret<String>) -> Result<Secret<String>,
 pub async fn change_password(
     user_id: uuid::Uuid,
     password: Secret<String>,
-    pool: &DefaultDBPool,
+    pool: &PostgresPool,
 ) -> Result<(), anyhow::Error> {
     let password_hash = spawn_blocking_with_tracing(move || compute_password_hash(password))
         .await?

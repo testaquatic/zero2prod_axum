@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use crate::{
     authentication::{reject_anonymous_users, PgSessionStorage},
+    database::postgres::PostgresPool,
     email_client::Postmark,
     error::Z2PAError,
     routes::{
@@ -9,7 +10,7 @@ use crate::{
         change_password_form, confirm, health_check, home, log_out, login, login_form,
         publish_newsletter_basic_auth, subscribe,
     },
-    settings::{DefaultDBPool, DefaultEmailClient, Settings},
+    settings::Settings,
 };
 use axum::{
     body::Body,
@@ -36,8 +37,8 @@ pub struct ApplicationBaseUrl(pub String);
 #[derive(Clone)]
 pub struct AppState {
     flash_config: axum_flash::Config,
-    pool: Arc<DefaultDBPool>,
-    email_client: Arc<DefaultEmailClient>,
+    pool: Arc<PostgresPool>,
+    email_client: Arc<Postmark>,
     base_url: Arc<ApplicationBaseUrl>,
 }
 
@@ -47,13 +48,13 @@ impl FromRef<AppState> for axum_flash::Config {
     }
 }
 
-impl FromRef<AppState> for Arc<DefaultDBPool> {
+impl FromRef<AppState> for Arc<PostgresPool> {
     fn from_ref(input: &AppState) -> Self {
         input.pool.clone()
     }
 }
 
-impl FromRef<AppState> for Arc<DefaultEmailClient> {
+impl FromRef<AppState> for Arc<Postmark> {
     fn from_ref(input: &AppState) -> Self {
         input.email_client.clone()
     }
@@ -68,8 +69,8 @@ impl FromRef<AppState> for Arc<ApplicationBaseUrl> {
 impl AppState {
     pub fn new(
         flash_config_key: &Secret<String>,
-        pool: DefaultDBPool,
-        email_client: DefaultEmailClient,
+        pool: PostgresPool,
+        email_client: Postmark,
         base_url: &str,
     ) -> Result<AppState, anyhow::Error> {
         let key = axum_flash::Key::from(
@@ -145,11 +146,11 @@ impl Server {
         let tcp_listener = settings.application.get_listener().await?;
         let pool = settings
             .database
-            .get_pool::<DefaultDBPool>()
+            .get_pool()
             .await
             .map_err(Z2PAError::DatabaseError)?;
         // `settings`를 사용해서 `EmailClient`를 만든다.
-        let email_client = settings.email_client.get_email_client::<Postmark>()?;
+        let email_client = settings.email_client.get_email_client()?;
 
         let app_state = AppState::new(
             &settings.application.hmac_secret,

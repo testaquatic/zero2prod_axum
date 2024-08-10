@@ -1,5 +1,5 @@
 mod base;
 mod postmark;
 
-pub use base::{BodyData, EmailClient, EmailClientError};
+pub use base::{BodyData, EmailClientError};
 pub use postmark::Postmark;

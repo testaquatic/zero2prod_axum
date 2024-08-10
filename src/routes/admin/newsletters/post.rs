@@ -10,9 +10,8 @@ use axum_flash::Flash;
 
 use crate::{
     authentication::UserId,
-    database::{NextAction, Z2PADB},
+    database::{postgres::PostgresPool, NextAction},
     idempotency::IdempotencyKey,
-    settings::DefaultDBPool,
 };
 
 use super::AdminPublishError;
@@ -27,7 +26,7 @@ pub struct FormData {
 
 #[tracing::instrument(name = "Publish newsletter by WEB interface.", skip_all)]
 pub async fn admin_publish_newsletter(
-    State(pool): State<Arc<DefaultDBPool>>,
+    State(pool): State<Arc<PostgresPool>>,
     // 사용자 세션에서 추출한 사용자 id를 주입힌다.
     Extension(user_id): Extension<UserId>,
     flash: Flash,
@@ -66,7 +65,7 @@ pub async fn admin_publish_newsletter(
     let idempotency_key =
         IdempotencyKey::try_from(idempotency_key).map_err(AdminPublishError::BadRequest)?;
 
-    let mut next_action = match pool
+    let mut pg_transaction = match pool
         .try_processing(&idempotency_key, user_id.0)
         .await
         .map_err(|e| AdminPublishError::UnexpectedError(e.into()))?
@@ -75,25 +74,22 @@ pub async fn admin_publish_newsletter(
         NextAction::ReturnSavedResponse(saved_response) => {
             return Ok((flash.info("이메일 전송을 예약했습니다."), saved_response).into_response());
         }
-        next_action => next_action,
+        NextAction::StartProcessing(pg_transaction) => pg_transaction,
     };
 
-    DefaultDBPool::schedule_newsletter_delivery(
-        &mut next_action,
-        &title,
-        &text_content,
-        &html_content,
-    )
-    .await
-    .context("Failed to schedule newsletter delivery")
-    .map_err(AdminPublishError::UnexpectedError)?;
+    pg_transaction
+        .schedule_newsletter_delivery(&title, &text_content, &html_content)
+        .await
+        .context("Failed to schedule newsletter delivery")
+        .map_err(AdminPublishError::UnexpectedError)?;
 
     let response = (
         flash.info("이메일 전송을 예약했습니다."),
         response::Redirect::to("/admin/newsletters"),
     )
         .into_response();
-    let response = DefaultDBPool::save_response(next_action, &idempotency_key, user_id.0, response)
+    let response = pg_transaction
+        .save_response(&idempotency_key, user_id.0, response)
         .await
         .map_err(|e| AdminPublishError::UnexpectedError(e.into()))?;
     Ok(response)

@@ -10,8 +10,8 @@ use secrecy::Secret;
 
 use crate::{
     authentication::{AuthError, Credentials},
+    database::postgres::PostgresPool,
     session_state::TypedSession,
-    settings::DefaultDBPool,
     utils::error_chain_fmt,
 };
 
@@ -49,7 +49,7 @@ pub async fn login(
     flash: Flash,
     session: TypedSession,
     // `DefaultDBPool`을 주입해서 데이터베이스로부터 저장된 크리덴셜을 꺼낸다.
-    State(pool): State<Arc<DefaultDBPool>>,
+    State(pool): State<Arc<PostgresPool>>,
     // `HmacSecret`은 더 이상 필요하지 않다.
     Form(form): Form<FormData>,
 ) -> axum::response::Result<impl IntoResponse> {

@@ -1,30 +1,25 @@
-use axum::{
-    body::to_bytes,
-    response::{IntoResponse, Response},
-};
 use futures_util::TryFutureExt;
 use secrecy::{ExposeSecret, Secret};
 use sqlx::{
     postgres::{PgConnectOptions, PgPoolOptions, PgQueryResult, PgSslMode},
-    PgPool, Postgres,
+    PgPool,
 };
 use uuid::Uuid;
 
 use crate::{
-    database::{
-        base::{HeaderPairRecord, Z2PADBError, Z2PADB},
-        NextAction, UserCredential,
-    },
+    database::{base::Z2PADBError, NextAction, UserCredential},
     domain::NewSubscriber,
     settings::DatabaseSettings,
     utils::SubscriptionToken,
 };
 
-use super::query::{
-    pg_change_password, pg_confirm_subscriber, pg_enqueue_delivery_tasks, pg_get_saved_response,
-    pg_get_subscriber_id_from_token, pg_get_user_credential, pg_get_user_id, pg_get_username,
-    pg_insert_newsletter_issue, pg_insert_subscriber, pg_save_response, pg_store_token,
-    pg_try_saving_idempotency_key,
+use super::{
+    postgres_query::{
+        pg_change_password, pg_confirm_subscriber, pg_get_saved_response,
+        pg_get_subscriber_id_from_token, pg_get_user_credential, pg_get_username,
+        pg_insert_subscriber, pg_store_token, pg_try_saving_idempotency_key,
+    },
+    postgres_transaction::PostgresTransaction,
 };
 
 #[derive(Clone)]
@@ -32,12 +27,11 @@ pub struct PostgresPool {
     pool: PgPool,
 }
 
-impl Z2PADB for PostgresPool {
-    type Z2PADBPool = Self;
-    type DB = Postgres;
-
+impl PostgresPool {
     #[tracing::instrument(name = "Connect to the Postgres server.", skip_all)]
-    fn connect(database_settings: &crate::settings::DatabaseSettings) -> Result<Self, Z2PADBError> {
+    pub fn connect(
+        database_settings: &crate::settings::DatabaseSettings,
+    ) -> Result<Self, Z2PADBError> {
         let pg_connect_options = database_settings.connect_options_with_db();
         let pool = PgPoolOptions::new()
             .acquire_timeout(std::time::Duration::from_secs(2))
@@ -45,11 +39,15 @@ impl Z2PADB for PostgresPool {
         Ok(PostgresPool { pool })
     }
 
+    pub async fn begin<'a>(&'a self) -> Result<PostgresTransaction<'a>, Z2PADBError> {
+        Ok(PostgresTransaction::new(self.pool.begin().await?))
+    }
+
     #[tracing::instrument(
         name = "Saving new subscriber details and token in the database."
         skip_all,
     )]
-    async fn insert_subscriber(
+    pub async fn insert_subscriber(
         &self,
         new_subscriber: &NewSubscriber,
     ) -> Result<SubscriptionToken, Z2PADBError> {
@@ -87,7 +85,10 @@ impl Z2PADB for PostgresPool {
     }
 
     #[tracing::instrument(name = "Mark subscriber as confirmed", skip_all)]
-    async fn confirm_subscriber(&self, subscriber_id: Uuid) -> Result<PgQueryResult, Z2PADBError> {
+    pub async fn confirm_subscriber(
+        &self,
+        subscriber_id: Uuid,
+    ) -> Result<PgQueryResult, Z2PADBError> {
         pg_confirm_subscriber(self.as_ref(), subscriber_id)
             .await
             .map_err(|e| {
@@ -97,7 +98,7 @@ impl Z2PADB for PostgresPool {
     }
 
     #[tracing::instrument(name = "Get subscriber_id from token", skip_all)]
-    async fn get_subscriber_id_from_token(
+    pub async fn get_subscriber_id_from_token(
         &self,
         subscription_token: &str,
     ) -> Result<Option<Uuid>, Z2PADBError> {
@@ -109,18 +110,8 @@ impl Z2PADB for PostgresPool {
             })
     }
 
-    async fn get_user_id(
-        &self,
-        username: &str,
-        password_hash: Secret<String>,
-    ) -> Result<Option<Uuid>, Z2PADBError> {
-        pg_get_user_id(self.as_ref(), username, password_hash)
-            .await
-            .map_err(Z2PADBError::SqlxError)
-    }
-
     #[tracing::instrument(name = "Get stored credentials", skip_all)]
-    async fn get_user_credentials(
+    pub async fn get_user_credentials(
         &self,
         username: &str,
     ) -> Result<Option<UserCredential>, Z2PADBError> {
@@ -130,13 +121,13 @@ impl Z2PADB for PostgresPool {
     }
 
     #[tracing::instrument(name = "Get username", skip(self))]
-    async fn get_username(&self, user_id: Uuid) -> Result<String, Z2PADBError> {
+    pub async fn get_username(&self, user_id: Uuid) -> Result<String, Z2PADBError> {
         pg_get_username(self.as_ref(), user_id)
             .map_err(Z2PADBError::SqlxError)
             .await
     }
 
-    async fn change_password(
+    pub async fn change_password(
         &self,
         user_id: Uuid,
         password_hash: Secret<String>,
@@ -156,52 +147,20 @@ impl Z2PADB for PostgresPool {
             .map_err(Z2PADBError::SqlxError)
     }
 
-    async fn save_response(
-        next_action: NextAction<'_, Self::DB>,
-        idempotency_key: &crate::idempotency::IdempotencyKey,
-        user_id: Uuid,
-        http_response: axum::response::Response,
-    ) -> Result<Response, Z2PADBError> {
-        let mut transaction = next_action.try_get_transaction()?;
-        let (header, body) = http_response.into_parts();
-        let status_code = header.status.as_u16() as i16;
-        let headers = header
-            .headers
-            .iter()
-            .map(|(name, value)| HeaderPairRecord {
-                name: name.to_string(),
-                value: value.as_bytes().to_vec(),
-            })
-            .collect::<Vec<_>>();
-        let body = to_bytes(body, usize::MAX)
-            .await
-            .map_err(Z2PADBError::AzumCoreError)?
-            .to_vec();
-
-        pg_save_response(
-            transaction.as_mut(),
-            user_id,
-            idempotency_key.as_ref(),
-            status_code,
-            &headers,
-            &body,
-        )
-        .await?;
-        transaction.commit().await?;
-
-        Ok((header, body).into_response())
-    }
-
-    async fn try_processing(
+    pub async fn try_processing(
         &self,
         idempotency_key: &crate::idempotency::IdempotencyKey,
         user_id: Uuid,
-    ) -> Result<crate::database::base::NextAction<Self::DB>, Z2PADBError> {
-        let mut transaction = self.as_ref().begin().await?;
+    ) -> Result<NextAction, Z2PADBError> {
+        let mut transaction = self.begin().await?;
 
-        match pg_try_saving_idempotency_key(transaction.as_mut(), idempotency_key.as_ref(), user_id)
-            .await?
-            .rows_affected()
+        match pg_try_saving_idempotency_key(
+            transaction.as_mut().as_mut(),
+            idempotency_key.as_ref(),
+            user_id,
+        )
+        .await?
+        .rows_affected()
         {
             0 => {
                 let saved_response = self
@@ -212,32 +171,6 @@ impl Z2PADB for PostgresPool {
             }
             _ => Ok(NextAction::StartProcessing(transaction)),
         }
-    }
-
-    async fn insert_newsletter_issue(
-        next_action: &mut NextAction<'_, Self::DB>,
-        title: &str,
-        text_content: &str,
-        html_content: &str,
-    ) -> Result<Uuid, Z2PADBError> {
-        let transaction = next_action.try_get_transaction_mut_ref()?;
-
-        let uuid =
-            pg_insert_newsletter_issue(transaction.as_mut(), title, text_content, html_content)
-                .await?;
-
-        Ok(uuid)
-    }
-
-    #[tracing::instrument(skip_all)]
-    async fn enqueue_delivery_tasks(
-        next_action: &mut NextAction<'_, Self::DB>,
-        newsletter_issue_id: Uuid,
-    ) -> Result<PgQueryResult, Z2PADBError> {
-        let transaction = next_action.try_get_transaction_mut_ref()?;
-        pg_enqueue_delivery_tasks(transaction.as_mut(), newsletter_issue_id)
-            .await
-            .map_err(Z2PADBError::SqlxError)
     }
 }
 

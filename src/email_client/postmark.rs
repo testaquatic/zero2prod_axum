@@ -2,9 +2,13 @@ use reqwest::Client;
 use secrecy::{ExposeSecret, Secret};
 use url::Url;
 
-use crate::{domain::SubscriberEmail, settings::EmailClientSettings};
+use crate::{
+    domain::{NewSubscriber, SubscriberEmail},
+    settings::EmailClientSettings,
+    utils::SubscriptionToken,
+};
 
-use super::{EmailClient, EmailClientError};
+use super::EmailClientError;
 
 pub struct Postmark {
     http_client: Client,
@@ -50,7 +54,7 @@ impl Postmark {
     }
 }
 
-impl EmailClient for Postmark {
+impl Postmark {
     async fn send_email(
         &self,
         recipient: &SubscriberEmail,
@@ -83,7 +87,7 @@ impl EmailClient for Postmark {
         Ok(())
     }
 
-    fn from_email_client_settings(
+    pub fn from_email_client_settings(
         email_client_settings: &EmailClientSettings,
     ) -> Result<Self, EmailClientError> {
         let base_url = &email_client_settings.base_url;
@@ -95,15 +99,37 @@ impl EmailClient for Postmark {
 
         Postmark::new(base_url, sender, authorization_token, timeout)
     }
+
+    #[tracing::instrument(name = "Send a confirmation email to a new subscriber.", skip_all)]
+    pub async fn send_confirmation_email(
+        &self,
+        new_subscriber: NewSubscriber,
+        base_url: &str,
+        subscription_token: &SubscriptionToken,
+    ) -> Result<(), EmailClientError> {
+        let confirmation_link = format!(
+            "{}/subscriptions/confirm?subscription_token={}",
+            base_url,
+            subscription_token.as_ref()
+        );
+        let text_body = format!(
+            "Welcome to our newletter!\nVisit {} to confirm your subscription",
+            confirmation_link
+        );
+        let html_body = format!(
+            "Welcome to our newsletter!<br>
+            Click <a href=\"{}\">here</a> to confirm your subscription.",
+            confirmation_link
+        );
+        self.send_email(&new_subscriber.email, "Welcome", &html_body, &text_body)
+            .await
+    }
 }
 
 #[cfg(test)]
 mod tests {
 
-    use crate::{
-        domain::SubscriberEmail,
-        email_client::{postmark::Postmark, EmailClient},
-    };
+    use crate::{domain::SubscriberEmail, email_client::postmark::Postmark};
     use claim::{assert_err, assert_ok};
     use fake::{
         faker::{
