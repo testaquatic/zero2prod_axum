@@ -95,7 +95,7 @@ impl<'a> PostgresTransaction<'a> {
         html_content: &str,
     ) -> Result<(), Z2PADBError> {
         let issue_id = self
-            .insert_newsletter_issue(&title, &text_content, &html_content)
+            .insert_newsletter_issue(title, text_content, html_content)
             .await?;
 
         self.enqueue_delivery_tasks(issue_id).await?;

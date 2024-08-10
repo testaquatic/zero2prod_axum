@@ -1,7 +1,7 @@
 use futures_util::TryFutureExt;
-use secrecy::{ExposeSecret, Secret};
+use secrecy::Secret;
 use sqlx::{
-    postgres::{PgConnectOptions, PgPoolOptions, PgQueryResult, PgSslMode},
+    postgres::{PgPoolOptions, PgQueryResult},
     PgPool,
 };
 use uuid::Uuid;
@@ -9,7 +9,6 @@ use uuid::Uuid;
 use crate::{
     database::{base::Z2PADBError, NextAction, UserCredential},
     domain::NewSubscriber,
-    settings::DatabaseSettings,
     utils::SubscriptionToken,
 };
 
@@ -39,7 +38,7 @@ impl PostgresPool {
         Ok(PostgresPool { pool })
     }
 
-    pub async fn begin<'a>(&'a self) -> Result<PostgresTransaction<'a>, Z2PADBError> {
+    pub async fn begin(&self) -> Result<PostgresTransaction, Z2PADBError> {
         Ok(PostgresTransaction::new(self.pool.begin().await?))
     }
 
@@ -192,35 +191,5 @@ impl TryFrom<PostgresPool> for PgPool {
 impl PostgresPool {
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
-    }
-}
-
-pub trait DatabaseSettingsPgExt {
-    fn connect_options_without_db(&self) -> PgConnectOptions;
-    fn connect_options_with_db(&self) -> PgConnectOptions;
-}
-
-impl DatabaseSettingsPgExt for DatabaseSettings {
-    fn connect_options_without_db(&self) -> PgConnectOptions {
-        let ssl_mod = if self.require_ssl {
-            PgSslMode::Require
-        } else {
-            // 암호화된 커넥션을 시도한다.
-            // 실패하면 암호화하지 않은 커넥션을 사용한다.
-            PgSslMode::Prefer
-        };
-        PgConnectOptions::new()
-            .username(&self.username)
-            .password(self.password.expose_secret())
-            .host(&self.host)
-            .port(self.port)
-            .ssl_mode(ssl_mod)
-    }
-    fn connect_options_with_db(&self) -> PgConnectOptions {
-        self.connect_options_without_db()
-            .database(&self.database_name)
-        // ``.log_statements`은 대한 부분은 저자의 예시 코드에도 보이지 않는다.
-        // https://github.com/LukeMathWalker/zero-to-production/blob/root-chapter-05/src/configuration.rs
-        // 노이즈를 줄이려고 INFO를 TRACE로 변경하는 것이 이해가 되지 않는다.
     }
 }

@@ -2,10 +2,7 @@ use anyhow::Context;
 use sqlx::postgres::PgQueryResult;
 use uuid::Uuid;
 use zero2prod_axum::{
-    database::{
-        postgres::{DatabaseSettingsPgExt, PostgresPool},
-        Z2PADBError,
-    },
+    database::{postgres::PostgresPool, Z2PADBError},
     settings::DatabaseSettings,
 };
 
