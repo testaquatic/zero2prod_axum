@@ -8,7 +8,11 @@ use axum::{
 use uuid::Uuid;
 
 use crate::{
-    authentication::{basic_authentication, AuthError}, database::{postgres::PostgresPool, NextAction}, email_client::BodyData, idempotency::IdempotencyKey, utils::error_chain_fmt
+    authentication::{basic_authentication, AuthError},
+    database::{NextAction, PostgresPool},
+    email_client::BodyData,
+    idempotency::IdempotencyKey,
+    utils::error_chain_fmt,
 };
 
 #[derive(thiserror::Error)]
@@ -56,7 +60,7 @@ impl IntoResponse for PublishError {
 
 #[tracing::instrument(
     name = "Publish a newsletter issue",
-    skip_all, 
+    skip_all,
     fields(
         username = tracing::field::Empty,
         user_id = tracing::field::Empty
@@ -84,7 +88,6 @@ pub async fn publish_newsletter_basic_auth(
     tracing::Span::current().record("user_id", tracing::field::display(&user_id));
 
     let next_action = pool
-        .as_ref()
         .try_processing(
             &IdempotencyKey::try_from(Uuid::new_v4().to_string())
                 .map_err(PublishError::UnexpectedError)?,
@@ -94,18 +97,23 @@ pub async fn publish_newsletter_basic_auth(
         .map_err(|e| PublishError::UnexpectedError(e.into()))?;
 
     let mut transaciton = match next_action {
-        NextAction::ReturnSavedResponse(_) => return Err(PublishError::UnexpectedError(anyhow::anyhow!("Unexpected uuid duplicate"))),
+        NextAction::ReturnSavedResponse(_) => {
+            return Err(PublishError::UnexpectedError(anyhow::anyhow!(
+                "Unexpected uuid duplicate"
+            )))
+        }
         NextAction::StartProcessing(transaction) => transaction,
     };
 
-    transaciton.schedule_newsletter_delivery(
-        &body.title,
-        &body.content.text,
-        &body.content.html,
-    )
-    .await
-    .context("Failed to schedule newsletter delivery")
-    .map_err(PublishError::UnexpectedError)?;
+    transaciton
+        .schedule_newsletter_delivery(&body.title, &body.content.text, &body.content.html)
+        .await
+        .context("Failed to schedule newsletter delivery")
+        .map_err(PublishError::UnexpectedError)?;
+    transaciton
+        .commit()
+        .await
+        .map_err(|e| PublishError::UnexpectedError(e.into()))?;
 
     Ok(http::StatusCode::ACCEPTED.into_response())
 }

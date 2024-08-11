@@ -23,7 +23,8 @@ use wiremock::{
 };
 use zero2prod_axum::{
     authentication::PgSessionStorage,
-    database::postgres::PostgresPool,
+    database::PostgresPool,
+    issue_delivery_worker::{try_excute_task, ExecutionOutcome},
     settings::Settings,
     startup::{AppState, Server},
     telemetry::{get_tracing_subscriber, init_tracing_subscriber},
@@ -187,12 +188,21 @@ impl TestApp {
         // 데이터베이스를 생성한다.
         PostgresPool::create_db(&self.settings.database).await?;
         // 데이터베이스를 마이그레이션 한다.
-        let pool = self.settings.database.get_pool().await?;
+        let pool = PostgresPool::connect(self.settings.database.connect_options_with_db())?;
         pool.migrate().await?;
         // `TestUser`를 DB에 저장한다.
         self.test_user.store(&pool).await?;
 
         Ok(pool)
+    }
+
+    pub async fn dispatch_all_pending_emails(&self) -> Result<(), anyhow::Error> {
+        let email_client = self.settings.email_client.get_email_client()?;
+        let pool = PostgresPool::connect(self.settings.database.connect_options_with_db())?;
+
+        while let ExecutionOutcome::TaskCompleted = try_excute_task(&pool, &email_client).await? {}
+
+        Ok(())
     }
 
     pub async fn post_subscriptions(

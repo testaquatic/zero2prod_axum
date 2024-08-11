@@ -10,7 +10,7 @@ use tower_sessions_moka_store::MokaStore;
 use tower_sessions_sqlx_store::PostgresStore;
 use uuid::Uuid;
 
-use crate::{database::postgres::PostgresPool, session_state::TypedSession, utils::AppError500};
+use crate::{database::PostgresPool, session_state::TypedSession, utils::AppError500};
 
 #[derive(Clone)]
 pub struct UserId(pub Uuid);
@@ -48,10 +48,7 @@ impl PgSessionStorage {
         key: Secret<String>,
     ) -> Result<PgSessionStorage, anyhow::Error> {
         // 세션 저장소를 생성한다.
-        let pg_store = PostgresStore::new(
-            pool.try_into()
-                .map_err(|s| anyhow::anyhow!("Failed to convert to PgPool.: {}", s))?,
-        );
+        let pg_store = PostgresStore::new(pool.into());
         pg_store.migrate().await?;
 
         // 60초마다 만료된 세션을 삭제한다.

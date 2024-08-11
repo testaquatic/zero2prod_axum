@@ -4,7 +4,6 @@ use sqlx::postgres::{PgConnectOptions, PgSslMode};
 use tokio::net::TcpListener;
 
 use crate::{
-    database::{postgres::PostgresPool, Z2PADBError},
     domain::{InvalidNewSubscriber, SubscriberEmail},
     email_client::{EmailClientError, Postmark},
     startup::Server,
@@ -125,10 +124,6 @@ impl DatabaseSettings {
         // ``.log_statements`은 대한 부분은 저자의 예시 코드에도 보이지 않는다.
         // https://github.com/LukeMathWalker/zero-to-production/blob/root-chapter-05/src/configuration.rs
         // 노이즈를 줄이려고 INFO를 TRACE로 변경하는 것이 이해가 되지 않는다.
-    }
-
-    pub async fn get_pool(&self) -> Result<PostgresPool, Z2PADBError> {
-        PostgresPool::connect(self)
     }
 }
 

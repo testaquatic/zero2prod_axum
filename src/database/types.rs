@@ -1,10 +1,13 @@
+use std::str::FromStr;
+
 use crate::utils::{error_chain_fmt, AppError500};
 use axum::response::{IntoResponse, Response};
 use http::{HeaderMap, HeaderName, HeaderValue};
 
 use secrecy::Secret;
-use sqlx::{Postgres, Transaction};
 use uuid::Uuid;
+
+use super::PostgresTransaction;
 
 // DB 변경을 쉽게 하기 위한 트레이트
 #[derive(thiserror::Error)]
@@ -19,8 +22,6 @@ pub enum Z2PADBError {
     NoSavedResponse,
     #[error("expected: NextAction::StartProcessing, actual: NextAction::ReturnSavedResponse")]
     InvalidNextAction,
-    #[error(transparent)]
-    ConvertError(anyhow::Error),
 }
 
 impl std::fmt::Debug for Z2PADBError {
@@ -49,9 +50,11 @@ pub struct SavedHttpResponse {
 
 pub enum NextAction<'a> {
     // 나중에 사용할 트랜잭션을 가지고 있다.
-    StartProcessing(Transaction<'a, Postgres>),
+    StartProcessing(PostgresTransaction<'a>),
     ReturnSavedResponse(SavedHttpResponse),
 }
+
+// 업데이트로 아래 코드는 필요 없는 듯 하다.
 /*
 impl PgHasArrayType for HeaderPairRecord {
     fn array_type_info() -> sqlx::postgres::PgTypeInfo {
@@ -87,3 +90,11 @@ impl IntoResponse for SavedHttpResponse {
         (status_code, header_map, self.response_body).into_response()
     }
 }
+
+pub struct NewsletterIssue {
+    pub title: String,
+    pub text_content: String,
+    pub html_content: String,
+}
+
+// 불필요하게 복잡도만 늘리는 `Z2PADB`는 삭제했다.

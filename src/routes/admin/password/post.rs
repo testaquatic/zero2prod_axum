@@ -11,7 +11,7 @@ use unicode_segmentation::UnicodeSegmentation;
 
 use crate::{
     authentication::{AuthError, Credentials, UserId},
-    database::postgres::PostgresPool,
+    database::PostgresPool,
     utils::AppError500,
 };
 

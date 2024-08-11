@@ -10,7 +10,7 @@ use axum_flash::Flash;
 
 use crate::{
     authentication::UserId,
-    database::{postgres::PostgresPool, NextAction},
+    database::{NextAction, PostgresPool},
     idempotency::IdempotencyKey,
 };
 
@@ -53,7 +53,6 @@ pub async fn admin_publish_newsletter(
         )
             .into_response());
     }
-
     // 차용 검사기가 오류를 발생하지 않도록 폼을 제거해야 한다.
     let FormData {
         title,
@@ -61,7 +60,6 @@ pub async fn admin_publish_newsletter(
         text_content,
         idempotency_key,
     } = form_data;
-
     let idempotency_key =
         IdempotencyKey::try_from(idempotency_key).map_err(AdminPublishError::BadRequest)?;
 
@@ -76,7 +74,6 @@ pub async fn admin_publish_newsletter(
         }
         NextAction::StartProcessing(pg_transaction) => pg_transaction,
     };
-
     pg_transaction
         .schedule_newsletter_delivery(&title, &text_content, &html_content)
         .await
@@ -92,5 +89,6 @@ pub async fn admin_publish_newsletter(
         .save_response(&idempotency_key, user_id.0, response)
         .await
         .map_err(|e| AdminPublishError::UnexpectedError(e.into()))?;
+
     Ok(response)
 }

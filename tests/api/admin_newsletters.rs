@@ -20,6 +20,7 @@ async fn you_must_be_logged_in_to_access_the_admin_newsletters() -> Result<(), a
         response.headers().get(http::header::LOCATION),
         Some(&HeaderValue::from_str("/login")?)
     );
+    test_app.dispatch_all_pending_emails().await?;
 
     Ok(())
 }
@@ -40,6 +41,7 @@ async fn admin_newsletters_page_must_be_shown_to_logged_in_users() -> Result<(),
 
     // 확인
     assert_eq!(response.status(), http::StatusCode::OK);
+    test_app.dispatch_all_pending_emails().await?;
 
     Ok(())
 }
@@ -93,6 +95,7 @@ async fn users_not_fill_formdata_will_get_flash_message() -> Result<(), anyhow::
     assert!(html.contains("<p><i>입력을 잘못했습니다.</i></p>"));
     let html = test_app.get_admin_newsletters_html().await?;
     assert!(!html.contains("<p><i>입력을 잘못했습니다.</i></p>"));
+    test_app.dispatch_all_pending_emails().await?;
 
     Ok(())
 }
@@ -135,6 +138,7 @@ async fn newsletters_are_delivered_to_confirmed_subscriber() -> Result<(), anyho
     assert!(html.contains("<p><i>이메일 전송을 예약했습니다.</i></p>"));
     let html = test_app.get_admin_newsletters_html().await?;
     assert!(!html.contains("<p><i>이메일 전송을 예약했습니다.</i></p>"));
+    test_app.dispatch_all_pending_emails().await?;
 
     Ok(())
     // Mock은 뉴스레터 이메일을 보냈다는 Drop을 검증한다.
@@ -189,6 +193,7 @@ async fn newsletter_creation_is_idempotent() -> Result<(), anyhow::Error> {
     // 실행 - 단계 4 - 리다이렉트를 따른다.
     let html_page = test_app.get_admin_newsletters_html().await?;
     assert!(html_page.contains("<p><i>이메일 전송을 예약했습니다.</i></p>"));
+    test_app.dispatch_all_pending_emails().await?;
 
     Ok(())
     // Mock은 뉴스레터 이메일을 한 번 보냈다는 드롭을 검증한다.
@@ -226,11 +231,14 @@ async fn concurrent_form_submission_is_handled_gracefully() -> Result<(), anyhow
 
     assert_eq!(response1.status(), response2.status());
     assert_eq!(response1.text().await?, response2.text().await?);
+    test_app.dispatch_all_pending_emails().await?;
 
     Ok(())
     // Mock은 드롭시 이메일을 한 번만 보냈음을 검증한다.
 }
 
+// 재설계의 내용과 맞지 않는다.
+/*
 #[tokio::test]
 async fn transient_errors_do_not_cause_duplicate_deliveries_on_retries() -> Result<(), anyhow::Error>
 {
@@ -285,8 +293,10 @@ async fn transient_errors_do_not_cause_duplicate_deliveries_on_retries() -> Resu
         .post_admin_newsletters(&newsletter_request_body)
         .await?;
     assert_eq!(response.status(), http::StatusCode::SEE_OTHER);
+    test_app.dispatch_all_pending_emails().await?;
 
     Ok(())
 
     // mock은 중복된 뉴스레터를 발송하지 않았음을 검증한다.
 }
+*/

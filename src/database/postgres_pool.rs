@@ -1,24 +1,25 @@
 use futures_util::TryFutureExt;
 use secrecy::Secret;
 use sqlx::{
-    postgres::{PgPoolOptions, PgQueryResult},
+    postgres::{PgConnectOptions, PgPoolOptions, PgQueryResult},
     PgPool,
 };
 use uuid::Uuid;
 
 use crate::{
-    database::{base::Z2PADBError, NextAction, UserCredential},
+    database::{types::Z2PADBError, NextAction, UserCredential},
     domain::NewSubscriber,
     utils::SubscriptionToken,
 };
 
 use super::{
     postgres_query::{
-        pg_change_password, pg_confirm_subscriber, pg_get_saved_response,
-        pg_get_subscriber_id_from_token, pg_get_user_credential, pg_get_username,
-        pg_insert_subscriber, pg_store_token, pg_try_saving_idempotency_key,
+        pg_change_password, pg_confirm_subscriber, pg_dequeue_task, pg_get_issue,
+        pg_get_saved_response, pg_get_subscriber_id_from_token, pg_get_user_credential,
+        pg_get_username, pg_insert_subscriber, pg_store_token, pg_try_saving_idempotency_key,
     },
     postgres_transaction::PostgresTransaction,
+    types::NewsletterIssue,
 };
 
 #[derive(Clone)]
@@ -26,12 +27,27 @@ pub struct PostgresPool {
     pool: PgPool,
 }
 
+impl AsRef<PgPool> for PostgresPool {
+    fn as_ref(&self) -> &PgPool {
+        // 호출자는 inner 문자열에 대한 공유 참조를 얻는다.
+        // 호출자는 읽기 전용으로 접근할 수 있으며, 이는 불변량을 깨뜨리지 못한다.
+        &self.pool
+    }
+}
+
+impl From<PostgresPool> for PgPool {
+    fn from(value: PostgresPool) -> Self {
+        value.pool
+    }
+}
+
 impl PostgresPool {
+    pub fn new(pool: PgPool) -> Self {
+        Self { pool }
+    }
+
     #[tracing::instrument(name = "Connect to the Postgres server.", skip_all)]
-    pub fn connect(
-        database_settings: &crate::settings::DatabaseSettings,
-    ) -> Result<Self, Z2PADBError> {
-        let pg_connect_options = database_settings.connect_options_with_db();
+    pub fn connect(pg_connect_options: PgConnectOptions) -> Result<Self, Z2PADBError> {
         let pool = PgPoolOptions::new()
             .acquire_timeout(std::time::Duration::from_secs(2))
             .connect_lazy_with(pg_connect_options);
@@ -140,7 +156,7 @@ impl PostgresPool {
         &self,
         idempotency_key: &crate::idempotency::IdempotencyKey,
         user_id: Uuid,
-    ) -> Result<Option<crate::database::base::SavedHttpResponse>, Z2PADBError> {
+    ) -> Result<Option<crate::database::types::SavedHttpResponse>, Z2PADBError> {
         pg_get_saved_response(self.as_ref(), idempotency_key.as_ref(), user_id)
             .await
             .map_err(Z2PADBError::SqlxError)
@@ -171,25 +187,26 @@ impl PostgresPool {
             _ => Ok(NextAction::StartProcessing(transaction)),
         }
     }
-}
 
-impl AsRef<PgPool> for PostgresPool {
-    fn as_ref(&self) -> &PgPool {
-        // 호출자는 inner 문자열에 대한 공유 참조를 얻는다.
-        // 호출자는 읽기 전용으로 접근할 수 있으며, 이는 불변량을 깨뜨리지 못한다.
-        &self.pool
+    #[tracing::instrument(skip_all)]
+    pub async fn dequeue_task(
+        &self,
+    ) -> Result<Option<(PostgresTransaction, Uuid, String)>, Z2PADBError> {
+        let mut transaction = self.begin().await?;
+        let r = pg_dequeue_task(transaction.as_mut().as_mut())
+            .await
+            .map_err(Z2PADBError::SqlxError)?;
+
+        match r {
+            Some((uuid, email)) => Ok(Some((transaction, uuid, email))),
+            None => Ok(None),
+        }
     }
-}
 
-impl TryFrom<PostgresPool> for PgPool {
-    type Error = String;
-    fn try_from(value: PostgresPool) -> Result<Self, Self::Error> {
-        Ok(value.pool)
-    }
-}
-
-impl PostgresPool {
-    pub fn new(pool: PgPool) -> Self {
-        Self { pool }
+    #[tracing::instrument(skip_all)]
+    pub async fn get_issue(&self, issue_id: Uuid) -> Result<NewsletterIssue, Z2PADBError> {
+        pg_get_issue(self.as_ref(), issue_id)
+            .await
+            .map_err(Z2PADBError::SqlxError)
     }
 }

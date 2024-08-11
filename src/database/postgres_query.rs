@@ -1,11 +1,15 @@
+// 쿼리와 로직을 분리한다.
+
 use secrecy::{ExposeSecret, Secret};
 use sqlx::{postgres::PgQueryResult, PgExecutor};
 use uuid::Uuid;
 
 use crate::database::{
-    base::{HeaderPairRecord, SavedHttpResponse},
+    types::{HeaderPairRecord, SavedHttpResponse},
     UserCredential,
 };
+
+use super::types::NewsletterIssue;
 
 pub async fn pg_insert_subscriber(
     pg_executor: impl PgExecutor<'_>,
@@ -72,6 +76,7 @@ pub async fn pg_get_subscriber_id_from_token(
     Ok(result.map(|row| row.subscriber_id))
 }
 
+/*
 pub async fn pg_get_user_id(
     pg_executor: impl PgExecutor<'_>,
     username: &str,
@@ -90,6 +95,7 @@ pub async fn pg_get_user_id(
     .await?;
     Ok(user_id.map(|row| row.user_id))
 }
+*/
 
 pub async fn pg_get_user_credential(
     pg_executor: impl PgExecutor<'_>,
@@ -270,5 +276,65 @@ pub async fn pg_enqueue_delivery_tasks(
         newsletter_issue_id
     )
     .execute(pg_executor)
+    .await
+}
+
+#[tracing::instrument(skip_all)]
+pub async fn pg_dequeue_task(
+    pg_executor: impl PgExecutor<'_>,
+) -> Result<Option<(Uuid, String)>, sqlx::Error> {
+    let r = sqlx::query!(
+        r#"
+        SELECT newsletter_issue_id, subscriber_email
+        FROM issue_delivery_queue
+        FOR UPDATE
+        SKIP LOCKED
+        LIMIT 1
+        "#,
+    )
+    .fetch_optional(pg_executor)
+    .await?;
+
+    match r {
+        Some(r) => Ok(Some((r.newsletter_issue_id, r.subscriber_email))),
+        None => Ok(None),
+    }
+}
+
+pub async fn pg_delete_task(
+    pg_executor: impl PgExecutor<'_>,
+    issue_id: Uuid,
+    email: &str,
+) -> Result<PgQueryResult, sqlx::Error> {
+    sqlx::query!(
+        r#"
+        DELETE FROM issue_delivery_queue
+        WHERE
+            newsletter_issue_id = $1
+            AND
+            subscriber_email = $2
+        "#,
+        issue_id,
+        email
+    )
+    .execute(pg_executor)
+    .await
+}
+
+pub async fn pg_get_issue(
+    pg_executor: impl PgExecutor<'_>,
+    issue_id: Uuid,
+) -> Result<NewsletterIssue, sqlx::Error> {
+    sqlx::query_as!(
+        NewsletterIssue,
+        r#"
+        SELECT title, text_content, html_content
+        FROM newsletter_issues
+        WHERE
+            newsletter_issue_id = $1
+        "#,
+        issue_id
+    )
+    .fetch_one(pg_executor)
     .await
 }

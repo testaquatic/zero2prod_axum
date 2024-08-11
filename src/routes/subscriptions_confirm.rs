@@ -5,7 +5,7 @@ use axum::{
     response::{IntoResponse, Response, Result},
 };
 
-use crate::database::{postgres::PostgresPool, Z2PADBError};
+use crate::database::{PostgresPool, Z2PADBError};
 
 #[derive(serde::Deserialize)]
 pub struct Parameters {

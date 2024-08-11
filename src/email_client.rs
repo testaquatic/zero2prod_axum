@@ -94,7 +94,8 @@ impl Postmark {
 }
 
 impl Postmark {
-    async fn send_email(
+    #[tracing::instrument(name = "Send email.", skip_all)]
+    pub async fn send_email(
         &self,
         recipient: &SubscriberEmail,
         subject: &str,

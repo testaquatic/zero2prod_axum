@@ -4,6 +4,7 @@ use wiremock::{
     matchers::{method, path},
     Mock, ResponseTemplate,
 };
+use zero2prod_axum::database::PostgresPool;
 
 #[tokio::test]
 async fn subscribe_returns_a_200_for_valid_form_data() -> Result<(), anyhow::Error> {
@@ -44,7 +45,7 @@ async fn subscribe_persists_the_new_subscriber() -> Result<(), anyhow::Error> {
     test_app.post_subscriptions(body).await?;
 
     // 확인
-    let pool = test_app.settings.database.get_pool().await?;
+    let pool = PostgresPool::connect(test_app.settings.database.connect_options_with_db())?;
     #[derive(sqlx::FromRow)]
     struct Saved {
         email: String,
@@ -177,7 +178,7 @@ async fn subscribe_fails_if_there_is_a_fatal_database_error() -> Result<(), anyh
     let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
 
     // 데이터베이스를 무시한다.
-    let pool = test_app.settings.database.get_pool().await?;
+    let pool = PostgresPool::connect(test_app.settings.database.connect_options_with_db())?;
     sqlx::query!("ALTER TABLE subscriptions DROP COLUMN email;")
         .execute(pool.as_ref())
         .await?;

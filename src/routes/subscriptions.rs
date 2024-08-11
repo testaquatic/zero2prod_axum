@@ -1,5 +1,5 @@
 use crate::{
-    database::postgres::PostgresPool,
+    database::PostgresPool,
     domain::{InvalidNewSubscriber, NewSubscriber, SubscriberEmail, SubscriberName},
     email_client::Postmark,
     error::Z2PAError,

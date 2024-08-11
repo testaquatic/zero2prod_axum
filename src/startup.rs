@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::{
     authentication::{reject_anonymous_users, PgSessionStorage},
-    database::postgres::PostgresPool,
+    database::PostgresPool,
     email_client::Postmark,
     error::Z2PAError,
     routes::{
@@ -144,10 +144,7 @@ impl Server {
 
     pub async fn build(settings: &Settings) -> Result<Server, anyhow::Error> {
         let tcp_listener = settings.application.get_listener().await?;
-        let pool = settings
-            .database
-            .get_pool()
-            .await
+        let pool = PostgresPool::connect(settings.database.connect_options_with_db())
             .map_err(Z2PAError::DatabaseError)?;
         // `settings`를 사용해서 `EmailClient`를 만든다.
         let email_client = settings.email_client.get_email_client()?;

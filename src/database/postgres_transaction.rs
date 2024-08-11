@@ -5,10 +5,10 @@ use axum::{
 use sqlx::{postgres::PgQueryResult, Postgres, Transaction};
 use uuid::Uuid;
 
-use crate::database::{base::HeaderPairRecord, Z2PADBError};
+use crate::database::{types::HeaderPairRecord, Z2PADBError};
 
 use super::postgres_query::{
-    pg_enqueue_delivery_tasks, pg_insert_newsletter_issue, pg_save_response,
+    pg_delete_task, pg_enqueue_delivery_tasks, pg_insert_newsletter_issue, pg_save_response,
 };
 
 pub struct PostgresTransaction<'a> {
@@ -24,6 +24,15 @@ impl<'a> AsMut<Transaction<'a, Postgres>> for PostgresTransaction<'a> {
 impl<'a> PostgresTransaction<'a> {
     pub fn new(pg_transaction: Transaction<'a, Postgres>) -> Self {
         Self { pg_transaction }
+    }
+
+    // `PostgresTransaction`의 소유권을 가져가서 다시 사용하지 못하게 한다.
+    #[tracing::instrument(skip_all)]
+    pub async fn commit(self) -> Result<(), Z2PADBError> {
+        self.pg_transaction
+            .commit()
+            .await
+            .map_err(Z2PADBError::SqlxError)
     }
 
     #[tracing::instrument(skip_all)]
@@ -83,7 +92,7 @@ impl<'a> PostgresTransaction<'a> {
             &body,
         )
         .await?;
-        self.pg_transaction.commit().await?;
+        self.commit().await?;
 
         Ok((header, body).into_response())
     }
@@ -101,5 +110,19 @@ impl<'a> PostgresTransaction<'a> {
         self.enqueue_delivery_tasks(issue_id).await?;
 
         Ok(())
+    }
+
+    #[tracing::instrument(skip_all)]
+    pub async fn delete_task(
+        mut self,
+        issue_id: Uuid,
+        email: &str,
+    ) -> Result<PgQueryResult, Z2PADBError> {
+        let pg_query_result = pg_delete_task(self.as_mut().as_mut(), issue_id, email)
+            .await
+            .map_err(Z2PADBError::SqlxError)?;
+        self.commit().await?;
+
+        Ok(pg_query_result)
     }
 }

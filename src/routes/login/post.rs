@@ -10,7 +10,7 @@ use secrecy::Secret;
 
 use crate::{
     authentication::{AuthError, Credentials},
-    database::postgres::PostgresPool,
+    database::PostgresPool,
     session_state::TypedSession,
     utils::error_chain_fmt,
 };

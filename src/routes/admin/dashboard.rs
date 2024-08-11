@@ -6,7 +6,7 @@ use axum::{
     Extension,
 };
 
-use crate::{authentication::UserId, database::postgres::PostgresPool, utils::AppError500};
+use crate::{authentication::UserId, database::PostgresPool, utils::AppError500};
 
 pub async fn admin_dashboard(
     State(pool): State<Arc<PostgresPool>>,

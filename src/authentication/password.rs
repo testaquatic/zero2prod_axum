@@ -7,7 +7,7 @@ use secrecy::{ExposeSecret, Secret};
 use tokio::task::spawn_blocking;
 
 use crate::{
-    database::{postgres::PostgresPool, UserCredential},
+    database::{PostgresPool, UserCredential},
     utils::spawn_blocking_with_tracing,
 };
 

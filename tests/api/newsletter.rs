@@ -34,7 +34,8 @@ async fn newsletters_are_not_delivered_to_unconfirmed_subscriber() -> Result<(),
     let response = test_app.post_newsletters(newsletter_request_body).await?;
 
     // 확인
-    assert_eq!(response.status(), http::StatusCode::OK);
+    assert_eq!(response.status(), http::StatusCode::ACCEPTED);
+    test_app.dispatch_all_pending_emails().await?;
     Ok(())
     // mock은 Drop, 즉 뉴스레터 이메일을 보내지 않았음을 검증한다.
 }
@@ -63,7 +64,8 @@ async fn newsletters_are_delivered_to_confirmed_subscriber() -> Result<(), anyho
     let response = test_app.post_newsletters(newsletter_request_body).await?;
 
     // 확인
-    assert_eq!(response.status(), http::StatusCode::OK);
+    assert_eq!(response.status(), http::StatusCode::ACCEPTED);
+    test_app.dispatch_all_pending_emails().await?;
 
     Ok(())
     // Mock은 뉴스레터 이메일을 보냈다는 Drop을 검증한다.
@@ -101,6 +103,7 @@ async fn newsletters_returns_422_for_invalid_data() -> Result<(), anyhow::Error>
             "The API did not with 400 Bad Request when the payload was {}.",
             error_message
         );
+        test_app.dispatch_all_pending_emails().await?;
     }
 
     Ok(())
@@ -130,6 +133,7 @@ async fn requests_missing_authorization_are_rejected() -> Result<(), anyhow::Err
         response.headers()[http::header::WWW_AUTHENTICATE],
         r#"Basic realm="publish""#
     );
+    test_app.dispatch_all_pending_emails().await?;
 
     Ok(())
 }
@@ -162,6 +166,7 @@ async fn non_existing_user_is_rejected() -> Result<(), anyhow::Error> {
         response.headers()[http::header::WWW_AUTHENTICATE],
         r#"Basic realm="publish""#
     );
+    test_app.dispatch_all_pending_emails().await?;
 
     Ok(())
 }
@@ -195,6 +200,7 @@ async fn invalid_password_is_rejected() -> Result<(), anyhow::Error> {
         response.headers()[http::header::WWW_AUTHENTICATE],
         r#"Basic realm="publish""#
     );
+    test_app.dispatch_all_pending_emails().await?;
 
     Ok(())
 }
