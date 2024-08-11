@@ -22,6 +22,7 @@ pub struct FormData {
     new_password_check: Secret<String>,
 }
 
+#[tracing::instrument(name = "Change password.", skip_all)]
 pub async fn change_password(
     // TypedSession을 더 이상 주입하지 않는다.
     flash: Flash,

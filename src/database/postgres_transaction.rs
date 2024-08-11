@@ -27,7 +27,6 @@ impl<'a> PostgresTransaction<'a> {
     }
 
     // `PostgresTransaction`의 소유권을 가져가서 다시 사용하지 못하게 한다.
-    #[tracing::instrument(skip_all)]
     pub async fn commit(self) -> Result<(), Z2PADBError> {
         self.pg_transaction
             .commit()
@@ -35,7 +34,6 @@ impl<'a> PostgresTransaction<'a> {
             .map_err(Z2PADBError::SqlxError)
     }
 
-    #[tracing::instrument(skip_all)]
     async fn enqueue_delivery_tasks(
         &mut self,
         newsletter_issue_id: Uuid,
