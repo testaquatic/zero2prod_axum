@@ -5,3 +5,18 @@
 
 __actix-web 대신 [axum]( <https://docs.rs/axum/latest/axum/> )으로 작성했다.__
 
+# Endpoint
+
+## /heath_check
+
+GET 요청을 받으면 바디가 없는 200 OK 응답을 반환한다.
+
+- 요청
+  - GET /heath_check
+
+    ```
+    http -v http://127.0.0.1:8000/health_check
+    ```
+
+- 반환
+  - 200 OK
