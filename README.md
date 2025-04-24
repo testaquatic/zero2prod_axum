@@ -18,5 +18,17 @@ GET 요청을 받으면 바디가 없는 200 OK 응답을 반환한다.
     http -v http://127.0.0.1:8000/health_check
     ```
 
-- 반환
+- 응답
   - 200 OK
+
+## /subscriptions
+- 요청
+  - POST /subscriptions/name={name}&email={email}  
+    application/x-www-form-urlencoded
+
+- 응답
+  - 200 OK  
+    유효한 이름과 이메일 제공
+
+  - 422 UNPROCESSABLE ENTITY  
+    이름이나 이메일이 누락됨
