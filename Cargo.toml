@@ -4,9 +4,10 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-axum = "0.8.3"
+axum = { version = "0.8.3" }
 chrono = { version = "0.4.40", default-features = false, features = ["clock"] }
 config = "0.15.11"
+secrecy = { version = "0.10.3", features = ["serde"] }
 serde = { version = "1.0.219", features = ["derive"] }
 sqlx = { version = "0.8.5", default-features = false, features = [
     "runtime-tokio-rustls",
@@ -16,10 +17,16 @@ sqlx = { version = "0.8.5", default-features = false, features = [
     "chrono",
     "migrate",
 ] }
-tokio = { version = "1.44.2", features = [
-    "macros",
-    "parking_lot",
-    "rt-multi-thread",
+tokio = { version = "1.44.2", features = ["macros", "rt-multi-thread"] }
+tower = "0.5.2"
+tower-http = { version = "0.6.2", features = ["trace"] }
+tracing = { version = "0.1.41" }
+tracing-bunyan-formatter = "0.3.10"
+tracing-log = "0.2.0"
+tracing-subscriber = { version = "0.3.19", features = [
+    "registry",
+    "env-filter",
+    "json",
 ] }
 uuid = { version = "1.16.0", features = ["v4"] }
 

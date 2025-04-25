@@ -1,6 +1,34 @@
+use std::sync::LazyLock;
+
 use reqwest::{StatusCode, header};
+use secrecy::ExposeSecret;
 use sqlx::{Connection, Executor, PgConnection, PgPool};
-use zero2prod_axum::configuration::{DatabaseSettings, get_configuration};
+use tracing::Subscriber;
+use zero2prod_axum::{
+    configuration::{DatabaseSettings, get_configuration},
+    telemetry::{get_subscriber, init_subscriber},
+};
+
+// `LazyLock`을 사용해서 한번만 실행된다.
+static TRACING: LazyLock<()> = LazyLock::new(|| {
+    let default_filter_level = "info".to_string();
+    let subscriber_name = "test".to_string();
+
+    let subscriber: Box<dyn Subscriber + Send + Sync> = if std::env::var("TEST_LOG").is_ok() {
+        Box::new(get_subscriber(
+            subscriber_name,
+            default_filter_level.into(),
+            std::io::stdout,
+        ))
+    } else {
+        Box::new(get_subscriber(
+            subscriber_name,
+            default_filter_level.into(),
+            std::io::sink,
+        ))
+    };
+    init_subscriber(subscriber);
+});
 
 /// 애플리케이션 정보를 저장한다.
 pub struct TestApp {
@@ -15,6 +43,7 @@ pub struct TestApp {
 /// 반환  
 ///     `TestApp`
 async fn spawn_app() -> Result<TestApp, anyhow::Error> {
+    LazyLock::force(&TRACING);
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
     let port = listener.local_addr()?.port();
     let address = format!("http://127.0.0.1:{port}");
@@ -37,18 +66,19 @@ async fn spawn_app() -> Result<TestApp, anyhow::Error> {
 
 /// 테스트용 데이터베이스를 생성하고 마이그레이션한다.
 pub async fn configure_database(config: &DatabaseSettings) -> Result<PgPool, sqlx::Error> {
-    let mut connection = PgConnection::connect(&config.connection_string_without_db()).await?;
+    let mut connection =
+        PgConnection::connect(&config.connection_string_without_db().expose_secret()).await?;
     connection
         .execute(format!(r#"CREATE DATABASE "{}";"#, config.database_name).as_str())
         .await?;
 
-    let connection_pool = PgPool::connect(&config.connection_string()).await?;
+    let connection_pool = PgPool::connect(&config.connection_string().expose_secret()).await?;
     sqlx::migrate!("./migrations").run(&connection_pool).await?;
 
     Ok(connection_pool)
 }
 
-/// 멀티스레드 런타임을 사용하도록 설정해야 테스트를 통과한다.
+/// 멀티스레드 런타임을 사용하도록 설정해야 테스트를 통과한다.  
 /// [이 페이지](https://docs.rs/tokio/latest/tokio/attr.test.html)를 참고했다.
 #[tokio::test(flavor = "multi_thread")]
 async fn health_check_works() -> Result<(), anyhow::Error> {

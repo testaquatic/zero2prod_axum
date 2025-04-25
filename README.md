@@ -26,6 +26,10 @@ GET 요청을 받으면 바디가 없는 200 OK 응답을 반환한다.
   - POST /subscriptions/name={name}&email={email}  
     application/x-www-form-urlencoded
 
+    ```
+    http -v --form POST localhost:8000/subscriptions email={email} name={name}
+    ```
+
 - 응답
   - 200 OK  
     유효한 이름과 이메일 제공

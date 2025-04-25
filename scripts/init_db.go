@@ -24,7 +24,7 @@ func init() {
 
 func main() {
 	flag.Parse()
-	checkPrecondition()
+	checkPrerequisite()
 
 	// 커스텀 유저가 설정되었는지 확인한다.
 	dbUser := os.Getenv("POSTGRES_USER")
@@ -75,6 +75,7 @@ func main() {
 	log.Println("Running migrations now!")
 	dataBaseURL := fmt.Sprintf("DATABASE_URL=postgres://%s:%s@localhost:%s/%s", dbUser, dbPass, dbPort, dbName)
 
+	// sqlx 데이터 베이스를 생성한다.
 	cmd = makeCmd("sqlx", "database", "create")
 	cmd.Env = append(cmd.Env, dataBaseURL)
 	err := runCmd(true, cmd)
@@ -82,6 +83,7 @@ func main() {
 		log.Fatal(err)
 	}
 
+	// 데이터베이스 마이그레이션을 한다.
 	cmd = makeCmd("sqlx", "migrate", "run")
 	cmd.Env = append(cmd.Env, dataBaseURL)
 	err = runCmd(true, cmd)
@@ -92,12 +94,12 @@ func main() {
 }
 
 // 사전 조건을 점검한다.
-func checkPrecondition() {
+func checkPrerequisite() {
 	lookPaths := []string{"docker", "psql"}
 	for _, lookPath := range lookPaths {
 		_, err := exec.LookPath(lookPath)
 		if err != nil {
-			log.Fatal("Error: " + lookPath + " is not installed")
+			log.Fatalf("Error: %s lookPath is not installed", lookPath)
 		}
 	}
 	_, err := exec.LookPath("sqlx")
@@ -134,7 +136,7 @@ func waitPostgres(dbUser, dbPass, dbPort string) {
 		cmd.Env = append(cmd.Env, "PGPASSWORD="+dbPass)
 		err := runCmd(true, cmd)
 		if err == nil {
-			log.Println("Postgres is up and running on port " + dbPort)
+			log.Println("Postgres is up and running on port", dbPort)
 			break
 		}
 		log.Println("Postgres is still unavailable - sleeping")
