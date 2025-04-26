@@ -9,6 +9,7 @@ chrono = { version = "0.4.40", default-features = false, features = ["clock"] }
 config = "0.15.11"
 secrecy = { version = "0.10.3", features = ["serde"] }
 serde = { version = "1.0.219", features = ["derive"] }
+serde-aux = "4.7.0"
 sqlx = { version = "0.8.5", default-features = false, features = [
     "runtime-tokio-rustls",
     "macros",

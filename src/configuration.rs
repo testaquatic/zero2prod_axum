@@ -1,4 +1,5 @@
 use secrecy::{ExposeSecret, SecretString};
+use serde_aux::prelude::deserialize_number_from_string;
 
 /// 애플리케이션 설정
 #[derive(serde::Deserialize)]
@@ -13,6 +14,7 @@ pub struct Settings {
 pub struct DatabaseSettings {
     pub username: String,
     pub password: SecretString,
+    #[serde(deserialize_with = "deserialize_number_from_string")]
     pub port: u16,
     pub host: String,
     pub database_name: String,
@@ -22,6 +24,7 @@ pub struct DatabaseSettings {
 #[derive(serde::Deserialize)]
 pub struct ApplicationSettings {
     /// 포트
+    #[serde(deserialize_with = "deserialize_number_from_string")]
     pub port: u16,
     pub host: String,
 }
@@ -47,6 +50,11 @@ pub fn get_configuration() -> Result<Settings, config::ConfigError> {
         .add_source(config::File::from(
             configuration_directory.join(&environment_filename),
         ))
+        .add_source(
+            config::Environment::with_prefix("APP")
+                .prefix_separator("_")
+                .separator("__"),
+        )
         .build()?
         .try_deserialize()
 }
