@@ -36,3 +36,11 @@ GET 요청을 받으면 바디가 없는 200 OK 응답을 반환한다.
 
   - 422 UNPROCESSABLE ENTITY  
     이름이나 이메일이 누락됨
+
+# 도커
+
+## 이미지 빌드
+
+```
+docker build --tag zero2prod_axum --file Dockerfile .
+```
