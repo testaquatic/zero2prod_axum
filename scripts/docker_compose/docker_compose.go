@@ -31,14 +31,20 @@ func init() {
 
 func main() {
 	flag.Parse()
+
 	log.Println("Staring containers.")
 	cmd := zcmd.MakeCmd("docker", "compose", "up", "-d")
-	zcmd.RunCmd(true, cmd)
-	log.Println("Running migrations now!")
-	postgres.Wait()
-	err := postgres.Prepare()
+	err := zcmd.RunCmd(true, cmd)
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	log.Println("Running migrations now!")
+	postgres.Wait()
+	err = postgres.Prepare()
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	log.Println("Done!")
 }
