@@ -1,7 +1,6 @@
 use std::sync::LazyLock;
 
 use reqwest::{StatusCode, header};
-use secrecy::ExposeSecret;
 use sqlx::{Connection, Executor, PgConnection, PgPool};
 use tracing::Subscriber;
 use zero2prod_axum::{
@@ -66,13 +65,14 @@ async fn spawn_app() -> Result<TestApp, anyhow::Error> {
 
 /// 테스트용 데이터베이스를 생성하고 마이그레이션한다.
 pub async fn configure_database(config: &DatabaseSettings) -> Result<PgPool, sqlx::Error> {
-    let mut connection =
-        PgConnection::connect(&config.connection_string_without_db().expose_secret()).await?;
+    // 데이터베이스 생성
+    let mut connection = PgConnection::connect_with(&config.without_db()).await?;
     connection
         .execute(format!(r#"CREATE DATABASE "{}";"#, config.database_name).as_str())
         .await?;
 
-    let connection_pool = PgPool::connect(&config.connection_string().expose_secret()).await?;
+    // 데이터베이스 마이그레이션
+    let connection_pool = PgPool::connect_with(config.with_db()).await?;
     sqlx::migrate!("./migrations").run(&connection_pool).await?;
 
     Ok(connection_pool)

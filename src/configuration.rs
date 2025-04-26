@@ -1,5 +1,9 @@
 use secrecy::{ExposeSecret, SecretString};
 use serde_aux::prelude::deserialize_number_from_string;
+use sqlx::{
+    ConnectOptions,
+    postgres::{PgConnectOptions, PgSslMode},
+};
 
 /// 애플리케이션 설정
 #[derive(serde::Deserialize)]
@@ -7,26 +11,6 @@ pub struct Settings {
     pub database: DatabaseSettings,
     /// 포트
     pub application: ApplicationSettings,
-}
-
-/// 데이터베이스 연결 파라미터
-#[derive(serde::Deserialize)]
-pub struct DatabaseSettings {
-    pub username: String,
-    pub password: SecretString,
-    #[serde(deserialize_with = "deserialize_number_from_string")]
-    pub port: u16,
-    pub host: String,
-    pub database_name: String,
-}
-
-// 애플리케이션 설정
-#[derive(serde::Deserialize)]
-pub struct ApplicationSettings {
-    /// 포트
-    #[serde(deserialize_with = "deserialize_number_from_string")]
-    pub port: u16,
-    pub host: String,
 }
 
 /// 애플리케이션 설정을 읽는다.
@@ -57,6 +41,53 @@ pub fn get_configuration() -> Result<Settings, config::ConfigError> {
         )
         .build()?
         .try_deserialize()
+}
+
+// 애플리케이션 설정
+#[derive(serde::Deserialize)]
+pub struct ApplicationSettings {
+    /// 포트
+    #[serde(deserialize_with = "deserialize_number_from_string")]
+    pub port: u16,
+    pub host: String,
+}
+
+/// 데이터베이스 연결 파라미터
+#[derive(serde::Deserialize)]
+pub struct DatabaseSettings {
+    pub username: String,
+    pub password: SecretString,
+    #[serde(deserialize_with = "deserialize_number_from_string")]
+    pub port: u16,
+    pub host: String,
+    pub database_name: String,
+    // 암호화
+    pub require_ssl: bool,
+}
+
+impl DatabaseSettings {
+    /// postgres://username:password@host:port/db_name 형식의 문자열을 얻는다.
+    pub fn with_db(&self) -> PgConnectOptions {
+        self.without_db()
+            .database(&self.database_name)
+            .log_statements(tracing_log::log::LevelFilter::Trace)
+    }
+
+    /// postgres://username:password@host:port 형식의 문자열을 얻는다.
+    pub fn without_db(&self) -> PgConnectOptions {
+        let ssl_mode = if self.require_ssl {
+            PgSslMode::Require
+        } else {
+            PgSslMode::Prefer
+        };
+
+        PgConnectOptions::new()
+            .host(&self.host)
+            .username(&self.username)
+            .password(&self.password.expose_secret())
+            .port(self.port)
+            .ssl_mode(ssl_mode)
+    }
 }
 
 /// 애플리케이션이 사용할 수 있는 런타임 환경
@@ -94,32 +125,5 @@ impl TryFrom<String> for Environment {
 
     fn try_from(s: String) -> Result<Self, Self::Error> {
         s.as_str().try_into()
-    }
-}
-
-impl DatabaseSettings {
-    /// postgres://username:password@host:port/db_name 형식의 문자열을 얻는다.
-    pub fn connection_string(&self) -> SecretString {
-        format!(
-            "postgres://{}:{}@{}:{}/{}",
-            self.username,
-            self.password.expose_secret(),
-            self.host,
-            self.port,
-            self.database_name,
-        )
-        .into()
-    }
-
-    /// postgres://username:password@host:port 형식의 문자열을 얻는다.
-    pub fn connection_string_without_db(&self) -> SecretString {
-        format!(
-            "postgres://{}:{}@{}:{}",
-            self.username,
-            self.password.expose_secret(),
-            self.host,
-            self.port,
-        )
-        .into()
     }
 }
