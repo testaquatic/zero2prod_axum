@@ -5,6 +5,7 @@ use sqlx::{Connection, Executor, PgConnection, PgPool};
 use tracing::Subscriber;
 use zero2prod_axum::{
     configuration::{DatabaseSettings, get_configuration},
+    database::ZPgPool,
     telemetry::{get_subscriber, init_subscriber},
 };
 
@@ -34,7 +35,7 @@ pub struct TestApp {
     /// 인스턴스 주소
     pub address: String,
     /// 커넥션 풀
-    pub db_pool: PgPool,
+    pub zpg_pool: ZPgPool,
 }
 
 /// 백그라운드에서 애플리케이션을 구동한다.  
@@ -50,21 +51,18 @@ async fn spawn_app() -> Result<TestApp, anyhow::Error> {
     let mut configuration = get_configuration()?;
     configuration.database.database_name = uuid::Uuid::new_v4().to_string();
 
-    let connection_pool = configure_database(&configuration.database).await?;
+    let zpg_pool = configure_database(&configuration.database).await?;
 
-    let server = zero2prod_axum::startup::run(listener, connection_pool.clone());
+    let server = zero2prod_axum::startup::run(listener, zpg_pool.clone());
     let _ = tokio::spawn(async move {
         server.await.expect("Failed to start server.");
     });
 
-    Ok(TestApp {
-        address,
-        db_pool: connection_pool,
-    })
+    Ok(TestApp { address, zpg_pool })
 }
 
 /// 테스트용 데이터베이스를 생성하고 마이그레이션한다.
-pub async fn configure_database(config: &DatabaseSettings) -> Result<PgPool, sqlx::Error> {
+pub async fn configure_database(config: &DatabaseSettings) -> Result<ZPgPool, sqlx::Error> {
     // 데이터베이스 생성
     let mut connection = PgConnection::connect_with(&config.without_db()).await?;
     connection
@@ -75,7 +73,7 @@ pub async fn configure_database(config: &DatabaseSettings) -> Result<PgPool, sql
     let connection_pool = PgPool::connect_with(config.with_db()).await?;
     sqlx::migrate!("./migrations").run(&connection_pool).await?;
 
-    Ok(connection_pool)
+    Ok(ZPgPool::new(connection_pool))
 }
 
 /// 멀티스레드 런타임을 사용하도록 설정해야 테스트를 통과한다.  
@@ -115,7 +113,7 @@ async fn subscribe_returns_a_200_for_valid_form_data() -> Result<(), anyhow::Err
     pretty_assertions::assert_eq!(StatusCode::OK, response.status());
 
     let saved = sqlx::query!("SELECT email, name FROM subscriptions")
-        .fetch_one(&app.db_pool)
+        .fetch_one(app.zpg_pool.pg_pool.as_ref())
         .await?;
     pretty_assertions::assert_eq!(saved.email, "ursula_le_guin@gmail.com");
     pretty_assertions::assert_eq!(saved.name, "le guin");

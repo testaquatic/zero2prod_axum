@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use axum::{
     Form,
     extract::State,
@@ -7,8 +5,9 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use chrono::Utc;
-use sqlx::PgPool;
 use uuid::Uuid;
+
+use crate::database::{ZDabaBase, ZPgPool};
 
 #[derive(serde::Deserialize)]
 pub struct FormData {
@@ -25,7 +24,7 @@ pub struct FormData {
         subscriber_name = %form.name
     )
 )]
-pub async fn subscribe(pool: State<Arc<PgPool>>, form: Form<FormData>) -> Response {
+pub async fn subscribe(pool: State<ZPgPool>, form: Form<FormData>) -> Response {
     match insert_subscriber(&pool, &form).await {
         Ok(_) => StatusCode::OK.into_response(),
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
@@ -37,20 +36,7 @@ pub async fn subscribe(pool: State<Arc<PgPool>>, form: Form<FormData>) -> Respon
     name = "Saving new subscriber details in the database",
     skip(pool, form)
 )]
-pub async fn insert_subscriber(pool: &PgPool, form: &FormData) -> Result<(), sqlx::Error> {
-    sqlx::query!(
-        r#"INSERT INTO subscriptions (id, email, name, subscribed_at) VALUES ($1, $2, $3, $4);"#,
-        Uuid::new_v4(),
-        form.email,
-        form.name,
-        Utc::now()
-    )
-    .execute(pool)
-    .await
-    .map_err(|e| {
-        tracing::error!("Failed to execute query: {:?}", e);
-        e
-    })?;
-
-    Ok(())
+pub async fn insert_subscriber(pool: &ZPgPool, form: &FormData) -> Result<(), sqlx::Error> {
+    pool.add_user(&Uuid::new_v4(), &form.email, &form.name, &Utc::now())
+        .await
 }

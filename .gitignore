@@ -1,7 +1,7 @@
 target/
-docker-compose.yml
 Cargo.lock
 node_modules/
 package-lock.json
 package.json
 /scripts/docker_compose/docker_compose
+/scripts/init_db/init_db

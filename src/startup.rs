@@ -1,4 +1,4 @@
-use std::{net::SocketAddr, sync::Arc};
+use std::net::SocketAddr;
 
 use axum::{
     Router,
@@ -6,22 +6,23 @@ use axum::{
     extract::{ConnectInfo, Request},
     routing::{get, post},
 };
-use sqlx::PgPool;
 use tokio::net::TcpListener;
 use tower::ServiceBuilder;
 use tower_http::trace::TraceLayer;
 use tracing::Span;
 use uuid::Uuid;
 
-use crate::routes::{health_check, subscribe};
+use crate::{
+    database::ZPgPool,
+    routes::{health_check, subscribe},
+};
 
 /// `Router`를 얻는다.
-fn get_app(db_pool: PgPool) -> Router {
-    let db_pool = Arc::new(db_pool);
+fn get_app(zpg_pool: ZPgPool) -> Router {
     Router::new()
         .route("/health_check", get(health_check))
         .route("/subscriptions", post(subscribe))
-        .with_state(db_pool)
+        .with_state(zpg_pool)
         .layer(ServiceBuilder::new().layer(TraceLayer::new_for_http().make_span_with(make_span)))
 }
 
@@ -45,7 +46,7 @@ fn make_span(request: &Request<Body>) -> Span {
 /// listener를 얻으려면 `async`가 필요하다.
 /// 웹서버를 실행한다.
 #[tracing::instrument(name = "Server", skip_all)]
-pub async fn run(listener: TcpListener, db_pool: PgPool) -> Result<(), std::io::Error> {
+pub async fn run(listener: TcpListener, db_pool: ZPgPool) -> Result<(), std::io::Error> {
     let app = get_app(db_pool);
 
     axum::serve(
