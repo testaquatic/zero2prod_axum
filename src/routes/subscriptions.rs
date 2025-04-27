@@ -7,7 +7,10 @@ use axum::{
 use chrono::Utc;
 use uuid::Uuid;
 
-use crate::database::{ZDabaBase, ZPgPool};
+use crate::{
+    database::{ZDabaBase, ZPgPool},
+    domain::{NewSubscriber, SubscriberName},
+};
 
 #[derive(serde::Deserialize)]
 pub struct FormData {
@@ -25,7 +28,17 @@ pub struct FormData {
     )
 )]
 pub async fn subscribe(pool: State<ZPgPool>, form: Form<FormData>) -> Response {
-    match insert_subscriber(&pool, &form).await {
+    let name = match SubscriberName::try_from(form.0.name) {
+        Ok(name) => name,
+        Err(_) => return StatusCode::BAD_REQUEST.into_response(),
+    };
+
+    let new_subscriber = NewSubscriber {
+        email: form.0.email,
+        name,
+    };
+
+    match insert_subscriber(&pool, &new_subscriber).await {
         Ok(_) => StatusCode::OK.into_response(),
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     }
@@ -34,9 +47,18 @@ pub async fn subscribe(pool: State<ZPgPool>, form: Form<FormData>) -> Response {
 /// 데이터베이스에 사용자 정보를 저장한다.
 #[tracing::instrument(
     name = "Saving new subscriber details in the database",
-    skip(pool, form)
+    skip(zpg_pool, new_subscriber)
 )]
-pub async fn insert_subscriber(pool: &ZPgPool, form: &FormData) -> Result<(), sqlx::Error> {
-    pool.add_user(&Uuid::new_v4(), &form.email, &form.name, &Utc::now())
+pub async fn insert_subscriber(
+    zpg_pool: &ZPgPool,
+    new_subscriber: &NewSubscriber,
+) -> Result<(), sqlx::Error> {
+    zpg_pool
+        .add_user(
+            &Uuid::new_v4(),
+            &new_subscriber.email,
+            new_subscriber.name.as_ref(),
+            &Utc::now(),
+        )
         .await
 }

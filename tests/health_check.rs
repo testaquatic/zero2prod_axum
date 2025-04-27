@@ -1,5 +1,6 @@
 use std::sync::LazyLock;
 
+use pretty_assertions::assert_eq;
 use reqwest::{StatusCode, header};
 use sqlx::{Connection, Executor, PgConnection, PgPool};
 use tracing::Subscriber;
@@ -89,7 +90,7 @@ async fn health_check_works() -> Result<(), anyhow::Error> {
 
     // 확인
     assert!(response.status().is_success());
-    pretty_assertions::assert_eq!(Some(0), response.content_length());
+    assert_eq!(Some(0), response.content_length());
 
     Ok(())
 }
@@ -110,13 +111,13 @@ async fn subscribe_returns_a_200_for_valid_form_data() -> Result<(), anyhow::Err
         .await?;
 
     // 확인
-    pretty_assertions::assert_eq!(StatusCode::OK, response.status());
+    assert_eq!(StatusCode::OK, response.status());
 
     let saved = sqlx::query!("SELECT email, name FROM subscriptions")
         .fetch_one(app.zpg_pool.pg_pool.as_ref())
         .await?;
-    pretty_assertions::assert_eq!(saved.email, "ursula_le_guin@gmail.com");
-    pretty_assertions::assert_eq!(saved.name, "le guin");
+    assert_eq!(saved.email, "ursula_le_guin@gmail.com");
+    assert_eq!(saved.name, "le guin");
 
     Ok(())
 }
@@ -143,10 +144,42 @@ async fn subscribe_returns_a_400_when_data_is_missing() -> Result<(), anyhow::Er
             .await?;
 
         // 확인
-        pretty_assertions::assert_eq!(
+        assert_eq!(
             StatusCode::UNPROCESSABLE_ENTITY,
             response.status(),
             "The API did not fail with 400 Bad Request when the payload was {error_message}.",
+        );
+    }
+
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn subscribe_returns_a_400_when_fields_are_present_but_invalid() -> Result<(), anyhow::Error>
+{
+    // 준비
+    let app = spawn_app().await?;
+    let client = reqwest::Client::new();
+    let test_cases = vec![
+        ("name=&email=ursula_le_guin%40gmail.com", "empty name"),
+        ("name=Ursula&email=", "empty email"),
+        ("name=Ursula&email=definitely-not-an-email", "invalid_email"),
+    ];
+
+    for (body, description) in test_cases {
+        // 실행
+        let response = client
+            .post(&format!("{}/subscriptions", app.address))
+            .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+            .body(body)
+            .send()
+            .await?;
+
+        // 확인
+        assert_eq!(
+            StatusCode::BAD_REQUEST,
+            response.status(),
+            "The API did not return a 200 OK when the payload was {description}",
         );
     }
 

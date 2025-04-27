@@ -33,6 +33,7 @@ impl ZPgPool {
 
 impl ZDabaBase for ZPgPool {
     type Error = sqlx::Error;
+    /// 사용자를 Postgres에 추가한다.
     async fn add_user(
         &self,
         uuid: &Uuid,
