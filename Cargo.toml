@@ -31,9 +31,12 @@ tracing-subscriber = { version = "0.3.19", features = [
 ] }
 unicode-segmentation = "1.12.0"
 uuid = { version = "1.16.0", features = ["v4"] }
+validator = "0.20.0"
 
 [dev-dependencies]
 anyhow = "1.0.98"
 claim = "0.5.0"
+fake = "4.3.0"
 pretty_assertions = "1.4.1"
+proptest = { version = "1.6.0", features = ["attr-macro"] }
 reqwest = "0.12.15"

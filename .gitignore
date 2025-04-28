@@ -5,3 +5,4 @@ package-lock.json
 package.json
 /scripts/docker_compose/docker_compose
 /scripts/init_db/init_db
+proptest-regressions/

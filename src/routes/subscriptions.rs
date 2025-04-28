@@ -9,13 +9,23 @@ use uuid::Uuid;
 
 use crate::{
     database::{ZDabaBase, ZPgPool},
-    domain::{NewSubscriber, SubscriberName},
+    domain::{NewSubscriber, SubscriberEmail, SubscriberName},
 };
 
 #[derive(serde::Deserialize)]
 pub struct FormData {
     email: String,
     name: String,
+}
+
+impl TryFrom<FormData> for NewSubscriber {
+    type Error = String;
+
+    fn try_from(value: FormData) -> Result<Self, Self::Error> {
+        let name = SubscriberName::try_from(value.name)?;
+        let email = SubscriberEmail::try_from(value.email)?;
+        Ok(Self { email, name })
+    }
 }
 
 /// /subscriptions 핸들러이다.
@@ -28,14 +38,9 @@ pub struct FormData {
     )
 )]
 pub async fn subscribe(pool: State<ZPgPool>, form: Form<FormData>) -> Response {
-    let name = match SubscriberName::try_from(form.0.name) {
-        Ok(name) => name,
+    let new_subscriber = match form.0.try_into() {
+        Ok(form) => form,
         Err(_) => return StatusCode::BAD_REQUEST.into_response(),
-    };
-
-    let new_subscriber = NewSubscriber {
-        email: form.0.email,
-        name,
     };
 
     match insert_subscriber(&pool, &new_subscriber).await {
@@ -56,7 +61,7 @@ pub async fn insert_subscriber(
     zpg_pool
         .add_user(
             &Uuid::new_v4(),
-            &new_subscriber.email,
+            new_subscriber.email.as_ref(),
             new_subscriber.name.as_ref(),
             &Utc::now(),
         )
