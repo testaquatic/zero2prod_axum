@@ -6,7 +6,7 @@ use sqlx::{Connection, Executor, PgConnection, PgPool};
 use tracing::Subscriber;
 use zero2prod_axum::{
     configuration::{DatabaseSettings, get_configuration},
-    database::ZPgPool,
+    database::{GetZPgPool, ZPgPool},
     telemetry::{get_subscriber, init_subscriber},
 };
 
@@ -36,7 +36,7 @@ pub struct TestApp {
     /// 인스턴스 주소
     pub address: String,
     /// 커넥션 풀
-    pub zpg_pool: ZPgPool,
+    pub z_pgpool: ZPgPool,
 }
 
 /// 백그라운드에서 애플리케이션을 구동한다.  
@@ -52,14 +52,14 @@ async fn spawn_app() -> Result<TestApp, anyhow::Error> {
     let mut configuration = get_configuration()?;
     configuration.database.database_name = uuid::Uuid::new_v4().to_string();
 
-    let zpg_pool = configure_database(&configuration.database).await?;
+    let z_pgpool = configure_database(&configuration.database).await?;
 
-    let server = zero2prod_axum::startup::run(listener, zpg_pool.clone());
+    let server = zero2prod_axum::startup::run(listener, z_pgpool.clone());
     let _ = tokio::spawn(async move {
         server.await.expect("Failed to start server.");
     });
 
-    Ok(TestApp { address, zpg_pool })
+    Ok(TestApp { address, z_pgpool })
 }
 
 /// 테스트용 데이터베이스를 생성하고 마이그레이션한다.
@@ -71,10 +71,12 @@ pub async fn configure_database(config: &DatabaseSettings) -> Result<ZPgPool, sq
         .await?;
 
     // 데이터베이스 마이그레이션
-    let connection_pool = PgPool::connect_with(config.with_db()).await?;
-    sqlx::migrate!("./migrations").run(&connection_pool).await?;
+    let z_pgpool = PgPool::connect_with(config.with_db()).await?.get_zpg_pool();
+    sqlx::migrate!("./migrations")
+        .run(z_pgpool.as_ref())
+        .await?;
 
-    Ok(ZPgPool::new(connection_pool))
+    Ok(z_pgpool)
 }
 
 /// 멀티스레드 런타임을 사용하도록 설정해야 테스트를 통과한다.  
@@ -114,7 +116,7 @@ async fn subscribe_returns_a_200_for_valid_form_data() -> Result<(), anyhow::Err
     assert_eq!(StatusCode::OK, response.status());
 
     let saved = sqlx::query!("SELECT email, name FROM subscriptions")
-        .fetch_one(app.zpg_pool.pg_pool.as_ref())
+        .fetch_one(app.z_pgpool.pg_pool.as_ref())
         .await?;
     assert_eq!(saved.email, "ursula_le_guin@gmail.com");
     assert_eq!(saved.name, "le guin");

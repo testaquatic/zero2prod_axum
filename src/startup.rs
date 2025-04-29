@@ -46,8 +46,8 @@ fn make_span(request: &Request<Body>) -> Span {
 /// listener를 얻으려면 `async`가 필요하다.
 /// 웹서버를 실행한다.
 #[tracing::instrument(name = "Server", skip_all)]
-pub async fn run(listener: TcpListener, db_pool: ZPgPool) -> Result<(), std::io::Error> {
-    let app = get_app(db_pool);
+pub async fn run(listener: TcpListener, z_pgpool: ZPgPool) -> Result<(), std::io::Error> {
+    let app = get_app(z_pgpool);
 
     axum::serve(
         listener,

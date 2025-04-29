@@ -8,7 +8,7 @@ use chrono::Utc;
 use uuid::Uuid;
 
 use crate::{
-    database::{ZDabaBase, ZPgPool},
+    database::ZPgPool,
     domain::{NewSubscriber, SubscriberEmail, SubscriberName},
 };
 

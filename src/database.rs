@@ -1,22 +1,8 @@
-use std::{error::Error, sync::Arc};
+use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use sqlx::PgPool;
 use uuid::Uuid;
-
-/// 데이터베이스의 작동을 추상화한다.
-/// 트레이트나 인터페이스의 함수는 적어야 한다고 생각하지만 여기에서는 이 원칙을 포기한다.
-pub trait ZDabaBase: Send + Sync + Clone {
-    type Error: Send + Sync + Error;
-    /// 구독자를 추가한다.
-    fn add_user(
-        &self,
-        uuid: &Uuid,
-        email: &str,
-        name: &str,
-        subscribed_at: &DateTime<Utc>,
-    ) -> impl std::future::Future<Output = Result<(), Self::Error>> + Send;
-}
 
 #[derive(Clone)]
 pub struct ZPgPool {
@@ -31,16 +17,15 @@ impl ZPgPool {
     }
 }
 
-impl ZDabaBase for ZPgPool {
-    type Error = sqlx::Error;
+impl ZPgPool {
     /// 사용자를 Postgres에 추가한다.
-    async fn add_user(
+    pub async fn add_user(
         &self,
         uuid: &Uuid,
         email: &str,
         name: &str,
         subscribed_at: &DateTime<Utc>,
-    ) -> Result<(), Self::Error> {
+    ) -> Result<(), sqlx::Error> {
         sqlx::query!(
         r#"INSERT INTO subscriptions (id, email, name, subscribed_at) VALUES ($1, $2, $3, $4);"#,
         uuid,
@@ -56,5 +41,21 @@ impl ZDabaBase for ZPgPool {
     })?;
 
         Ok(())
+    }
+}
+
+impl AsRef<PgPool> for ZPgPool {
+    fn as_ref(&self) -> &PgPool {
+        &self.pg_pool
+    }
+}
+
+pub trait GetZPgPool {
+    fn get_zpg_pool(self) -> ZPgPool;
+}
+
+impl GetZPgPool for PgPool {
+    fn get_zpg_pool(self) -> ZPgPool {
+        ZPgPool::new(self)
     }
 }
