@@ -6,7 +6,9 @@ use sqlx::{Connection, Executor, PgConnection, PgPool};
 use tracing::Subscriber;
 use zero2prod_axum::{
     configuration::{DatabaseSettings, get_configuration},
-    database::{GetZPgPool, ZPgPool},
+    database::ZPgPool,
+    email_client::EmailClient,
+    startup::run,
     telemetry::{get_subscriber, init_subscriber},
 };
 
@@ -50,11 +52,21 @@ async fn spawn_app() -> Result<TestApp, anyhow::Error> {
     let address = format!("http://127.0.0.1:{port}");
 
     let mut configuration = get_configuration()?;
-    configuration.database.database_name = uuid::Uuid::new_v4().to_string();
 
+    configuration.database.database_name = uuid::Uuid::new_v4().to_string();
     let z_pgpool = configure_database(&configuration.database).await?;
 
-    let server = zero2prod_axum::startup::run(listener, z_pgpool.clone());
+    let sender_email = configuration
+        .email_client
+        .sender()
+        .map_err(|e| anyhow::anyhow!(e))?;
+    let email_client = EmailClient::new(
+        configuration.email_client.base_url,
+        sender_email,
+        configuration.email_client.authorization_token,
+    );
+
+    let server = run(listener, z_pgpool.clone(), email_client);
     let _ = tokio::spawn(async move {
         server.await.expect("Failed to start server.");
     });
@@ -71,7 +83,7 @@ pub async fn configure_database(config: &DatabaseSettings) -> Result<ZPgPool, sq
         .await?;
 
     // 데이터베이스 마이그레이션
-    let z_pgpool = PgPool::connect_with(config.with_db()).await?.get_zpg_pool();
+    let z_pgpool: ZPgPool = PgPool::connect_with(config.with_db()).await?.into();
     sqlx::migrate!("./migrations")
         .run(z_pgpool.as_ref())
         .await?;

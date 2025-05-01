@@ -9,4 +9,9 @@
         password: "password",
         database_name: "newsletter",
     },
+    email_client: {
+        base_url: "localhost:8800",
+        sender_email: "temp@gmail.com",
+        authorization_token: "my-secret-token",
+    },
 }

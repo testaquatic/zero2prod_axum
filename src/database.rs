@@ -50,12 +50,8 @@ impl AsRef<PgPool> for ZPgPool {
     }
 }
 
-pub trait GetZPgPool {
-    fn get_zpg_pool(self) -> ZPgPool;
-}
-
-impl GetZPgPool for PgPool {
-    fn get_zpg_pool(self) -> ZPgPool {
-        ZPgPool::new(self)
+impl From<PgPool> for ZPgPool {
+    fn from(pg_pool: PgPool) -> Self {
+        Self::new(pg_pool)
     }
 }

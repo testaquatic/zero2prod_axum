@@ -5,12 +5,15 @@ use sqlx::{
     postgres::{PgConnectOptions, PgSslMode},
 };
 
+use crate::domain::SubscriberEmail;
+
 /// 애플리케이션 설정
 #[derive(serde::Deserialize)]
 pub struct Settings {
     pub database: DatabaseSettings,
     /// 포트
     pub application: ApplicationSettings,
+    pub email_client: EmailClientSettings,
 }
 
 /// 애플리케이션 설정을 읽는다.
@@ -41,6 +44,44 @@ pub fn get_configuration() -> Result<Settings, config::ConfigError> {
         )
         .build()?
         .try_deserialize()
+}
+
+/// 애플리케이션이 사용할 수 있는 런타임 환경
+enum Environment {
+    Local,
+    Production,
+}
+
+impl Environment {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Environment::Local => "local",
+            Environment::Production => "production",
+        }
+    }
+}
+
+impl TryFrom<&str> for Environment {
+    type Error = String;
+
+    fn try_from(s: &str) -> Result<Self, Self::Error> {
+        match s.to_lowercase().as_str() {
+            "local" => Ok(Self::Local),
+            "production" => Ok(Self::Production),
+            other => Err(format!(
+                "{} is not a supported environment. Use either `local` or `production`.",
+                other,
+            )),
+        }
+    }
+}
+
+impl TryFrom<String> for Environment {
+    type Error = String;
+
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        s.as_str().try_into()
+    }
 }
 
 // 애플리케이션 설정
@@ -90,40 +131,15 @@ impl DatabaseSettings {
     }
 }
 
-/// 애플리케이션이 사용할 수 있는 런타임 환경
-enum Environment {
-    Local,
-    Production,
+#[derive(serde::Deserialize)]
+pub struct EmailClientSettings {
+    pub base_url: String,
+    pub sender_email: String,
+    pub authorization_token: SecretString,
 }
 
-impl Environment {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            Environment::Local => "local",
-            Environment::Production => "production",
-        }
-    }
-}
-
-impl TryFrom<&str> for Environment {
-    type Error = String;
-
-    fn try_from(s: &str) -> Result<Self, Self::Error> {
-        match s.to_lowercase().as_str() {
-            "local" => Ok(Self::Local),
-            "production" => Ok(Self::Production),
-            other => Err(format!(
-                "{} is not a supported environment. Use either `local` or `production`.",
-                other,
-            )),
-        }
-    }
-}
-
-impl TryFrom<String> for Environment {
-    type Error = String;
-
-    fn try_from(s: String) -> Result<Self, Self::Error> {
-        s.as_str().try_into()
+impl EmailClientSettings {
+    pub fn sender(&self) -> Result<SubscriberEmail, String> {
+        self.sender_email.clone().try_into()
     }
 }

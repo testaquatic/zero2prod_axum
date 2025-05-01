@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use axum::{
     Form,
     extract::State,
@@ -10,6 +12,7 @@ use uuid::Uuid;
 use crate::{
     database::ZPgPool,
     domain::{NewSubscriber, SubscriberEmail, SubscriberName},
+    startup::RouterState,
 };
 
 #[derive(serde::Deserialize)]
@@ -37,13 +40,13 @@ impl TryFrom<FormData> for NewSubscriber {
         subscriber_name = %form.name
     )
 )]
-pub async fn subscribe(pool: State<ZPgPool>, form: Form<FormData>) -> Response {
+pub async fn subscribe(pool: State<Arc<RouterState>>, form: Form<FormData>) -> Response {
     let new_subscriber = match form.0.try_into() {
         Ok(form) => form,
         Err(_) => return StatusCode::BAD_REQUEST.into_response(),
     };
 
-    match insert_subscriber(&pool, &new_subscriber).await {
+    match insert_subscriber(&pool.z_pgpool, &new_subscriber).await {
         Ok(_) => StatusCode::OK.into_response(),
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     }

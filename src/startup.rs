@@ -1,4 +1,4 @@
-use std::net::SocketAddr;
+use std::{net::SocketAddr, sync::Arc};
 
 use axum::{
     Router,
@@ -14,16 +14,31 @@ use uuid::Uuid;
 
 use crate::{
     database::ZPgPool,
+    email_client::EmailClient,
     routes::{health_check, subscribe},
 };
 
+pub struct RouterState {
+    pub z_pgpool: ZPgPool,
+    pub email_client: EmailClient,
+}
+
+impl RouterState {
+    pub fn new(z_pgpool: ZPgPool, email_client: EmailClient) -> Self {
+        Self {
+            z_pgpool,
+            email_client,
+        }
+    }
+}
+
 /// `Router`를 얻는다.
-fn get_app(zpg_pool: ZPgPool) -> Router {
+fn get_router(z_pgpool: ZPgPool, email_client: EmailClient) -> Router {
     Router::new()
         .route("/health_check", get(health_check))
         .route("/subscriptions", post(subscribe))
-        .with_state(zpg_pool)
         .layer(ServiceBuilder::new().layer(TraceLayer::new_for_http().make_span_with(make_span)))
+        .with_state(Arc::new(RouterState::new(z_pgpool, email_client)))
 }
 
 /// 스팬을 생성한다.
@@ -46,8 +61,12 @@ fn make_span(request: &Request<Body>) -> Span {
 /// listener를 얻으려면 `async`가 필요하다.
 /// 웹서버를 실행한다.
 #[tracing::instrument(name = "Server", skip_all)]
-pub async fn run(listener: TcpListener, z_pgpool: ZPgPool) -> Result<(), std::io::Error> {
-    let app = get_app(z_pgpool);
+pub async fn run(
+    listener: TcpListener,
+    z_pgpool: ZPgPool,
+    email_client: EmailClient,
+) -> Result<(), std::io::Error> {
+    let app = get_router(z_pgpool, email_client);
 
     axum::serve(
         listener,
