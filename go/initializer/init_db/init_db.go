@@ -7,7 +7,7 @@ import (
 	"os"
 	"os/exec"
 
-	"github.com/testaquatic/zero2prod_axum/scripts/zcmd"
+	"github.com/testaquatic/zero2prod_axum/go/initializer/zcmd"
 )
 
 var skipDocker bool
