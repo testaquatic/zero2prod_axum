@@ -13,5 +13,6 @@
         base_url: "localhost:8800",
         sender_email: "temp@gmail.com",
         authorization_token: "my-secret-token",
+        timeout_milliseconds: 10000,
     },
 }

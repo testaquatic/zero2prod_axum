@@ -60,11 +60,13 @@ async fn spawn_app() -> Result<TestApp, anyhow::Error> {
         .email_client
         .sender()
         .map_err(|e| anyhow::anyhow!(e))?;
+    let timeout = configuration.email_client.timeout();
     let email_client = EmailClient::new(
         configuration.email_client.base_url,
         sender_email,
         configuration.email_client.authorization_token,
-    );
+        timeout,
+    )?;
 
     let server = run(listener, z_pgpool.clone(), email_client);
     let _ = tokio::spawn(async move {

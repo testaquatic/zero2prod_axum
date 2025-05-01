@@ -1,4 +1,4 @@
-use reqwest::Client;
+use reqwest::{Client, Response};
 use secrecy::{ExposeSecret, SecretString};
 
 use crate::domain::SubscriberEmail;
@@ -15,13 +15,17 @@ impl EmailClient {
         base_url: String,
         sender: SubscriberEmail,
         authorization_token: SecretString,
-    ) -> EmailClient {
-        EmailClient {
-            http_client: Client::new(),
+        timeout: std::time::Duration,
+    ) -> Result<Self, reqwest::Error> {
+        let http_client = Client::builder().timeout(timeout).build()?;
+        let email_client = EmailClient {
+            http_client,
             base_url,
             sender,
             authorization_token,
-        }
+        };
+
+        Ok(email_client)
     }
 
     pub async fn send_email(
@@ -30,14 +34,14 @@ impl EmailClient {
         subject: &str,
         html_content: &str,
         text_content: &str,
-    ) -> Result<(), reqwest::Error> {
-        let url = format!("{}/email", self.base_url);
+    ) -> Result<Response, reqwest::Error> {
+        let url = format!("http://{}/email", self.base_url);
         let request_body = SendEmailRequest {
-            from: self.sender.as_ref().to_string(),
-            to: recipient.as_ref().to_string(),
-            subject: subject.to_string(),
-            html_body: html_content.to_string(),
-            text_body: text_content.to_string(),
+            from: self.sender.as_ref(),
+            to: recipient.as_ref(),
+            subject,
+            html_body: html_content,
+            text_body: text_content,
         };
         self.http_client
             .post(&url)
@@ -47,24 +51,25 @@ impl EmailClient {
             )
             .json(&request_body)
             .send()
-            .await?;
-
-        Ok(())
+            .await?
+            .error_for_status()
     }
 }
 
 #[derive(serde::Serialize)]
-struct SendEmailRequest {
-    from: String,
-    to: String,
-    subject: String,
-    html_body: String,
-    text_body: String,
+#[serde(rename_all = "PascalCase")]
+pub struct SendEmailRequest<'a> {
+    from: &'a str,
+    to: &'a str,
+    subject: &'a str,
+    html_body: &'a str,
+    text_body: &'a str,
 }
 
 #[cfg(test)]
 mod tests {
 
+    use claim::{assert_err, assert_ok};
     use fake::{
         Fake, Faker,
         faker::{
@@ -72,33 +77,115 @@ mod tests {
             lorem::en::{Paragraph, Sentence},
         },
     };
+    use reqwest::StatusCode;
     use secrecy::SecretString;
+    use serde_json::Value;
 
-    use crate::{configuration, domain::SubscriberEmail, email_client::EmailClient};
+    use crate::{domain::SubscriberEmail, email_client::EmailClient, mock_server::PMMockServer};
+
+    /// 무작위로 이메일 제목을 생성한다.
+    fn subject() -> String {
+        Sentence(1..2).fake()
+    }
+
+    /// 무작위로 이메일 내용을 생성한다.
+    fn content() -> String {
+        Paragraph(1..10).fake()
+    }
+
+    /// 무작위로 구독자 이메일을 생성한다.
+    fn email() -> Result<SubscriberEmail, anyhow::Error> {
+        SubscriberEmail::try_from(SafeEmail().fake::<String>()).map_err(|e| anyhow::anyhow!(e))
+    }
+
+    /// `EmailClient`의 테스트 인스턴스를 얻는다.
+    fn email_client(base_url: String) -> Result<EmailClient, anyhow::Error> {
+        let email_client = EmailClient::new(
+            base_url,
+            email()?,
+            SecretString::new(Faker.fake::<String>().into_boxed_str()),
+            std::time::Duration::from_millis(200),
+        )?;
+
+        Ok(email_client)
+    }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn send_email_fires_a_request_to_base_url() -> Result<(), anyhow::Error> {
+    async fn send_email_sends_the_expected_request() -> Result<(), anyhow::Error> {
         // 준비
-        let sender = SubscriberEmail::try_from(SafeEmail().fake::<String>())
-            .map_err(|e| anyhow::anyhow!(e))?;
-        let configuration = configuration::get_configuration()?;
-        let email_client = EmailClient::new(
-            format!("{}/email", configuration.email_client.base_url),
-            sender,
-            SecretString::from(Faker.fake::<String>()),
-        );
-
-        let subscriber_email = SubscriberEmail::try_from(SafeEmail().fake::<String>())
-            .map_err(|e| anyhow::anyhow!(e))?;
-        let subject = Sentence(1..2).fake::<String>();
-        let content = Paragraph(1..10).fake::<String>();
+        let pm_mock_server = PMMockServer::new_from_configuration().await?;
+        let email_client = email_client(pm_mock_server.addr.clone())?;
 
         // 실행
-        let _ = email_client
-            .send_email(subscriber_email, &subject, &content, &content)
+        let response = email_client
+            .send_email(email()?, &subject(), &content(), &content())
+            .await?;
+
+        // 확인
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = response.json::<serde_json::Map<String, Value>>().await?;
+        let uuid = body
+            .get("MessageID")
+            .expect("No MessageID in response")
+            .as_str()
+            .expect("Failed to get MessageID");
+
+        let debug = pm_mock_server.get_request_info(&uuid).await?;
+        debug
+            .header_exists("X-Postmark-Server-Token")
+            .header_check(reqwest::header::CONTENT_TYPE, "application/json")
+            .method_check(reqwest::Method::POST);
+
+        Ok(())
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn send_email_succeeds_if_the_server_returns_200() -> Result<(), anyhow::Error> {
+        // 준비
+        let pm_mock_server = PMMockServer::new_from_configuration().await?;
+        let email_client = email_client(pm_mock_server.addr.clone())?;
+
+        // 실행
+        let outcome = email_client
+            .send_email(email()?, &subject(), &content(), &content())
             .await;
 
         // 확인
+        assert_ok!(outcome);
+
+        Ok(())
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn send_email_fails_if_the_server_returns_500() -> Result<(), anyhow::Error> {
+        // 준비
+        let pm_mock_server = PMMockServer::new_from_configuration().await?;
+        let email_client = email_client(format!("{}/500", pm_mock_server.addr))?;
+
+        // 실행
+        let coutcome = email_client
+            .send_email(email()?, &subject(), &content(), &content())
+            .await;
+
+        // 확인
+        assert_err!(coutcome);
+
+        Ok(())
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn send_email_times_out_if_the_server_takes_too_long() -> Result<(), anyhow::Error> {
+        // 준비
+        let pm_moc_server = PMMockServer::new_from_configuration().await?;
+        let email_client = email_client(format!("{}/delay", pm_moc_server.addr))?;
+
+        // 실행
+        let outcome = email_client
+            .send_email(email()?, &subject(), &content(), &content())
+            .await;
+
+        // 확인
+        assert_err!(outcome);
 
         Ok(())
     }

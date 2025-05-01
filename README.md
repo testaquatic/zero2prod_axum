@@ -27,9 +27,6 @@ __대괄호({})부분은 환경에 맞춰서 치환한다.__
 ### POST
 
 - 요청
-  - /subscriptions/name={name}&email={email}  
-    Content-Type: application/x-www-form-urlencoded
-
     ```
     http -v --form POST localhost:8000/subscriptions email={email} name={name}
     ```

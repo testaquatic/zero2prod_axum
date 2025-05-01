@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -29,7 +30,7 @@ func main() {
 	flag.Parse()
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/health_check", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		io.Copy(w, r.Body)
 		r.Body.Close()
@@ -37,6 +38,12 @@ func main() {
 	emailHandler := new(PMMockServerState)
 	emailHandler.AddHander(http.MethodPost, emailHandler.PMMockServerPostHandler())
 	mux.Handle("/email", emailHandler)
+	mux.HandleFunc("/500/email", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		io.Copy(w, r.Body)
+		r.Body.Close()
+	})
+	mux.Handle("/delay/email", &DelayHandler{next: emailHandler})
 	mux.Handle("/debug", emailHandler.PMMockServerDebugHandler())
 
 	listener, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", Port))
@@ -76,11 +83,13 @@ func (server *PMMockServerState) PMMockServerPostHandler() http.Handler {
 			http.Error(w, "Invalid content type", http.StatusBadRequest)
 			return
 		}
-		if accept, ok := r.Header["Accept"]; !ok || accept[0] != "application/json" {
-			log.Println(accept)
-			http.Error(w, "Invalid accept type", http.StatusBadRequest)
-			return
-		}
+		/*
+			if accept, ok := r.Header["Accept"]; !ok || accept[0] != "application/json" {
+				log.Println(accept)
+				http.Error(w, "Invalid accept type", http.StatusBadRequest)
+				return
+			}
+		*/
 		var body PMRequestBody
 		err := json.NewDecoder(r.Body).Decode(&body)
 		if err != nil {
@@ -111,7 +120,7 @@ func (server *PMMockServerState) PMMockServerPostHandler() http.Handler {
 
 		response := PMResponse{
 			To:          body.To,
-			SubmittedAT: time.Now().Format(time.RFC3339),
+			SubmittedAt: time.Now().Format(time.RFC3339),
 			MessageID:   messageID,
 			ErrorCode:   0,
 			Message:     "OK",
@@ -140,15 +149,17 @@ func (server *PMMockServerState) PMMockServerDebugHandler() http.Handler {
 			return
 		}
 		defer r.Body.Close()
+		log.Printf("command: %+v", command)
 
 		switch command.Command {
 		case "get":
-			request, ok := server.Requests[command.Uuid]
+			request, ok := server.Requests[strings.TrimSpace(command.Uuid)]
 			if !ok {
 				http.Error(w, "Not found", http.StatusNotFound)
 				return
 			}
 			json.NewEncoder(w).Encode(request)
+
 			return
 		default:
 			http.Error(w, "Invalid command", http.StatusBadRequest)
@@ -174,9 +185,19 @@ type PMRequestBody struct {
 }
 
 type PMResponse struct {
-	To          string
-	SubmittedAT string
-	MessageID   string
+	To          string `json:",omitempty"`
+	SubmittedAt string `json:",omitempty"`
+	MessageID   string `json:",omitempty"`
 	ErrorCode   uint
-	Message     string
+	Message     string `json:",omitempty"`
+}
+
+type DelayHandler struct {
+	next http.Handler
+}
+
+func (h *DelayHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	log.Println("DelayHandler!")
+	time.Sleep(100 * time.Second)
+	h.next.ServeHTTP(w, r)
 }
