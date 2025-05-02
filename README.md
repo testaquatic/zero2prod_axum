@@ -10,7 +10,7 @@ __이중 중괄호( `{{이중 중괄호}}` )부분은 환경에 맞춰서 치환
 
 ## `/heath_check`
 
-### GET  
+### `GET`  
 
 바디가 없는 `200 OK` 응답을 반환한다.
 
@@ -66,6 +66,12 @@ docker build --tag zero2prod_axum --file Dockerfile .
   ```
   docker-compose down
   ```
+
+# 테스트는 [/go/mock_server/](/go/mock_server/)의 서버를 시작해야 한다.
+책의 [wiremock]( <https://docs.rs/wiremock/latest/wiremock/index.html> ) 대신에 직접 GO로 코드를 작성했다.  
+```
+cd go/mock_server/ && go run main.go; cd ../..
+```
 
 # 데이터베이스 설정
 
