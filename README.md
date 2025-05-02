@@ -1,18 +1,18 @@
 # zero2prod_axum
 
-["제로부터 시작하는 러스트 백엔드 프로그래밍"](https://product.kyobobook.co.kr/detail/S000212216062)을 읽고 작성한 코드이다.  
+["제로부터 시작하는 러스트 백엔드 프로그래밍"](https://product.kyobobook.co.kr/detail/S000212216062)을 읽으면서 작성한 코드이다.  
 저자 깃허브: [https://github.com/LukeMathWalker/zero-to-production](https://github.com/LukeMathWalker/zero-to-production)  
 
-__actix-web 대신 [axum]( <https://docs.rs/axum/latest/axum/> )으로 작성했다.__  
-__대괄호({})부분은 환경에 맞춰서 치환한다.__
+__[actix-web]( <https://docs.rs/actix-web/latest/actix_web/> ) 대신 [axum]( <https://docs.rs/axum/latest/axum/> )으로 작성했다.__  
+__이중 중괄호( `{{이중 중괄호}}` )부분은 환경에 맞춰서 치환한다.__
 
 # Endpoint
 
-## /heath_check
+## `/heath_check`
 
 ### GET  
 
-바디가 없는 200 OK 응답을 반환한다.
+바디가 없는 `200 OK` 응답을 반환한다.
 
 - 요청
   ```
@@ -20,32 +20,32 @@ __대괄호({})부분은 환경에 맞춰서 치환한다.__
   ```
 
 - 응답
-  - 200 OK
+  - `200 OK`
 
-## /subscriptions
+## `/subscriptions`
 
-### POST
+### `POST`
 
 - 요청
     ```
-    http -v --form POST localhost:8000/subscriptions email={email} name={name}
+    http -v --form POST localhost:8000/subscriptions email={{email}} name={{name}}
     ```
 
 - 응답
-  - 200 OK  
+  - `200 OK`  
     유효한 이름과 이메일 제공  
     - 이름의 유효성
       1. 앞뒤의 공백을 제외하고 1자이상 256자 이하여야 한다.
       2. '/', '(', ')', '"', '<', '>', '\\', '{', '}', ';', ':', '|'를 포함하지 않아야 한다.
 
-  - 400 BAD REQUEST  
+  - `400 BAD REQUEST`  
     유효하지 않은 이름이나 이메일을 입력했다.
 
-  - 422 UNPROCESSABLE ENTITY  
+  - `422 UNPROCESSABLE ENTITY`  
     이름이나 이메일 필드가 누락됐다.
 
-  - 500 INTERNAL_SERVER_ERROR  
-    데이터베이스 오류가 발생했다.
+  - `500 INTERNAL_SERVER_ERROR`  
+    내부 오류가 발생했다.
 
 # 도커
 
@@ -71,10 +71,10 @@ docker build --tag zero2prod_axum --file Dockerfile .
 
 PostgreSQL을 사용한다.
 ```
-export {DATABASE_URL}
+export {{DATABASE_URL}}
 sqlx database create
 sqlx migrate run
 ```
 
 # 편의성을 위한 코드
-[/scripts](/scripts/)를 참고한다.
+[/go/](/go/)를 참고한다.

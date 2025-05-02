@@ -78,6 +78,12 @@ func (server *PMMockServerState) ServeHTTP(w http.ResponseWriter, r *http.Reques
 
 func (server *PMMockServerState) PMMockServerPostHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			io.Copy(io.Discard, r.Body)
+			r.Body.Close()
+		}()
+		log.Println("PMMockServerPostHandler!")
+
 		if contentType, ok := r.Header["Content-Type"]; !ok || contentType[0] != "application/json" {
 			log.Println(contentType)
 			http.Error(w, "Invalid content type", http.StatusBadRequest)
@@ -93,25 +99,19 @@ func (server *PMMockServerState) PMMockServerPostHandler() http.Handler {
 		var body PMRequestBody
 		err := json.NewDecoder(r.Body).Decode(&body)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-		_, err = io.Copy(io.Discard, r.Body)
-		if err != nil {
 			log.Println(err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		defer r.Body.Close()
 
 		request := PMRequest{
 			Header: r.Header,
 			Body:   body,
 			Method: r.Method,
 		}
+		log.Printf("PMRequest: %#v\n", request)
+
 		messageID := uuid.New().String()
-		log.Println("messageID:", messageID)
-		log.Println("request:", request)
 
 		if server.Requests == nil {
 			server.Requests = make(map[string]PMRequest)
@@ -127,6 +127,7 @@ func (server *PMMockServerState) PMMockServerPostHandler() http.Handler {
 		}
 
 		w.WriteHeader(http.StatusOK)
+		log.Printf("PMResponse: %#v\n", response)
 		err = json.NewEncoder(w).Encode(response)
 		if err != nil {
 			log.Println(err)
@@ -141,31 +142,41 @@ type Command struct {
 
 func (server *PMMockServerState) PMMockServerDebugHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			io.Copy(io.Discard, r.Body)
+			r.Body.Close()
+		}()
+		log.Println("PMMockServerDebugHandler!")
+
 		command := new(Command)
 		err := json.NewDecoder(r.Body).Decode(command)
 		if err != nil {
 			log.Println(err)
 			http.Error(w, err.Error(), http.StatusBadRequest)
+
 			return
 		}
-		defer r.Body.Close()
-		log.Printf("command: %+v", command)
+		log.Printf("Command: %#v\n", command)
 
 		switch command.Command {
 		case "get":
 			request, ok := server.Requests[strings.TrimSpace(command.Uuid)]
 			if !ok {
+				log.Printf("Invalid UUID: %#v\n", command.Uuid)
 				http.Error(w, "Not found", http.StatusNotFound)
+
 				return
 			}
+			log.Printf("PMRequest: %#v\n", request)
 			json.NewEncoder(w).Encode(request)
 
 			return
 		default:
+			log.Printf("Invalid command: %#v\n", command.Command)
 			http.Error(w, "Invalid command", http.StatusBadRequest)
+
 			return
 		}
-
 	},
 	)
 }
