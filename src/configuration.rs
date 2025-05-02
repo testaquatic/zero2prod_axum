@@ -8,7 +8,7 @@ use sqlx::{
 use crate::domain::SubscriberEmail;
 
 /// 애플리케이션 설정
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, Clone)]
 pub struct Settings {
     pub database: DatabaseSettings,
     /// 포트
@@ -85,7 +85,7 @@ impl TryFrom<String> for Environment {
 }
 
 // 애플리케이션 설정
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, Clone)]
 pub struct ApplicationSettings {
     /// 포트
     #[serde(deserialize_with = "deserialize_number_from_string")]
@@ -94,7 +94,7 @@ pub struct ApplicationSettings {
 }
 
 /// 데이터베이스 연결 파라미터
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, Clone)]
 pub struct DatabaseSettings {
     pub username: String,
     pub password: SecretString,
@@ -131,7 +131,7 @@ impl DatabaseSettings {
     }
 }
 
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, Clone)]
 pub struct EmailClientSettings {
     pub base_url: String,
     pub sender_email: String,
