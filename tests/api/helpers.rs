@@ -59,6 +59,7 @@ impl TestApp {
 ///
 /// 반환  
 ///     `TestApp`
+#[cfg(test)]
 pub async fn spawn_app() -> Result<TestApp, anyhow::Error> {
     LazyLock::force(&TRACING);
 

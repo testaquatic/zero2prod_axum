@@ -22,6 +22,16 @@ use crate::{
     routes::{health_check, subscribe},
 };
 
+/// 그냥 경고 메시지의 타입을 복사했다.
+/// 여기에서 포트 추출이 바로 가능하다.
+type Server = Serve<
+    tokio::net::TcpListener,
+    Service,
+    AddExtension<Router, ConnectInfo<std::net::SocketAddr>>,
+>;
+
+type Service = IntoMakeServiceWithConnectInfo<Router, SocketAddr>;
+
 /// 라우터의 상태를 표현한다.
 /// 정적인 데이터를 넣는다.
 pub struct RouterState {
@@ -39,38 +49,29 @@ impl RouterState {
 }
 
 /// `Router`를 얻는다.
-fn get_router(z_pgpool: ZPgPool, email_client: EmailClient) -> Router {
+fn get_service(router_state: RouterState) -> Service {
     Router::new()
         .route("/health_check", get(health_check))
         .route("/subscriptions", post(subscribe))
         .layer(ServiceBuilder::new().layer(TraceLayer::new_for_http().make_span_with(make_span)))
-        .with_state(Arc::new(RouterState::new(z_pgpool, email_client)))
+        .with_state(Arc::new(router_state))
+        .into_make_service_with_connect_info::<SocketAddr>()
 }
 
 /// 스팬을 생성한다.
 fn make_span(request: &Request<Body>) -> Span {
-    let request_id = Uuid::new_v4();
     let remote_addr = request
         .extensions()
-        .get::<ConnectInfo<SocketAddr>>()
-        .map(|socketaddr| socketaddr.to_string())
-        .unwrap_or("UNKNOWN".to_string());
+        .get::<ConnectInfo<std::net::SocketAddr>>()
+        .map(|connect_info| &connect_info.0);
     tracing::info_span!(
         "http-request",
-        %request_id,
+        request_id = %Uuid::new_v4(),
         method = %request.method(),
         path = %request.uri(),
-        remote_addr = %remote_addr,
+        remote_addr = ?remote_addr,
     )
 }
-
-/// 그냥 경고 메시지의 타입을 복사했다.
-/// 여기에서 포트 추출이 바로 가능하다.
-type Server = Serve<
-    tokio::net::TcpListener,
-    IntoMakeServiceWithConnectInfo<Router, std::net::SocketAddr>,
-    AddExtension<Router, ConnectInfo<std::net::SocketAddr>>,
->;
 
 /// 새롭게 만들어진 서버 인스턴스
 /// 타입 정의가 복잡하므로 추상화한다.
@@ -100,7 +101,8 @@ impl Application {
             configuration.application.host, configuration.application.port
         );
         let listener = TcpListener::bind(address).await?;
-        let server = run(listener, z_pg_pool, email_client);
+        let router_state = RouterState::new(z_pg_pool.clone(), email_client);
+        let server = run(listener, router_state);
 
         Ok(Application { server })
     }
@@ -127,11 +129,6 @@ pub async fn get_z_pgpool(database_settings: &DatabaseSettings) -> ZPgPool {
 
 /// listener를 얻으려면 `async`가 필요하다.
 /// 서버 인스턴스를 얻는다.
-pub fn run(listener: TcpListener, z_pgpool: ZPgPool, email_client: EmailClient) -> Server {
-    let app = get_router(z_pgpool, email_client);
-
-    axum::serve(
-        listener,
-        app.into_make_service_with_connect_info::<SocketAddr>(),
-    )
+pub fn run(listener: TcpListener, router_state: RouterState) -> Server {
+    axum::serve(listener, get_service(router_state))
 }
