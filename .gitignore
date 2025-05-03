@@ -3,6 +3,6 @@ Cargo.lock
 node_modules/
 package-lock.json
 package.json
-/scripts/docker_compose/docker_compose
-/scripts/init_db/init_db
+/go/initializer/docker_compose/docker_compose
+/go/initializer/init_db/init_db
 proptest-regressions/

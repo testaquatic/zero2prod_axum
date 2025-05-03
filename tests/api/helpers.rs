@@ -1,5 +1,6 @@
 use std::sync::LazyLock;
 
+use pm_mock_server::PMMockServer;
 use reqwest::header;
 use sqlx::{Connection, Executor, PgConnection};
 use tracing::Subscriber;
@@ -39,6 +40,8 @@ pub struct TestApp {
     pub address: String,
     /// 커넥션 풀
     pub z_pgpool: ZPgPool,
+    /// 목서버
+    pub email_server: PMMockServer,
 }
 
 impl TestApp {
@@ -61,12 +64,18 @@ impl TestApp {
 ///     `TestApp`
 #[cfg(test)]
 pub async fn spawn_app() -> Result<TestApp, anyhow::Error> {
+    use pm_mock_server::PMMockServer;
+
     LazyLock::force(&TRACING);
 
     let mut configuration = get_configuration()?;
     configuration.database.database_name = uuid::Uuid::new_v4().to_string();
     configuration.application.port = 0;
     configure_database(&configuration.database).await?;
+
+    // 이메일 서버 설정을 수정한다.
+    let email_server = PMMockServer::start_server().await?;
+    configuration.email_client.base_url = email_server.addr.clone();
 
     let application = Application::build(configuration.clone()).await?;
     let address = format!("http://127.0.0.1:{}", application.port()?);
@@ -76,6 +85,7 @@ pub async fn spawn_app() -> Result<TestApp, anyhow::Error> {
     Ok(TestApp {
         address,
         z_pgpool: get_z_pgpool(&configuration.database).await,
+        email_server,
     })
 }
 

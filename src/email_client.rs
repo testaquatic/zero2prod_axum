@@ -114,8 +114,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn send_email_sends_the_expected_request() -> Result<(), anyhow::Error> {
         // 준비
-        let pm_mock_server = PMMockServer::new_from_configuration().await?;
-        pm_mock_server.start_server().await?;
+        let pm_mock_server = PMMockServer::start_server().await?;
         let email_client = email_client(pm_mock_server.addr.clone())?;
 
         // 실행
@@ -144,8 +143,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn send_email_succeeds_if_the_server_returns_200() -> Result<(), anyhow::Error> {
         // 준비
-        let pm_mock_server = PMMockServer::new_from_configuration().await?;
-        pm_mock_server.start_server().await?;
+        let pm_mock_server = PMMockServer::start_server().await?;
         let email_client = email_client(pm_mock_server.addr.clone())?;
 
         // 실행
@@ -162,8 +160,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn send_email_fails_if_the_server_returns_500() -> Result<(), anyhow::Error> {
         // 준비
-        let pm_mock_server = PMMockServer::new_from_configuration().await?;
-        pm_mock_server.start_server().await?;
+        let pm_mock_server = PMMockServer::start_server().await?;
         let email_client = email_client(format!("{}/500", pm_mock_server.addr))?;
 
         // 실행
@@ -180,8 +177,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn send_email_times_out_if_the_server_takes_too_long() -> Result<(), anyhow::Error> {
         // 준비
-        let pm_mock_server = PMMockServer::new_from_configuration().await?;
-        pm_mock_server.start_server().await?;
+        let pm_mock_server = PMMockServer::start_server().await?;
         let email_client = email_client(format!("{}/delay", pm_mock_server.addr))?;
 
         // 실행

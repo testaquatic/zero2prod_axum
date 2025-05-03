@@ -1,13 +1,18 @@
 use std::{
+    collections::HashMap,
     process::{Command, Stdio},
     sync::atomic::{AtomicBool, Ordering},
 };
 
-use claim::assert_ok;
 use http::HeaderMap;
 use reqwest::{Client, Response};
 use serde_json::json;
 use zero2prod_axum::configuration::{self, EmailClientSettings};
+
+struct PMMockHub {
+    client: Client,
+    addr: String,
+}
 
 pub struct PMMockServer {
     client: Client,
@@ -51,26 +56,43 @@ pub struct PMResponse {
     pub message: String,
 }
 
-impl PMMockServer {
-    /// `PMMockServer`를 생성한다.
-    pub fn new(email_client_settings: &EmailClientSettings) -> PMMockServer {
-        PMMockServer {
+impl PMMockHub {
+    /// `PMMockHub`를 생성한다.
+    fn new(email_client_settings: &EmailClientSettings) -> PMMockHub {
+        PMMockHub {
             client: Client::new(),
             addr: email_client_settings.base_url.clone(),
         }
     }
 
+    /// 서버를 생성하고 주소를 반납한다.
+    async fn new_server(&self) -> Result<PMMockServer, anyhow::Error> {
+        self.hub_server().await?;
+        let port = self
+            .client
+            .get(format!("http://{}/new_server", self.addr))
+            .send()
+            .await?
+            .text()
+            .await?;
+
+        Ok(PMMockServer {
+            client: self.client.clone(),
+            addr: format!("localhost:{}", port),
+        })
+    }
+
     /// 설정 파일에서 `PMMockServer`를 생성한다.
-    pub async fn new_from_configuration() -> Result<PMMockServer, anyhow::Error> {
+    async fn new_from_configuration() -> Result<PMMockHub, anyhow::Error> {
         let configuration = configuration::get_configuration()?;
-        let pm_mock_server = PMMockServer::new(&configuration.email_client);
+        let pm_mock_server = PMMockHub::new(&configuration.email_client);
         // pm_mock_server.is_mock_server_is_on().await;
 
         Ok(pm_mock_server)
     }
 
     /// 서버가 작동하는지 테스트한다.
-    pub async fn health_check(&self) -> Result<Response, reqwest::Error> {
+    async fn health_check(&self) -> Result<Response, reqwest::Error> {
         self.client
             .get(&format!("http://{}/health_check", self.addr))
             .send()
@@ -78,33 +100,8 @@ impl PMMockServer {
             .error_for_status()
     }
 
-    /// 이전에 한 요청의 정보를 확인한다.
-    pub async fn get_request_info(&self, uuid: &str) -> Result<PMDebugGet, reqwest::Error> {
-        let response = self
-            .client
-            .get(&format!("http://{}/debug", self.addr))
-            .json(&json!({"uuid": uuid, "command": "get"}))
-            .send()
-            .await?;
-        assert_eq!(response.status(), reqwest::StatusCode::OK);
-
-        let response = response.json::<PMDebugGet>().await?;
-
-        Ok(response)
-    }
-
-    /// 서버가 작동하는지 확인하고, 작동하지 않으면 패닉이 발생한다.
-    pub async fn is_mock_server_is_on(&self) -> &Self {
-        let health_check = self.health_check().await;
-        assert_ok!(&health_check);
-        let status_check = health_check.unwrap().error_for_status();
-        assert_ok!(status_check);
-
-        self
-    }
-
     /// 서버를 시작한다.
-    pub async fn start_server(&self) -> Result<&Self, anyhow::Error> {
+    async fn hub_server(&self) -> Result<&Self, anyhow::Error> {
         // 서버가 실행중이라면 복잡한 테스트를 할 필요가 없다.
         if self.health_check().await.is_ok() {
             return Ok(self);
@@ -121,6 +118,7 @@ impl PMMockServer {
                             .current_dir("go/mock_server")
                             .arg("run")
                             .arg("main.go")
+                            .arg("server.go")
                             .stdout(Stdio::null())
                             .stderr(Stdio::null())
                             .spawn()?;
@@ -145,6 +143,46 @@ impl PMMockServer {
             }
         }
         Err(anyhow::anyhow!("Cannot start mock server"))
+    }
+}
+
+impl PMMockServer {
+    pub async fn start_server() -> Result<Self, anyhow::Error> {
+        let pm_mock_hub = PMMockHub::new_from_configuration().await?;
+        let pm_mock_server = pm_mock_hub.new_server().await?;
+
+        Ok(pm_mock_server)
+    }
+
+    /// 이전에 한 요청의 정보를 확인한다.
+    pub async fn get_request_info(&self, uuid: &str) -> Result<PMDebugGet, reqwest::Error> {
+        let response = self
+            .client
+            .get(&format!("http://{}/debug", self.addr))
+            .json(&json!({"uuid": uuid, "command": "get"}))
+            .send()
+            .await?;
+        assert_eq!(response.status(), reqwest::StatusCode::OK);
+
+        let response = response.json::<PMDebugGet>().await?;
+
+        Ok(response)
+    }
+
+    pub async fn get_all_requests_info(
+        &self,
+    ) -> Result<HashMap<String, PMDebugGet>, reqwest::Error> {
+        let response = self
+            .client
+            .get(&format!("http://{}/debug", self.addr))
+            .json(&json!({"command": "get_all"}))
+            .send()
+            .await?;
+        assert_eq!(response.status(), reqwest::StatusCode::OK);
+
+        let response = response.json::<HashMap<String, PMDebugGet>>().await?;
+
+        Ok(response)
     }
 }
 

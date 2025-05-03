@@ -27,7 +27,7 @@ impl ZPgPool {
         subscribed_at: &DateTime<Utc>,
     ) -> Result<(), sqlx::Error> {
         sqlx::query!(
-        r#"INSERT INTO subscriptions (id, email, name, subscribed_at) VALUES ($1, $2, $3, $4);"#,
+        r#"INSERT INTO subscriptions (id, email, name, subscribed_at, status) VALUES ($1, $2, $3, $4, 'confirmed');"#,
         uuid,
         email,
         name,

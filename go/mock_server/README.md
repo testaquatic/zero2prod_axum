@@ -7,11 +7,12 @@ __이중 중괄호( `{{이중 중괄호}}` )부분은 환경에 맞춰서 치환
 ./mock_server --help
 ```
 
-# 타임아웃
-`--timeout`스위치를 사용하지 않으면 기본적으로 `10초` 이후에 자동으로 종료한다.
-시간을 연장하려면 `/health_check`에 `GET` 요청을 보내면 `--timeout`에 지정한 만큼 늘어난다.
+# `PM_MOCK_HUB`
+독립적인 `PM_MOCK_SERVER`를 생성하기 위한 헬퍼이다.
 
-# 엔드포인트
+## 타임아웃
+`--timeout`스위치를 사용하지 않으면 기본적으로 `10초` 이후에 자동으로 종료한다.  
+시간을 연장하려면 `/health_check`에 `GET` 요청을 보내면 `--timeout`에 지정한 만큼 늘어난다.
 
 ## `/health_check`
 작동을 확인한다.
@@ -27,13 +28,27 @@ __이중 중괄호( `{{이중 중괄호}}` )부분은 환경에 맞춰서 치환
 - 응답
   - `200 OK`
 
+## `/new_server`
+새로운 `PM_MOCK_SERVER`를 생성한다.
+
+```
+http -v http://127.0.0.1:8800/new_server
+```
+
+- 응답
+    - `200 OK`  
+        {{PORT}}
+
+# `PM_MOCK_SERVER`
+테스트를 위헌 모사 서버이다.
+
 ## `/email`
 이메일 API를 모사한다.
 
 ### `POST`
 - 요청
     ```
-    http --json -v POST 127.0.0.1:8800/email \
+    http --json -v POST 127.0.0.1:{{PORT}}/email \
         Accept:application/json Content-Type:application/json X-Postmark-Server-Token:{{TOKEN}} \
         From={{SENDER_EMAIl}} To={{RECIPIENT_EMAIL}} \
         Subject={{SUBJECT}} \
@@ -56,7 +71,7 @@ __이중 중괄호( `{{이중 중괄호}}` )부분은 환경에 맞춰서 치환
 요청을 확인한다.
 - 요청
     ```
-    http --json -v http://localhost:8800/debug Content-Type:application/json command=get uuid={{UUID}}
+    http --json -v http://localhost:{{PORT}}/debug Content-Type:application/json command=get uuid={{UUID}}
     ```
 - 응답
     - `200 OK`

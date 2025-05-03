@@ -46,10 +46,28 @@ pub async fn subscribe(pool: State<Arc<RouterState>>, form: Form<FormData>) -> R
         Err(_) => return StatusCode::BAD_REQUEST.into_response(),
     };
 
-    match insert_subscriber(&pool.z_pgpool, &new_subscriber).await {
-        Ok(_) => StatusCode::OK.into_response(),
-        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    if insert_subscriber(&pool.z_pgpool, &new_subscriber)
+        .await
+        .is_err()
+    {
+        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     }
+
+    if pool
+        .email_client
+        .send_email(
+            new_subscriber.email,
+            "Welcome!",
+            "Welcome to our newsletter!",
+            "Welcome to our newsletter",
+        )
+        .await
+        .is_err()
+    {
+        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+    }
+
+    StatusCode::OK.into_response()
 }
 
 /// 데이터베이스에 사용자 정보를 저장한다.

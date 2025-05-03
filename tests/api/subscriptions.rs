@@ -77,3 +77,21 @@ async fn subscribe_returns_a_400_when_fields_are_present_but_invalid() -> Result
 
     Ok(())
 }
+
+/// 이메일을 전송하는지 확인한다.
+#[tokio::test(flavor = "multi_thread")]
+async fn subscribe_sends_a_confirmation_email_for_valid_data() -> Result<(), anyhow::Error> {
+    // 준비
+    let app = spawn_app().await?;
+    let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
+
+    // 실행
+    let response = app.post_subscriptions(body.to_string()).await?;
+    assert_eq!(response.status(), StatusCode::OK);
+
+    // 확인
+    let email_requsts = app.email_server.get_all_requests_info().await?;
+    assert_eq!(email_requsts.len(), 1);
+
+    Ok(())
+}
