@@ -49,8 +49,11 @@ http -v http://127.0.0.1:8800/new_server
 - 요청
     ```
     http --json -v POST 127.0.0.1:{{PORT}}/email \
-        Accept:application/json Content-Type:application/json X-Postmark-Server-Token:{{TOKEN}} \
-        From={{SENDER_EMAIl}} To={{RECIPIENT_EMAIL}} \
+        Accept:application/json \
+        Content-Type:application/json \ 
+        X-Postmark-Server-Token:{{TOKEN}} \
+        From={{SENDER_EMAIl}} \
+        To={{RECIPIENT_EMAIL}} \
         Subject={{SUBJECT}} \
         TextBody={{TEXT_BODY}} \
         HtmlBody={{HTML_BODY}}

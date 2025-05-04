@@ -15,11 +15,25 @@ async fn subscribe_returns_a_200_for_valid_form_data() -> Result<(), anyhow::Err
     // 확인
     assert_eq!(StatusCode::OK, response.status());
 
-    let saved = sqlx::query!("SELECT email, name FROM subscriptions")
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn subscribe_persists_the_new_subscriber() -> Result<(), anyhow::Error> {
+    // 준비
+    let app = spawn_app().await?;
+    let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
+
+    // 실행
+    app.post_subscriptions(body.to_string()).await?;
+
+    // 확인
+    let saved = sqlx::query!("SELECT email, name, status FROM subscriptions;")
         .fetch_one(app.z_pgpool.pg_pool.as_ref())
         .await?;
     assert_eq!(saved.email, "ursula_le_guin@gmail.com");
     assert_eq!(saved.name, "le guin");
+    assert_eq!(saved.status, "pending_confirmation");
 
     Ok(())
 }
@@ -92,6 +106,37 @@ async fn subscribe_sends_a_confirmation_email_for_valid_data() -> Result<(), any
     // 확인
     let email_requsts = app.email_server.get_all_requests_info().await?;
     assert_eq!(email_requsts.len(), 1);
+
+    Ok(())
+}
+
+/// 이메일의 링크를 추출하고 확인한다.
+#[tokio::test(flavor = "multi_thread")]
+async fn subscribe_sends_a_confirmation_email_with_a_link() -> Result<(), anyhow::Error> {
+    // 준비
+    let app = spawn_app().await?;
+    let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
+
+    // 실행
+    app.post_subscriptions(body.to_string()).await?;
+
+    // 확인
+    let email_requests = app.email_server.get_all_requests_info().await?;
+    let email_request = email_requests.values().collect::<Vec<_>>()[0];
+
+    let get_link = |s: &str| {
+        let links = linkify::LinkFinder::new()
+            .links(s)
+            .filter(|l| *l.kind() == linkify::LinkKind::Url)
+            .collect::<Vec<_>>();
+        assert_eq!(links.len(), 1);
+        links.get(0).unwrap().as_str().to_owned()
+    };
+
+    let html_link = get_link(&email_request.body.html_body);
+    let plain_text_link = get_link(&email_request.body.text_body);
+
+    assert_eq!(plain_text_link, html_link);
 
     Ok(())
 }
