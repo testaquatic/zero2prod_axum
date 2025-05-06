@@ -1,6 +1,6 @@
 use std::sync::LazyLock;
 
-use pm_mock_server::PMMockServer;
+use pm_mock_server::{PMBody, PMMockServer};
 use reqwest::{Url, header};
 use sqlx::{Connection, Executor, PgConnection};
 use tracing::Subscriber;
@@ -44,6 +44,12 @@ pub struct TestApp {
     pub email_server: PMMockServer,
 }
 
+/// 이메일 API에 대한 요청에 포함된 확인 링크
+pub struct ConfirmationLinks {
+    pub html: url::Url,
+    pub plain_text: url::Url,
+}
+
 impl TestApp {
     pub async fn post_subscriptions(
         &self,
@@ -57,6 +63,35 @@ impl TestApp {
             .await?;
 
         Ok(response)
+    }
+
+    /// 이메일 API에 대한 요청에 포함된 확인 링크를 추출한다.
+    pub fn get_confirmation_links(
+        &self,
+        email_request: &PMBody,
+    ) -> Result<ConfirmationLinks, anyhow::Error> {
+        let get_link = |s: &str| {
+            let links = linkify::LinkFinder::new()
+                .links(s)
+                .filter(|l| *l.kind() == linkify::LinkKind::Url)
+                .collect::<Vec<_>>();
+            assert_eq!(links.len(), 1);
+            let raw_link = links[0].as_str();
+            let mut confirmation_link = url::Url::parse(raw_link)?;
+            // 외부로 요청이 나가지 않도록 확인한다.
+            assert_eq!(confirmation_link.host_str(), Some("127.0.0.1"));
+            confirmation_link
+                .set_port(self.address.port())
+                .map_err(|_| anyhow::anyhow!("Failed to set port"))?;
+
+            Result::<Url, anyhow::Error>::Ok(confirmation_link)
+        };
+
+        let html = get_link(&email_request.html_body)?;
+        let plain_text = get_link(&email_request.text_body)?;
+        let confirmation_links = ConfirmationLinks { html, plain_text };
+
+        Ok(confirmation_links)
     }
 }
 
@@ -79,7 +114,7 @@ pub async fn spawn_app() -> Result<TestApp, anyhow::Error> {
 
     // 이메일 서버 설정을 수정한다.
     let email_server = PMMockServer::start_server().await?;
-    configuration.email_client.base_url = email_server.url();
+    configuration.email_client.base_url = email_server.url().to_string();
 
     let application = Application::build(configuration.clone()).await?;
     let application_port = application.port()?;

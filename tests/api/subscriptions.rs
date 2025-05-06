@@ -125,19 +125,8 @@ async fn subscribe_sends_a_confirmation_email_with_a_link() -> Result<(), anyhow
     let email_requests = app.email_server.recieved_reqeusts().await?;
     let email_request = &email_requests[0];
 
-    let get_link = |s: &str| {
-        let links = linkify::LinkFinder::new()
-            .links(s)
-            .filter(|l| *l.kind() == linkify::LinkKind::Url)
-            .collect::<Vec<_>>();
-        assert_eq!(links.len(), 1);
-        links.get(0).unwrap().as_str().to_owned()
-    };
-
-    let html_link = get_link(&email_request.html_body);
-    let plain_text_link = get_link(&email_request.text_body);
-
-    assert_eq!(plain_text_link, html_link);
+    let confirmation_links = app.get_confirmation_links(email_request)?;
+    assert_eq!(confirmation_links.html, confirmation_links.plain_text);
 
     Ok(())
 }

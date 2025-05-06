@@ -8,17 +8,18 @@ use std::{
 use http::HeaderMap;
 use reqwest::{Client, Response};
 use serde_json::json;
+use url::Url;
 use zero2prod_axum::configuration::{self, EmailClientSettings};
 
 struct PMMockHub {
     client: Client,
-    base_url: String,
+    base_url: Url,
     port: u16,
 }
 
 pub struct PMMockServer {
     client: Client,
-    base_url: String,
+    base_url: Url,
     port: u16,
 }
 
@@ -63,23 +64,24 @@ const PORT: u16 = 8800;
 
 impl PMMockHub {
     /// `PMMockHub`를 생성한다.
-    fn new(email_client_settings: &EmailClientSettings) -> PMMockHub {
-        PMMockHub {
+    fn new(email_client_settings: &EmailClientSettings) -> Result<PMMockHub, url::ParseError> {
+        let base_url = Url::parse(&email_client_settings.base_url)?;
+        let pm_mock_hub = PMMockHub {
             client: Client::new(),
-            base_url: email_client_settings
-                .base_url
-                .trim_end_matches('/')
-                .to_string(),
+            base_url: base_url,
             port: PORT,
-        }
+        };
+
+        Ok(pm_mock_hub)
     }
 
     /// 서버를 생성하고 주소를 반납한다.
     async fn new_server(&self) -> Result<PMMockServer, anyhow::Error> {
         self.hub_server().await?;
+
         let port = self
             .client
-            .get(format!("{}:{}/new_server", self.base_url, self.port))
+            .get(self.hub_url()?.join("/new_server")?)
             .send()
             .await?
             .text()
@@ -87,27 +89,39 @@ impl PMMockHub {
 
         Ok(PMMockServer {
             client: self.client.clone(),
-            base_url: self.base_url.to_string(),
+            base_url: self.base_url.clone(),
             port: u16::from_str(&port)?,
         })
+    }
+
+    fn hub_url(&self) -> Result<Url, anyhow::Error> {
+        let mut hub_url = self.base_url.clone();
+        hub_url
+            .set_port(Some(self.port))
+            .map_err(|_| anyhow::anyhow!("Failed to set port"))?;
+
+        Ok(hub_url)
     }
 
     /// 설정 파일에서 `PMMockServer`를 생성한다.
     async fn new_from_configuration() -> Result<PMMockHub, anyhow::Error> {
         let configuration = configuration::get_configuration()?;
-        let pm_mock_server = PMMockHub::new(&configuration.email_client);
+        let pm_mock_server = PMMockHub::new(&configuration.email_client)?;
         // pm_mock_server.is_mock_server_is_on().await;
 
         Ok(pm_mock_server)
     }
 
     /// 서버가 작동하는지 테스트한다.
-    async fn health_check(&self) -> Result<Response, reqwest::Error> {
-        self.client
-            .get(&format!("{}:{}/health_check", self.base_url, self.port))
+    async fn health_check(&self) -> Result<Response, anyhow::Error> {
+        let response = self
+            .client
+            .get(self.hub_url()?.join("/health_check")?)
             .send()
             .await?
-            .error_for_status()
+            .error_for_status()?;
+
+        Ok(response)
     }
 
     /// 서버를 시작한다.
@@ -167,10 +181,10 @@ impl PMMockServer {
     }
 
     /// 이전에 한 요청의 정보를 확인한다.
-    pub async fn get_request_info(&self, uuid: &str) -> Result<PMDebugGet, reqwest::Error> {
+    pub async fn get_request_info(&self, uuid: &str) -> Result<PMDebugGet, anyhow::Error> {
         let response = self
             .client
-            .get(&format!("{}/debug", self.url()))
+            .get(self.server_url().join("/debug")?)
             .json(&json!({"uuid": uuid, "command": "get"}))
             .send()
             .await?;
@@ -183,10 +197,10 @@ impl PMMockServer {
 
     pub async fn get_all_request_infos(
         &self,
-    ) -> Result<HashMap<String, PMDebugGet>, reqwest::Error> {
+    ) -> Result<HashMap<String, PMDebugGet>, anyhow::Error> {
         let response = self
             .client
-            .get(&format!("{}/debug", self.url()))
+            .get(self.server_url().join("/debug")?)
             .json(&json!({"command": "get_all"}))
             .send()
             .await?;
@@ -197,7 +211,7 @@ impl PMMockServer {
         Ok(response)
     }
 
-    pub async fn recieved_reqeusts(&self) -> Result<Vec<PMBody>, reqwest::Error> {
+    pub async fn recieved_reqeusts(&self) -> Result<Vec<PMBody>, anyhow::Error> {
         let request_infos = self.get_all_request_infos().await?;
         let requests = request_infos
             .into_values()
@@ -207,8 +221,17 @@ impl PMMockServer {
         Ok(requests)
     }
 
+    /// 비효율적이지만 테스트 코드이니 놔두는 것이 나을 것 같다.
+    /// 마지막의 슬래시를 제거해야 코드와 호환된다.
     pub fn url(&self) -> String {
-        format!("{}:{}", self.base_url, self.port)
+        self.server_url().as_str().trim_end_matches('/').to_string()
+    }
+
+    fn server_url(&self) -> Url {
+        let mut server_url = self.base_url.clone();
+        server_url.set_port(Some(self.port)).unwrap();
+
+        server_url
     }
 }
 

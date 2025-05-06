@@ -7,6 +7,7 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use chrono::Utc;
+use rand::{Rng, distr::Alphanumeric, rng};
 use uuid::Uuid;
 
 use crate::{
@@ -31,7 +32,13 @@ pub async fn subscribe(router_state: State<Arc<RouterState>>, form: Form<FormDat
         Err(_) => return StatusCode::BAD_REQUEST.into_response(),
     };
 
-    if insert_subscriber(&router_state.z_pgpool, &new_subscriber)
+    let subscriber_id = match insert_subscriber(&router_state.z_pgpool, &new_subscriber).await {
+        Ok(subscriber_id) => subscriber_id,
+        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    };
+
+    let subscription_token = generate_subscription_token();
+    if store_token(&router_state.z_pgpool, &subscriber_id, &subscription_token)
         .await
         .is_err()
     {
@@ -42,6 +49,7 @@ pub async fn subscribe(router_state: State<Arc<RouterState>>, form: Form<FormDat
         &router_state.email_client,
         new_subscriber,
         &router_state.base_url,
+        &subscription_token,
     )
     .await
     .is_err()
@@ -76,26 +84,31 @@ impl TryFrom<FormData> for NewSubscriber {
 pub async fn insert_subscriber(
     zpg_pool: &ZPgPool,
     new_subscriber: &NewSubscriber,
-) -> Result<(), sqlx::Error> {
+) -> Result<Uuid, sqlx::Error> {
+    let subscriber_id = Uuid::new_v4();
     zpg_pool
         .add_user(
-            &Uuid::new_v4(),
+            &subscriber_id,
             new_subscriber.email.as_ref(),
             new_subscriber.name.as_ref(),
             &Utc::now(),
         )
-        .await
+        .await?;
+
+    Ok(subscriber_id)
 }
 
+/// 이메일의 유효성을 확인하는 이메일을 보낸다.
 #[tracing::instrument(name = "Send a confirmation email to a new subscriber", skip_all)]
 pub async fn send_confirmation_email(
     email_client: &EmailClient,
     new_subscriber: NewSubscriber,
     base_url: &str,
+    subscription_token: &str,
 ) -> Result<(), reqwest::Error> {
     let confirmation_link = format!(
-        "{}/subscriptions/confirm?subscription_token=my_token",
-        base_url
+        "{}/subscriptions/confirm?subscription_token={}",
+        base_url, subscription_token
     );
     let plain_body = format!(
         "Welcome to our newsletter!\nVisit {} to confirm your subscription.",
@@ -109,6 +122,36 @@ pub async fn send_confirmation_email(
     email_client
         .send_email(new_subscriber.email, "Welcome!", &html_body, &plain_body)
         .await?;
+
+    Ok(())
+}
+
+/// 대소문자를 구분하는 무작위 25문자로 구성된 구독 토큰을 생성한다.
+fn generate_subscription_token() -> String {
+    // API가 변경되었다.
+    let rng = rng();
+    rng.sample_iter(Alphanumeric)
+        .map(|c| c as char)
+        .take(25)
+        .collect()
+}
+
+#[tracing::instrument(
+    name = "Store subscription token in the database",
+    skip(subscription_token, z_pgpool)
+)]
+pub async fn store_token(
+    z_pgpool: &ZPgPool,
+    subscriber_id: &Uuid,
+    subscription_token: &str,
+) -> Result<(), sqlx::Error> {
+    z_pgpool
+        .store_token(subscriber_id, subscription_token)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to execute query: {:?}", e);
+            e
+        })?;
 
     Ok(())
 }

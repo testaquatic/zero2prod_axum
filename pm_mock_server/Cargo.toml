@@ -15,4 +15,5 @@ reqwest = { version = "0.12.15", default-features = false, features = [
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.140"
 tokio = { version = "1.44.2" }
+url = "2.5.4"
 zero2prod_axum = { version = "0.1", path = "../" }
