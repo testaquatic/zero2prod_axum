@@ -22,3 +22,4 @@ services:
       - APP_DATABASE__PORT=5432
       - APP_DATABASE__DATABASE_NAME=newsletter
       - APP_DATABASE__REQUIRE_SSL=false
+      - APP_APPLICATION__BASE_URL=127.0.0.1

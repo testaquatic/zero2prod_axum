@@ -1,5 +1,6 @@
 use crate::helpers::spawn_app;
-use reqwest::StatusCode;
+use http::StatusCode;
+use pretty_assertions::assert_eq;
 
 /// 유효한 폼을 전송하면 200 OK를 반환해야 한다.
 #[tokio::test(flavor = "multi_thread")]
@@ -104,7 +105,7 @@ async fn subscribe_sends_a_confirmation_email_for_valid_data() -> Result<(), any
     assert_eq!(response.status(), StatusCode::OK);
 
     // 확인
-    let email_requsts = app.email_server.get_all_requests_info().await?;
+    let email_requsts = app.email_server.get_all_request_infos().await?;
     assert_eq!(email_requsts.len(), 1);
 
     Ok(())
@@ -121,8 +122,8 @@ async fn subscribe_sends_a_confirmation_email_with_a_link() -> Result<(), anyhow
     app.post_subscriptions(body.to_string()).await?;
 
     // 확인
-    let email_requests = app.email_server.get_all_requests_info().await?;
-    let email_request = email_requests.values().collect::<Vec<_>>()[0];
+    let email_requests = app.email_server.recieved_reqeusts().await?;
+    let email_request = &email_requests[0];
 
     let get_link = |s: &str| {
         let links = linkify::LinkFinder::new()
@@ -133,8 +134,8 @@ async fn subscribe_sends_a_confirmation_email_with_a_link() -> Result<(), anyhow
         links.get(0).unwrap().as_str().to_owned()
     };
 
-    let html_link = get_link(&email_request.body.html_body);
-    let plain_text_link = get_link(&email_request.body.text_body);
+    let html_link = get_link(&email_request.html_body);
+    let plain_text_link = get_link(&email_request.text_body);
 
     assert_eq!(plain_text_link, html_link);
 

@@ -47,6 +47,18 @@ __이중 중괄호( `{{이중 중괄호}}` )부분은 환경에 맞춰서 치환
   - `500 INTERNAL_SERVER_ERROR`  
     내부 오류가 발생했다.
 
+## `/subscriptions/confirm`
+
+###  `GET`
+
+- 요청
+
+- 응답
+  - `400 BAD REQUEST`
+  
+
+
+
 # 도커
 
 ## 이미지 빌드

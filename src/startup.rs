@@ -19,7 +19,7 @@ use crate::{
     configuration::{DatabaseSettings, Settings},
     database::ZPgPool,
     email_client::EmailClient,
-    routes::{health_check, subscribe},
+    routes::{confirm, health_check, subscribe},
 };
 
 /// 그냥 경고 메시지의 타입을 복사했다.
@@ -37,13 +37,15 @@ type Service = IntoMakeServiceWithConnectInfo<Router, SocketAddr>;
 pub struct RouterState {
     pub z_pgpool: ZPgPool,
     pub email_client: EmailClient,
+    pub base_url: String,
 }
 
 impl RouterState {
-    pub fn new(z_pgpool: ZPgPool, email_client: EmailClient) -> Self {
+    pub fn new(z_pgpool: ZPgPool, email_client: EmailClient, base_url: String) -> Self {
         Self {
             z_pgpool,
             email_client,
+            base_url,
         }
     }
 }
@@ -53,6 +55,7 @@ fn get_service(router_state: RouterState) -> Service {
     Router::new()
         .route("/health_check", get(health_check))
         .route("/subscriptions", post(subscribe))
+        .route("/subscriptions/confirm", get(confirm))
         .layer(ServiceBuilder::new().layer(TraceLayer::new_for_http().make_span_with(make_span)))
         .with_state(Arc::new(router_state))
         .into_make_service_with_connect_info::<SocketAddr>()
@@ -96,12 +99,17 @@ impl Application {
             timeout,
         )
         .expect("Failed to create email client.");
+        let router_state = RouterState::new(
+            z_pg_pool.clone(),
+            email_client,
+            configuration.application.base_url,
+        );
+
         let address = format!(
             "{}:{}",
             configuration.application.host, configuration.application.port
         );
         let listener = TcpListener::bind(address).await?;
-        let router_state = RouterState::new(z_pg_pool.clone(), email_client);
         let server = run(listener, router_state);
 
         Ok(Application { server })

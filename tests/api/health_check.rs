@@ -7,11 +7,11 @@ use crate::helpers::spawn_app;
 #[tokio::test(flavor = "multi_thread")]
 async fn health_check_works() -> Result<(), anyhow::Error> {
     // 준비
-    let address = spawn_app().await?.address;
+    let address = spawn_app().await?.address.join("health_check")?;
     let client = reqwest::Client::new();
 
     // 실행
-    let response = client.get(format!("{address}/health_check")).send().await?;
+    let response = client.get(address).send().await?;
 
     // 확인
     assert!(response.status().is_success());

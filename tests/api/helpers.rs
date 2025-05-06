@@ -1,7 +1,7 @@
 use std::sync::LazyLock;
 
 use pm_mock_server::PMMockServer;
-use reqwest::header;
+use reqwest::{Url, header};
 use sqlx::{Connection, Executor, PgConnection};
 use tracing::Subscriber;
 use zero2prod_axum::{
@@ -37,7 +37,7 @@ static TRACING: LazyLock<()> = LazyLock::new(|| {
 /// 테스트 정보를 저장한다.
 pub struct TestApp {
     /// 인스턴스 주소
-    pub address: String,
+    pub address: Url,
     /// 커넥션 풀
     pub z_pgpool: ZPgPool,
     /// 목서버
@@ -48,13 +48,15 @@ impl TestApp {
     pub async fn post_subscriptions(
         &self,
         body: String,
-    ) -> Result<reqwest::Response, reqwest::Error> {
-        reqwest::Client::new()
-            .post(&format!("{}/subscriptions", &self.address))
+    ) -> Result<reqwest::Response, anyhow::Error> {
+        let response = reqwest::Client::new()
+            .post(self.address.join("subscriptions")?)
             .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
             .body(body)
             .send()
-            .await
+            .await?;
+
+        Ok(response)
     }
 }
 
@@ -64,6 +66,8 @@ impl TestApp {
 ///     `TestApp`
 #[cfg(test)]
 pub async fn spawn_app() -> Result<TestApp, anyhow::Error> {
+    use std::str::FromStr;
+
     use pm_mock_server::PMMockServer;
 
     LazyLock::force(&TRACING);
@@ -75,12 +79,17 @@ pub async fn spawn_app() -> Result<TestApp, anyhow::Error> {
 
     // 이메일 서버 설정을 수정한다.
     let email_server = PMMockServer::start_server().await?;
-    configuration.email_client.base_url = email_server.addr.clone();
+    configuration.email_client.base_url = email_server.url();
 
     let application = Application::build(configuration.clone()).await?;
-    let address = format!("http://127.0.0.1:{}", application.port()?);
+    let application_port = application.port()?;
+
     // 서버 인스턴스를 백그라운드에서 실행한다.
     let _ = tokio::spawn(application.run_until_stopped());
+    let address = Url::from_str(&format!(
+        "http://{}:{}",
+        configuration.application.host, application_port
+    ))?;
 
     Ok(TestApp {
         address,

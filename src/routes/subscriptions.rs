@@ -38,9 +38,13 @@ pub async fn subscribe(router_state: State<Arc<RouterState>>, form: Form<FormDat
         return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     }
 
-    if send_confirmation_email(&router_state.email_client, new_subscriber)
-        .await
-        .is_err()
+    if send_confirmation_email(
+        &router_state.email_client,
+        new_subscriber,
+        &router_state.base_url,
+    )
+    .await
+    .is_err()
     {
         return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     }
@@ -87,8 +91,12 @@ pub async fn insert_subscriber(
 pub async fn send_confirmation_email(
     email_client: &EmailClient,
     new_subscriber: NewSubscriber,
+    base_url: &str,
 ) -> Result<(), reqwest::Error> {
-    let confirmation_link = "https://my-api.com/subscriptions/confirm";
+    let confirmation_link = format!(
+        "{}/subscriptions/confirm?subscription_token=my_token",
+        base_url
+    );
     let plain_body = format!(
         "Welcome to our newsletter!\nVisit {} to confirm your subscription.",
         confirmation_link

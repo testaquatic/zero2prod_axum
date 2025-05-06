@@ -1,6 +1,7 @@
 use std::{
     collections::HashMap,
     process::{Command, Stdio},
+    str::FromStr,
     sync::atomic::{AtomicBool, Ordering},
 };
 
@@ -11,12 +12,14 @@ use zero2prod_axum::configuration::{self, EmailClientSettings};
 
 struct PMMockHub {
     client: Client,
-    addr: String,
+    base_url: String,
+    port: u16,
 }
 
 pub struct PMMockServer {
     client: Client,
-    pub addr: String,
+    base_url: String,
+    port: u16,
 }
 
 #[derive(serde::Deserialize, Debug)]
@@ -56,12 +59,18 @@ pub struct PMResponse {
     pub message: String,
 }
 
+const PORT: u16 = 8800;
+
 impl PMMockHub {
     /// `PMMockHub`를 생성한다.
     fn new(email_client_settings: &EmailClientSettings) -> PMMockHub {
         PMMockHub {
             client: Client::new(),
-            addr: email_client_settings.base_url.clone(),
+            base_url: email_client_settings
+                .base_url
+                .trim_end_matches('/')
+                .to_string(),
+            port: PORT,
         }
     }
 
@@ -70,7 +79,7 @@ impl PMMockHub {
         self.hub_server().await?;
         let port = self
             .client
-            .get(format!("http://{}/new_server", self.addr))
+            .get(format!("{}:{}/new_server", self.base_url, self.port))
             .send()
             .await?
             .text()
@@ -78,7 +87,8 @@ impl PMMockHub {
 
         Ok(PMMockServer {
             client: self.client.clone(),
-            addr: format!("localhost:{}", port),
+            base_url: self.base_url.to_string(),
+            port: u16::from_str(&port)?,
         })
     }
 
@@ -94,7 +104,7 @@ impl PMMockHub {
     /// 서버가 작동하는지 테스트한다.
     async fn health_check(&self) -> Result<Response, reqwest::Error> {
         self.client
-            .get(&format!("http://{}/health_check", self.addr))
+            .get(&format!("{}:{}/health_check", self.base_url, self.port))
             .send()
             .await?
             .error_for_status()
@@ -119,6 +129,8 @@ impl PMMockHub {
                             .arg("run")
                             .arg("main.go")
                             .arg("server.go")
+                            .arg("--port")
+                            .arg(PORT.to_string())
                             .stdout(Stdio::null())
                             .stderr(Stdio::null())
                             .spawn()?;
@@ -158,7 +170,7 @@ impl PMMockServer {
     pub async fn get_request_info(&self, uuid: &str) -> Result<PMDebugGet, reqwest::Error> {
         let response = self
             .client
-            .get(&format!("http://{}/debug", self.addr))
+            .get(&format!("{}/debug", self.url()))
             .json(&json!({"uuid": uuid, "command": "get"}))
             .send()
             .await?;
@@ -169,12 +181,12 @@ impl PMMockServer {
         Ok(response)
     }
 
-    pub async fn get_all_requests_info(
+    pub async fn get_all_request_infos(
         &self,
     ) -> Result<HashMap<String, PMDebugGet>, reqwest::Error> {
         let response = self
             .client
-            .get(&format!("http://{}/debug", self.addr))
+            .get(&format!("{}/debug", self.url()))
             .json(&json!({"command": "get_all"}))
             .send()
             .await?;
@@ -183,6 +195,20 @@ impl PMMockServer {
         let response = response.json::<HashMap<String, PMDebugGet>>().await?;
 
         Ok(response)
+    }
+
+    pub async fn recieved_reqeusts(&self) -> Result<Vec<PMBody>, reqwest::Error> {
+        let request_infos = self.get_all_request_infos().await?;
+        let requests = request_infos
+            .into_values()
+            .map(|pmdebug_get| pmdebug_get.body)
+            .collect();
+
+        Ok(requests)
+    }
+
+    pub fn url(&self) -> String {
+        format!("{}:{}", self.base_url, self.port)
     }
 }
 

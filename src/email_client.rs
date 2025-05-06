@@ -35,7 +35,7 @@ impl EmailClient {
         html_content: &str,
         text_content: &str,
     ) -> Result<Response, reqwest::Error> {
-        let url = format!("http://{}/email", self.base_url);
+        let url = format!("{}/email", self.base_url);
         let request_body = SendEmailRequest {
             from: self.sender.as_ref(),
             to: recipient.as_ref(),
@@ -115,7 +115,7 @@ mod tests {
     async fn send_email_sends_the_expected_request() -> Result<(), anyhow::Error> {
         // 준비
         let pm_mock_server = PMMockServer::start_server().await?;
-        let email_client = email_client(pm_mock_server.addr.clone())?;
+        let email_client = email_client(pm_mock_server.url())?;
 
         // 실행
         let response = email_client
@@ -144,7 +144,7 @@ mod tests {
     async fn send_email_succeeds_if_the_server_returns_200() -> Result<(), anyhow::Error> {
         // 준비
         let pm_mock_server = PMMockServer::start_server().await?;
-        let email_client = email_client(pm_mock_server.addr.clone())?;
+        let email_client = email_client(pm_mock_server.url())?;
 
         // 실행
         let outcome = email_client
@@ -161,7 +161,7 @@ mod tests {
     async fn send_email_fails_if_the_server_returns_500() -> Result<(), anyhow::Error> {
         // 준비
         let pm_mock_server = PMMockServer::start_server().await?;
-        let email_client = email_client(format!("{}/500", pm_mock_server.addr))?;
+        let email_client = email_client(format!("{}/500", pm_mock_server.url()))?;
 
         // 실행
         let coutcome = email_client
@@ -178,7 +178,7 @@ mod tests {
     async fn send_email_times_out_if_the_server_takes_too_long() -> Result<(), anyhow::Error> {
         // 준비
         let pm_mock_server = PMMockServer::start_server().await?;
-        let email_client = email_client(format!("{}/delay", pm_mock_server.addr))?;
+        let email_client = email_client(format!("{}/delay", pm_mock_server.url()))?;
 
         // 실행
         let outcome = email_client
