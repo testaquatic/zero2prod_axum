@@ -8,10 +8,11 @@ use axum::{
 };
 use chrono::Utc;
 use rand::{Rng, distr::Alphanumeric, rng};
+use sqlx::{Postgres, Transaction};
 use uuid::Uuid;
 
 use crate::{
-    database::ZPgPool,
+    database::{insert_user_into_database, store_token_in_database},
     domain::{NewSubscriber, SubscriberEmail, SubscriberName},
     email_client::EmailClient,
     startup::RouterState,
@@ -32,16 +33,25 @@ pub async fn subscribe(router_state: State<Arc<RouterState>>, form: Form<FormDat
         Err(_) => return StatusCode::BAD_REQUEST.into_response(),
     };
 
-    let subscriber_id = match insert_subscriber(&router_state.z_pgpool, &new_subscriber).await {
+    let mut transaction = match router_state.z_pgpool.as_ref().begin().await {
+        Ok(transaction) => transaction,
+        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    };
+
+    let subscriber_id = match insert_subscriber(&mut transaction, &new_subscriber).await {
         Ok(subscriber_id) => subscriber_id,
         Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     };
 
     let subscription_token = generate_subscription_token();
-    if store_token(&router_state.z_pgpool, &subscriber_id, &subscription_token)
+    if store_token(&mut transaction, &subscriber_id, &subscription_token)
         .await
         .is_err()
     {
+        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+    }
+
+    if transaction.commit().await.is_err() {
         return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     }
 
@@ -77,23 +87,24 @@ impl TryFrom<FormData> for NewSubscriber {
 }
 
 /// 데이터베이스에 사용자 정보를 저장한다.
-#[tracing::instrument(
-    name = "Saving new subscriber details in the database",
-    skip(zpg_pool, new_subscriber)
-)]
+#[tracing::instrument(name = "Saving new subscriber details in the database", skip_all)]
 pub async fn insert_subscriber(
-    zpg_pool: &ZPgPool,
+    transaction: &mut Transaction<'_, Postgres>,
     new_subscriber: &NewSubscriber,
 ) -> Result<Uuid, sqlx::Error> {
     let subscriber_id = Uuid::new_v4();
-    zpg_pool
-        .add_user(
-            &subscriber_id,
-            new_subscriber.email.as_ref(),
-            new_subscriber.name.as_ref(),
-            &Utc::now(),
-        )
-        .await?;
+    insert_user_into_database(
+        transaction.as_mut(),
+        &subscriber_id,
+        new_subscriber.email.as_ref(),
+        new_subscriber.name.as_ref(),
+        &Utc::now(),
+    )
+    .await
+    .map_err(|e| {
+        tracing::error!("Failed to execute query: {:?}", e);
+        e
+    })?;
 
     Ok(subscriber_id)
 }
@@ -138,15 +149,14 @@ fn generate_subscription_token() -> String {
 
 #[tracing::instrument(
     name = "Store subscription token in the database",
-    skip(subscription_token, z_pgpool)
+    skip(subscription_token, transaction)
 )]
 pub async fn store_token(
-    z_pgpool: &ZPgPool,
+    transaction: &mut Transaction<'_, Postgres>,
     subscriber_id: &Uuid,
     subscription_token: &str,
 ) -> Result<(), sqlx::Error> {
-    z_pgpool
-        .store_token(subscriber_id, subscription_token)
+    store_token_in_database(transaction.as_mut(), subscriber_id, subscription_token)
         .await
         .map_err(|e| {
             tracing::error!("Failed to execute query: {:?}", e);

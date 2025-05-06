@@ -6,3 +6,4 @@ package.json
 /go/initializer/docker_compose/docker_compose
 /go/initializer/init_db/init_db
 proptest-regressions/
+/.sqlx

@@ -1,4 +1,10 @@
 .env
+.gitignore
+Cargo.lock
+docker-compose.yml
+go/
+pm_mock_server/target/
+pm_mock_server/Cargo.lock
 target/
 tests/
 Dockerfile

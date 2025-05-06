@@ -68,7 +68,7 @@ impl PMMockHub {
         let base_url = Url::parse(&email_client_settings.base_url)?;
         let pm_mock_hub = PMMockHub {
             client: Client::new(),
-            base_url: base_url,
+            base_url,
             port: PORT,
         };
 
@@ -165,7 +165,7 @@ impl PMMockHub {
             if self.health_check().await.is_err() {
                 tokio::time::sleep(std::time::Duration::from_millis(500)).await;
             } else {
-                return Ok(&self);
+                return Ok(self);
             }
         }
         Err(anyhow::anyhow!("Cannot start mock server"))

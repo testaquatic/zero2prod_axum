@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
-use sqlx::PgPool;
+use sqlx::{PgExecutor, PgPool};
 use uuid::Uuid;
 
 #[derive(Clone)]
@@ -18,50 +18,6 @@ impl ZPgPool {
 }
 
 impl ZPgPool {
-    /// 사용자를 Postgres에 추가한다.
-    #[tracing::instrument(skip_all)]
-    pub async fn add_user(
-        &self,
-        uuid: &Uuid,
-        email: &str,
-        name: &str,
-        subscribed_at: &DateTime<Utc>,
-    ) -> Result<(), sqlx::Error> {
-        sqlx::query!(
-        r#"INSERT INTO subscriptions (id, email, name, subscribed_at, status) VALUES ($1, $2, $3, $4, 'pending_confirmation');"#,
-        uuid,
-        email,
-        name,
-        subscribed_at
-    )
-    .execute(self.pg_pool.as_ref())
-    .await
-    .map_err(|e| {
-        tracing::error!("Failed to execute query: {:?}", e);
-        e
-    })?;
-
-        Ok(())
-    }
-
-    /// 사용자 id와 토큰을 `subscription_tokens` 테이블에 저장한다.
-    #[tracing::instrument(skip_all)]
-    pub async fn store_token(
-        &self,
-        subscriber_id: &Uuid,
-        subscription_token: &str,
-    ) -> Result<(), sqlx::Error> {
-        sqlx::query!(
-            r#"INSERT INTO subscription_tokens (subscription_token, subscriber_id) VALUES ($1, $2);"#,
-            subscription_token,
-            subscriber_id
-        )
-        .execute(self.pg_pool.as_ref())
-        .await?;
-
-        Ok(())
-    }
-
     /// 사용자의 `subscription_tokens`테이블의 `status` 컬럼을 `confirmed`로 변경한다.
     #[tracing::instrument(skip_all)]
     pub async fn confirm_subscriber(&self, subscriber_id: &Uuid) -> Result<(), sqlx::Error> {
@@ -102,4 +58,43 @@ impl From<PgPool> for ZPgPool {
     fn from(pg_pool: PgPool) -> Self {
         Self::new(pg_pool)
     }
+}
+
+/// 사용자를 Postgres에 추가한다.
+#[tracing::instrument(skip_all)]
+pub async fn insert_user_into_database(
+    pg_executor: impl PgExecutor<'_>,
+    uuid: &Uuid,
+    email: &str,
+    name: &str,
+    subscribed_at: &DateTime<Utc>,
+) -> Result<(), sqlx::Error> {
+    sqlx::query!(
+        r#"INSERT INTO subscriptions (id, email, name, subscribed_at, status) VALUES ($1, $2, $3, $4, 'pending_confirmation');"#,
+        uuid,
+        email,
+        name,
+        subscribed_at
+    )
+    .execute(pg_executor).await?;
+
+    Ok(())
+}
+
+/// 사용자 id와 토큰을 `subscription_tokens` 테이블에 저장한다.
+#[tracing::instrument(skip_all)]
+pub async fn store_token_in_database(
+    pg_executor: impl PgExecutor<'_>,
+    subscriber_id: &Uuid,
+    subscription_token: &str,
+) -> Result<(), sqlx::Error> {
+    sqlx::query!(
+        r#"INSERT INTO subscription_tokens (subscription_token, subscriber_id) VALUES ($1, $2);"#,
+        subscription_token,
+        subscriber_id
+    )
+    .execute(pg_executor)
+    .await?;
+
+    Ok(())
 }

@@ -28,7 +28,7 @@ __이중 중괄호( `{{이중 중괄호}}` )부분은 환경에 맞춰서 치환
 
 - 요청
     ```
-    http -v --form POST localhost:8000/subscriptions email={{email}} name={{name}}
+    http -v --form POST http://localhost:8000/subscriptions email={{email}} name={{name}}
     ```
 
 - 응답
@@ -52,9 +52,13 @@ __이중 중괄호( `{{이중 중괄호}}` )부분은 환경에 맞춰서 치환
 ###  `GET`
 
 - 요청
+  ```
+  http -v http://localhost:8000/subscriptions/confirm?subscription_token={{token}}
+  ```
 
 - 응답
   - `400 BAD REQUEST`
+  - `500 INTERNAL SERVER ERROR`
   
 
 
