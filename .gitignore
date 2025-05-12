@@ -7,3 +7,4 @@ package.json
 /go/initializer/init_db/init_db
 proptest-regressions/
 /.sqlx
+/.idea

@@ -32,7 +32,7 @@ impl ZPgPool {
     }
 
     /// `subscription_token`을 입력하면 `subscriber_id`가 반환된다.
-    #[tracing::instrument(skip_all)]
+    #[tracing::instrument(skip_all, err)]
     pub async fn get_subscriber_id_from_token(
         &self,
         subscription_token: &str,
@@ -61,7 +61,7 @@ impl From<PgPool> for ZPgPool {
 }
 
 /// 사용자를 Postgres에 추가한다.
-#[tracing::instrument(skip_all)]
+#[tracing::instrument(skip_all, err)]
 pub async fn insert_user_into_database(
     pg_executor: impl PgExecutor<'_>,
     uuid: &Uuid,
@@ -76,13 +76,47 @@ pub async fn insert_user_into_database(
         name,
         subscribed_at
     )
-    .execute(pg_executor).await?;
+    .execute(pg_executor)
+    .await?;
+
+    Ok(())
+}
+
+#[tracing::instrument(skip_all, err)]
+pub async fn select_uuid_pending_confirmation_email(
+    pg_executor: impl PgExecutor<'_>,
+    email: &str,
+) -> Result<Option<Uuid>, sqlx::Error> {
+    let result = sqlx::query!(
+        r#"SELECT id FROM subscriptions WHERE email = $1 AND status = 'pending_confirmation';"#,
+        email
+    )
+    .fetch_optional(pg_executor)
+    .await?
+    .map(|record| record.id);
+
+    Ok(result)
+}
+
+#[tracing::instrument(skip_all, err)]
+pub async fn update_token(
+    pg_executor: impl PgExecutor<'_>,
+    subscriber_id: &Uuid,
+    subscription_token: &str,
+) -> Result<(), sqlx::Error> {
+    sqlx::query!(
+        r#"UPDATE subscription_tokens SET subscription_token = $1 WHERE subscriber_id = $2;"#,
+        subscription_token,
+        subscriber_id
+    )
+    .execute(pg_executor)
+    .await?;
 
     Ok(())
 }
 
 /// 사용자 id와 토큰을 `subscription_tokens` 테이블에 저장한다.
-#[tracing::instrument(skip_all)]
+#[tracing::instrument(skip_all, err)]
 pub async fn store_token_in_database(
     pg_executor: impl PgExecutor<'_>,
     subscriber_id: &Uuid,
@@ -97,4 +131,20 @@ pub async fn store_token_in_database(
     .await?;
 
     Ok(())
+}
+
+/// 사용자 id에 이미 토큰이 저장되어 있는지 확인한다.
+#[tracing::instrument(skip_all, err)]
+pub async fn is_subscriber_already_has_token(
+    pg_executor: impl PgExecutor<'_>,
+    subscriber_id: &Uuid,
+) -> Result<bool, sqlx::Error> {
+    let result = sqlx::query!(
+        r#"SELECT subscription_token FROM subscription_tokens WHERE subscriber_id = $1;"#,
+        subscriber_id
+    )
+    .fetch_optional(pg_executor)
+    .await?;
+
+    Ok(result.is_some())
 }

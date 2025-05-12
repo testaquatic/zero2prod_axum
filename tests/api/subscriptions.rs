@@ -123,10 +123,82 @@ async fn subscribe_sends_a_confirmation_email_with_a_link() -> Result<(), anyhow
 
     // 확인
     let email_requests = app.email_server.recieved_reqeusts().await?;
-    let email_request = &email_requests[0];
+    let email_request = &email_requests[0].requests.body;
 
     let confirmation_links = app.get_confirmation_links(email_request)?;
     assert_eq!(confirmation_links.html, confirmation_links.plain_text);
+
+    Ok(())
+}
+
+/// 사용자가 구독을 두번 했을 때를 처리한다.
+/// 매번 다른 토큰을 전송해야 한다.
+#[tokio::test(flavor = "multi_thread")]
+async fn subscribe_twice_will_receive_two_confirmation_emails() -> Result<(), anyhow::Error> {
+    // 준비
+    let app = spawn_app().await?;
+    let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
+
+    // 실행
+    let responses = app.post_subscriptions_n(body.to_string(), 2).await?;
+
+    // 확인
+    assert_eq!(responses.len(), 2);
+    assert_eq!(responses[0].status(), StatusCode::OK);
+    assert_eq!(responses[1].status(), StatusCode::OK);
+
+    let email_requests = app.email_server.recieved_reqeusts().await?;
+    assert_eq!(email_requests.len(), 2);
+    assert_ne!(
+        email_requests[0].requests.body.html_body,
+        email_requests[1].requests.body.html_body
+    );
+
+    Ok(())
+}
+
+/// 같은 이메일로 구독을 두번 요청 받았을 때 마지막 토큰만 데이터베이스에 저장되어야 한다.
+#[tokio::test(flavor = "multi_thread")]
+async fn receiving_two_subcription_from_same_email_only_last_token_stored()
+-> Result<(), anyhow::Error> {
+    // 준비
+    let app = spawn_app().await?;
+    let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
+
+    // 실행
+    app.post_subscriptions_n(body.to_string(), 2).await?;
+
+    let last_send_body = app
+        .email_server
+        .get_all_request_infos()
+        .await?
+        .pop()
+        .ok_or(anyhow::anyhow!("No email request found"))?
+        .requests
+        .body;
+    let last_token = app
+        .get_confirmation_links(&last_send_body)?
+        .html
+        .query_pairs()
+        .find(|(q, _)| q == "subscription_token")
+        .ok_or(anyhow::anyhow!("No token found"))?
+        .1
+        .to_string();
+    let last_user_uuid = app
+        .z_pgpool
+        .get_subscriber_id_from_token(&last_token)
+        .await?
+        .ok_or(anyhow::anyhow!("No token found"))?;
+    let uuid = sqlx::query!(
+        "SELECT id FROM subscriptions WHERE email = $1;",
+        "ursula_le_guin@gmail.com"
+    )
+    .fetch_one(app.z_pgpool.pg_pool.as_ref())
+    .await?
+    .id;
+
+    // 확인
+    assert_eq!(uuid, last_user_uuid);
 
     Ok(())
 }

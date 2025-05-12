@@ -132,7 +132,8 @@ mod tests {
             .expect("Failed to get MessageID");
 
         let debug = pm_mock_server.get_request_info(&uuid).await?;
-        debug
+        debug[0]
+            .requests
             .header_exists("X-Postmark-Server-Token")
             .header_check(reqwest::header::CONTENT_TYPE, "application/json")
             .method_check(reqwest::Method::POST);

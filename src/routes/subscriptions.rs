@@ -8,11 +8,14 @@ use axum::{
 };
 use chrono::Utc;
 use rand::{Rng, distr::Alphanumeric, rng};
-use sqlx::{Postgres, Transaction};
+use sqlx::{PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
 use crate::{
-    database::{insert_user_into_database, store_token_in_database},
+    database::{
+        insert_user_into_database, select_uuid_pending_confirmation_email, store_token_in_database,
+        update_token,
+    },
     domain::{NewSubscriber, SubscriberEmail, SubscriberName},
     email_client::EmailClient,
     startup::RouterState,
@@ -38,22 +41,46 @@ pub async fn subscribe(router_state: State<Arc<RouterState>>, form: Form<FormDat
         Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     };
 
-    let subscriber_id = match insert_subscriber(&mut transaction, &new_subscriber).await {
-        Ok(subscriber_id) => subscriber_id,
-        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
-    };
-
     let subscription_token = generate_subscription_token();
-    if store_token(&mut transaction, &subscriber_id, &subscription_token)
-        .await
-        .is_err()
-    {
-        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
-    }
 
-    if transaction.commit().await.is_err() {
-        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
-    }
+    match insert_subscriber(&mut transaction, &new_subscriber).await {
+        Ok(subscriber_id) => {
+            if store_token(&mut transaction, &subscriber_id, &subscription_token)
+                .await
+                .is_err()
+            {
+                return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+            }
+
+            if transaction.commit().await.is_err() {
+                return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+            }
+        }
+        Err(e) => {
+            let e = e.as_database_error();
+            match e {
+                Some(e)
+                    if e.is_unique_violation()
+                        && e.constraint() == Some("subscriptions_email_key") =>
+                {
+                    if transaction.rollback().await.is_err() {
+                        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+                    }
+                    if update_token_when_subscribe_twice(
+                        router_state.z_pgpool.as_ref(),
+                        &new_subscriber.email,
+                        &subscription_token,
+                    )
+                    .await
+                    .is_err()
+                    {
+                        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+                    }
+                }
+                _ => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+            }
+        }
+    };
 
     if send_confirmation_email(
         &router_state.email_client,
@@ -86,13 +113,52 @@ impl TryFrom<FormData> for NewSubscriber {
     }
 }
 
+#[tracing::instrument(name = "Update Token in the database", skip_all, err)]
+async fn update_token_when_subscribe_twice(
+    pgpool: &PgPool,
+    subscriber_email: &SubscriberEmail,
+    new_token: &str,
+) -> Result<Uuid, sqlx::Error> {
+    let mut transaction = pgpool.begin().await?;
+    let subscriber_id = match select_uuid_pending_confirmation_email(
+        transaction.as_mut(),
+        subscriber_email.as_ref(),
+    )
+    .await?
+    {
+        Some(subscriber_id) => subscriber_id,
+        None => return Err(sqlx::Error::RowNotFound),
+    };
+
+    while let Err(e) = update_token(transaction.as_mut(), &subscriber_id, new_token).await {
+        match e.as_database_error() {
+            Some(db_err) => {
+                if let Some(code) = db_err.code() {
+                    // https://postgresql.kr/docs/10/errcodes-appendix.html 이곳의 에러 코드를 참고했다.
+                    if code != "25P02" {
+                        transaction = pgpool.begin().await?;
+                    } else {
+                        return Err(e);
+                    }
+                }
+            }
+            _ => return Err(e),
+        }
+    }
+
+    transaction.commit().await?;
+
+    Ok(subscriber_id)
+}
+
 /// 데이터베이스에 사용자 정보를 저장한다.
-#[tracing::instrument(name = "Saving new subscriber details in the database", skip_all)]
+#[tracing::instrument(name = "Saving new subscriber details in the database", skip_all, err)]
 pub async fn insert_subscriber(
     transaction: &mut Transaction<'_, Postgres>,
     new_subscriber: &NewSubscriber,
 ) -> Result<Uuid, sqlx::Error> {
     let subscriber_id = Uuid::new_v4();
+
     insert_user_into_database(
         transaction.as_mut(),
         &subscriber_id,
@@ -100,11 +166,7 @@ pub async fn insert_subscriber(
         new_subscriber.name.as_ref(),
         &Utc::now(),
     )
-    .await
-    .map_err(|e| {
-        tracing::error!("Failed to execute query: {:?}", e);
-        e
-    })?;
+    .await?;
 
     Ok(subscriber_id)
 }
@@ -149,19 +211,15 @@ fn generate_subscription_token() -> String {
 
 #[tracing::instrument(
     name = "Store subscription token in the database",
-    skip(subscription_token, transaction)
+    skip(subscription_token, transaction),
+    err
 )]
 pub async fn store_token(
     transaction: &mut Transaction<'_, Postgres>,
     subscriber_id: &Uuid,
     subscription_token: &str,
 ) -> Result<(), sqlx::Error> {
-    store_token_in_database(transaction.as_mut(), subscriber_id, subscription_token)
-        .await
-        .map_err(|e| {
-            tracing::error!("Failed to execute query: {:?}", e);
-            e
-        })?;
+    store_token_in_database(transaction.as_mut(), subscriber_id, subscription_token).await?;
 
     Ok(())
 }

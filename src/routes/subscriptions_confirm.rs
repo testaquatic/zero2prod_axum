@@ -15,6 +15,10 @@ pub async fn confirm(
     router_state: State<Arc<RouterState>>,
     parameters: Form<Parameters>,
 ) -> Response {
+    if !check_subscription_token_format(&parameters.subscription_token) {
+        return StatusCode::BAD_REQUEST.into_response();
+    }
+
     let id =
         match get_subscriber_id_from_token(&router_state.z_pgpool, &parameters.subscription_token)
             .await
@@ -44,33 +48,34 @@ pub struct Parameters {
 }
 
 /// 사용자의 상태를 `confirm`으로 변경한다.
-#[tracing::instrument(name = "Mark subscriber as confirmed", skip_all)]
+#[tracing::instrument(name = "Mark subscriber as confirmed", skip_all, err)]
 async fn confirm_subscriber(
     z_pgpool: &ZPgPool,
     subscriber_id: &uuid::Uuid,
 ) -> Result<(), sqlx::Error> {
-    z_pgpool
-        .confirm_subscriber(subscriber_id)
-        .await
-        .map_err(|e| {
-            tracing::error!("Failed to execute query: {:?}", e);
-            e
-        })
+    z_pgpool.confirm_subscriber(subscriber_id).await
 }
 
 /// `subscription_token`으로부터 `subscriber_id`를 얻는다.
-#[tracing::instrument(name = "Get subscriber_id from token", skip_all)]
+#[tracing::instrument(name = "Get subscriber_id from token", skip_all, err)]
 async fn get_subscriber_id_from_token(
     z_pgpool: &ZPgPool,
     subscription_token: &str,
 ) -> Result<Option<uuid::Uuid>, sqlx::Error> {
     let result = z_pgpool
         .get_subscriber_id_from_token(subscription_token)
-        .await
-        .map_err(|e| {
-            tracing::error!("Failed to execute query: {:?}", e);
-            e
-        })?;
+        .await?;
 
     Ok(result)
+}
+
+/// 토큰은 25자로 된 영숫자이다.
+fn check_subscription_token_format(subscription_token: &str) -> bool {
+    if subscription_token.len() != 25 {
+        return false;
+    }
+
+    subscription_token
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric())
 }

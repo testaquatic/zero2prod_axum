@@ -1,5 +1,4 @@
 use std::{
-    collections::HashMap,
     process::{Command, Stdio},
     str::FromStr,
     sync::atomic::{AtomicBool, Ordering},
@@ -24,12 +23,18 @@ pub struct PMMockServer {
 }
 
 #[derive(serde::Deserialize, Debug)]
-pub struct PMDebugGet {
+pub struct PMDebugRequest {
     #[serde(with = "http_serde::header_map")]
     pub header: HeaderMap,
     pub method: String,
     #[serde(rename = "body")]
     pub body: PMBody,
+}
+
+#[derive(serde::Deserialize, Debug)]
+pub struct PMDebug {
+    pub uuid: String,
+    pub requests: PMDebugRequest,
 }
 
 #[derive(serde::Deserialize, serde::Serialize, Debug)]
@@ -181,7 +186,7 @@ impl PMMockServer {
     }
 
     /// 이전에 한 요청의 정보를 확인한다.
-    pub async fn get_request_info(&self, uuid: &str) -> Result<PMDebugGet, anyhow::Error> {
+    pub async fn get_request_info(&self, uuid: &str) -> Result<Vec<PMDebug>, anyhow::Error> {
         let response = self
             .client
             .get(self.server_url().join("/debug")?)
@@ -190,14 +195,12 @@ impl PMMockServer {
             .await?;
         assert_eq!(response.status(), reqwest::StatusCode::OK);
 
-        let response = response.json::<PMDebugGet>().await?;
+        let response = response.json::<Vec<PMDebug>>().await?;
 
         Ok(response)
     }
 
-    pub async fn get_all_request_infos(
-        &self,
-    ) -> Result<HashMap<String, PMDebugGet>, anyhow::Error> {
+    pub async fn get_all_request_infos(&self) -> Result<Vec<PMDebug>, anyhow::Error> {
         let response = self
             .client
             .get(self.server_url().join("/debug")?)
@@ -206,17 +209,14 @@ impl PMMockServer {
             .await?;
         assert_eq!(response.status(), reqwest::StatusCode::OK);
 
-        let response = response.json::<HashMap<String, PMDebugGet>>().await?;
+        let response = response.json::<Vec<PMDebug>>().await?;
 
         Ok(response)
     }
 
-    pub async fn recieved_reqeusts(&self) -> Result<Vec<PMBody>, anyhow::Error> {
+    pub async fn recieved_reqeusts(&self) -> Result<Vec<PMDebug>, anyhow::Error> {
         let request_infos = self.get_all_request_infos().await?;
-        let requests = request_infos
-            .into_values()
-            .map(|pmdebug_get| pmdebug_get.body)
-            .collect();
+        let requests = request_infos.into_iter().collect::<Vec<_>>();
 
         Ok(requests)
     }
@@ -235,7 +235,7 @@ impl PMMockServer {
     }
 }
 
-impl PMDebugGet {
+impl PMDebugRequest {
     pub fn header_exists(&self, key: &str) -> &Self {
         assert!(
             self.header.contains_key(key),

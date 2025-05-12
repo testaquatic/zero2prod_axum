@@ -74,37 +74,40 @@ http -v http://127.0.0.1:8800/new_server
 요청을 확인한다.
 - 요청
     ```
+    http --json -v http://localhost:{{PORT}}/debug Content-Type:application/json command=get_all
+    ```
+    ```
     http --json -v http://localhost:{{PORT}}/debug Content-Type:application/json command=get uuid={{UUID}}
     ```
 - 응답
     - `200 OK`
         ```
-        {
-            "body": {
-                "From": {{SENDER_EMAIL}},
-                "To": {{RECIPIENT_EMAIL}},
-                "HtmlBody": {{HTML_BODY}},
-                "TextBody": {{TEXT_BODY}},
-                "Subject": {{SUBJECT}}
+        [{
+            "requests": {
+                "body": {
+                    "From": {{SENDER_EMAIL}},
+                    "To": {{RECIPIENT_EMAIL}},
+                    "HtmlBody": {{HTML_BODY}},
+                    "TextBody": {{TEXT_BODY}},
+                    "Subject": {{SUBJECT}}
+                },
+                "header": {
+                    "Accept": [
+                        "application/json"
+                    ],
+                    ...
+                    "Content-Type": [
+                        "application/json"
+                    ],
+                    ...
+                    "X-Postmark-Server-Token": [
+                        {{POSTMARK_SERVER_TOKEN}}
+                    ]
+                },
+                "method": {{METHOD}}
             },
-            "header": {
-                "Accept": [
-                "application/json"
-                ],
-                ...
-                "Content-Length": [
-                    {{CONTENT_LENGTH}}
-                ],
-                "Content-Type": [
-                    "application/json"
-                ],
-                ...
-                "X-Postmark-Server-Token": [
-                    {{POSTMARK_SERVER_TOKEN}}
-                ]
-            },
-            "method": {{METHOD}}
-        }
+            "uuid": {{UUID}}
+        }...]
         ```
 
 ## `/500/email`

@@ -15,11 +15,28 @@ import (
 
 type PMMockServerState struct {
 	// 키는 UUID이다.
-	Requests map[string]PMRequest
+	Requests []Request
 	// 키는 METHOD이다.
 	MethodHandler map[string]http.Handler
 }
 
+func (state *PMMockServerState) FindRequest(uuid string) ([]Request, bool) {
+	requests := []Request{}
+	for _, request := range state.Requests {
+		if request.Uuid == uuid {
+			requests = append(requests, request)
+		}
+	}
+	return requests, len(requests) > 0
+}
+
+type Request struct {
+	Uuid     string    `json:"uuid,omitempty"`
+	Requests PMRequest `json:"requests,omitempty"`
+}
+
+// PMMockServer를 시작한다.
+// 실질적인 서버의 역할을 한다.
 func StartPMMockServer(timeOut time.Duration, signalRecieved chan struct{}, wg *sync.WaitGroup) (string, error) {
 	log.Println("Starting PMMockServer")
 	wg.Add(1)
@@ -115,10 +132,10 @@ func (pmMockServer *PMMockServerState) PMMockServerPostHandler() http.Handler {
 
 		messageID := uuid.New().String()
 
-		if pmMockServer.Requests == nil {
-			pmMockServer.Requests = make(map[string]PMRequest)
-		}
-		pmMockServer.Requests[messageID] = request
+		pmMockServer.Requests = append(pmMockServer.Requests, Request{
+			Uuid:     messageID,
+			Requests: request,
+		})
 
 		response := PMResponse{
 			To:          body.To,
@@ -142,6 +159,7 @@ type Command struct {
 	Uuid    string `json:"uuid,omitempty"`
 }
 
+// /debug의 처리를 담당한다.
 func (pmMockServer *PMMockServerState) PMMockServerDebugHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
@@ -160,13 +178,9 @@ func (pmMockServer *PMMockServerState) PMMockServerDebugHandler() http.Handler {
 		}
 		log.Printf("Command: %#v\n", command)
 
-		if pmMockServer.Requests == nil {
-			pmMockServer.Requests = make(map[string]PMRequest)
-		}
-
 		switch command.Command {
 		case "get":
-			request, ok := pmMockServer.Requests[strings.TrimSpace(command.Uuid)]
+			request, ok := pmMockServer.FindRequest(strings.TrimSpace(command.Uuid))
 			if !ok {
 				log.Printf("Invalid UUID: %#v\n", command.Uuid)
 				http.Error(w, "Not found", http.StatusNotFound)

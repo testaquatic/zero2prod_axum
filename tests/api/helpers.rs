@@ -93,6 +93,22 @@ impl TestApp {
 
         Ok(confirmation_links)
     }
+
+    pub async fn post_subscriptions_n(
+        &self,
+        body: String,
+        n: usize,
+    ) -> Result<Vec<reqwest::Response>, anyhow::Error> {
+        let mut responses = Vec::with_capacity(n);
+        for _ in 0..n {
+            let response = self.post_subscriptions(body.clone()).await?;
+            responses.push(response);
+        }
+
+        Ok(responses)
+    }
+
+    
 }
 
 /// 백그라운드에서 애플리케이션을 구동한다.  
