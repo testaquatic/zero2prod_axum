@@ -193,12 +193,29 @@ async fn receiving_two_subcription_from_same_email_only_last_token_stored()
         "SELECT id FROM subscriptions WHERE email = $1;",
         "ursula_le_guin@gmail.com"
     )
-    .fetch_one(app.z_pgpool.pg_pool.as_ref())
+    .fetch_one(app.z_pgpool.as_ref())
     .await?
     .id;
 
     // 확인
     assert_eq!(uuid, last_user_uuid);
+
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn subscribe_fails_if_there_is_a_fatal_database_error() -> Result<(), anyhow::Error> {
+    // 준비
+    let app = spawn_app().await?;
+    let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
+
+    sqlx::query!("ALTER TABLE subscription_tokens DROP COLUMN subscription_token;")
+        .execute(app.z_pgpool.as_ref())
+        .await?;
+
+    let response = app.post_subscriptions(body.to_string()).await?;
+
+    assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
 
     Ok(())
 }
