@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{error::Error, sync::Arc};
 
 use axum::{
     Form,
@@ -30,54 +30,40 @@ use crate::{
         subscriber_name = %form.name
     )
 )]
-pub async fn subscribe(router_state: State<Arc<RouterState>>, form: Form<FormData>) -> Response {
+pub async fn subscribe(
+    router_state: State<Arc<RouterState>>,
+    form: Form<FormData>,
+) -> Result<Response, StoreTokenError> {
     let new_subscriber = match form.0.try_into() {
         Ok(form) => form,
-        Err(_) => return StatusCode::BAD_REQUEST.into_response(),
+        Err(_) => return Ok(StatusCode::BAD_REQUEST.into_response()),
     };
 
-    let mut transaction = match router_state.z_pgpool.as_ref().begin().await {
-        Ok(transaction) => transaction,
-        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
-    };
+    let mut transaction = router_state.z_pgpool.as_ref().begin().await?;
 
     let subscription_token = generate_subscription_token();
 
     match insert_subscriber(&mut transaction, &new_subscriber).await {
         Ok(subscriber_id) => {
-            if store_token(&mut transaction, &subscriber_id, &subscription_token)
-                .await
-                .is_err()
-            {
-                return StatusCode::INTERNAL_SERVER_ERROR.into_response();
-            }
-
-            if transaction.commit().await.is_err() {
-                return StatusCode::INTERNAL_SERVER_ERROR.into_response();
-            }
+            store_token(&mut transaction, &subscriber_id, &subscription_token).await?;
+            transaction.commit().await?;
         }
         Err(e) => {
-            let e = e.as_database_error();
-            match e {
+            let db_e = e.as_database_error();
+            match db_e {
                 Some(e)
                     if e.is_unique_violation()
                         && e.constraint() == Some("subscriptions_email_key") =>
                 {
-                    if transaction.rollback().await.is_err() {
-                        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
-                    }
-                    if update_token_when_subscribe_twice(
+                    transaction.rollback().await?;
+                    update_token_when_subscribe_twice(
                         router_state.z_pgpool.as_ref(),
                         &new_subscriber.email,
                         &subscription_token,
                     )
-                    .await
-                    .is_err()
-                    {
-                        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
-                    }
+                    .await?;
                 }
-                _ => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+                _ => return Err(StoreTokenError(axum::Error::new(e))),
             }
         }
     };
@@ -91,10 +77,10 @@ pub async fn subscribe(router_state: State<Arc<RouterState>>, form: Form<FormDat
     .await
     .is_err()
     {
-        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
-    }
+        return Ok(StatusCode::INTERNAL_SERVER_ERROR.into_response());
+    };
 
-    StatusCode::OK.into_response()
+    Ok(StatusCode::OK.into_response())
 }
 
 #[derive(serde::Deserialize)]
@@ -218,8 +204,57 @@ pub async fn store_token(
     transaction: &mut Transaction<'_, Postgres>,
     subscriber_id: &Uuid,
     subscription_token: &str,
-) -> Result<(), sqlx::Error> {
+) -> Result<(), StoreTokenError> {
     store_token_in_database(transaction.as_mut(), subscriber_id, subscription_token).await?;
 
     Ok(())
+}
+
+pub struct StoreTokenError(axum::Error);
+
+impl std::fmt::Display for StoreTokenError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "A database error was encountered while trying to store a subscription token."
+        )
+    }
+}
+
+impl From<sqlx::Error> for StoreTokenError {
+    fn from(error: sqlx::Error) -> Self {
+        StoreTokenError(axum::Error::new(error))
+    }
+}
+
+impl std::error::Error for StoreTokenError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        Some(&self.0)
+    }
+}
+
+impl std::fmt::Debug for StoreTokenError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        error_chain_fmt(self, f)
+    }
+}
+
+fn error_chain_fmt(
+    e: &impl std::error::Error,
+    f: &mut std::fmt::Formatter<'_>,
+) -> std::fmt::Result {
+    writeln!(f, "{}\n", e)?;
+    let mut current = e.source();
+    while let Some(cause) = current {
+        writeln!(f, "Caused by:\n\t{}", cause)?;
+        current = cause.source();
+    }
+
+    Ok(())
+}
+
+
+#[derive(Debug)]
+pub enum SubscriberError {
+    
 }
