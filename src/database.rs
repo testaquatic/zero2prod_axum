@@ -19,7 +19,6 @@ impl ZPgPool {
 
 impl ZPgPool {
     /// 사용자의 `subscription_tokens`테이블의 `status` 컬럼을 `confirmed`로 변경한다.
-    #[tracing::instrument(skip_all)]
     pub async fn confirm_subscriber(&self, subscriber_id: &Uuid) -> Result<(), sqlx::Error> {
         sqlx::query!(
             r#"UPDATE subscriptions SET status = 'confirmed' WHERE id = $1;"#,
@@ -32,7 +31,6 @@ impl ZPgPool {
     }
 
     /// `subscription_token`을 입력하면 `subscriber_id`가 반환된다.
-    #[tracing::instrument(skip_all, err)]
     pub async fn get_subscriber_id_from_token(
         &self,
         subscription_token: &str,
@@ -61,7 +59,6 @@ impl From<PgPool> for ZPgPool {
 }
 
 /// 사용자를 Postgres에 추가한다.
-#[tracing::instrument(skip_all, err)]
 pub async fn insert_user_into_database(
     pg_executor: impl PgExecutor<'_>,
     uuid: &Uuid,
@@ -82,7 +79,6 @@ pub async fn insert_user_into_database(
     Ok(())
 }
 
-#[tracing::instrument(skip_all, err)]
 pub async fn select_uuid_pending_confirmation_email(
     pg_executor: impl PgExecutor<'_>,
     email: &str,
@@ -98,7 +94,6 @@ pub async fn select_uuid_pending_confirmation_email(
     Ok(result)
 }
 
-#[tracing::instrument(skip_all, err)]
 pub async fn update_token(
     pg_executor: impl PgExecutor<'_>,
     subscriber_id: &Uuid,
@@ -116,7 +111,6 @@ pub async fn update_token(
 }
 
 /// 사용자 id와 토큰을 `subscription_tokens` 테이블에 저장한다.
-#[tracing::instrument(skip_all, err)]
 pub async fn store_token_in_database(
     pg_executor: impl PgExecutor<'_>,
     subscriber_id: &Uuid,
@@ -134,7 +128,6 @@ pub async fn store_token_in_database(
 }
 
 /// 사용자 id에 이미 토큰이 저장되어 있는지 확인한다.
-#[tracing::instrument(skip_all, err)]
 pub async fn is_subscriber_already_has_token(
     pg_executor: impl PgExecutor<'_>,
     subscriber_id: &Uuid,
