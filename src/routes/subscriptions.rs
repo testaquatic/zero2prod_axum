@@ -33,20 +33,25 @@ use crate::{
 pub async fn subscribe(
     router_state: State<Arc<RouterState>>,
     form: Form<FormData>,
-) -> Result<Response, StoreTokenError> {
-    let new_subscriber = match form.0.try_into() {
-        Ok(form) => form,
-        Err(_) => return Ok(StatusCode::BAD_REQUEST.into_response()),
-    };
+) -> Result<Response, SubscriberError> {
+    let new_subscriber = form.0.try_into()?;
 
-    let mut transaction = router_state.z_pgpool.as_ref().begin().await?;
+    let mut transaction = router_state
+        .z_pgpool
+        .as_ref()
+        .begin()
+        .await
+        .map_err(SubscriberError::PoolError)?;
 
     let subscription_token = generate_subscription_token();
 
     match insert_subscriber(&mut transaction, &new_subscriber).await {
         Ok(subscriber_id) => {
             store_token(&mut transaction, &subscriber_id, &subscription_token).await?;
-            transaction.commit().await?;
+            transaction
+                .commit()
+                .await
+                .map_err(SubscriberError::TransactionCommitError)?;
         }
         Err(e) => {
             let db_e = e.as_database_error();
@@ -55,7 +60,10 @@ pub async fn subscribe(
                     if e.is_unique_violation()
                         && e.constraint() == Some("subscriptions_email_key") =>
                 {
-                    transaction.rollback().await?;
+                    transaction
+                        .rollback()
+                        .await
+                        .map_err(SubscriberError::TransactionCommitError)?;
                     update_token_when_subscribe_twice(
                         router_state.z_pgpool.as_ref(),
                         &new_subscriber.email,
@@ -63,7 +71,7 @@ pub async fn subscribe(
                     )
                     .await?;
                 }
-                _ => return Err(StoreTokenError(axum::Error::new(e))),
+                _ => return Err(StoreTokenError(anyhow::Error::from(e)))?,
             }
         }
     };
@@ -104,16 +112,21 @@ async fn update_token_when_subscribe_twice(
     pgpool: &PgPool,
     subscriber_email: &SubscriberEmail,
     new_token: &str,
-) -> Result<Uuid, sqlx::Error> {
-    let mut transaction = pgpool.begin().await?;
+) -> Result<Uuid, SubscriberError> {
+    let mut transaction = pgpool.begin().await.map_err(SubscriberError::PoolError)?;
     let subscriber_id = match select_uuid_pending_confirmation_email(
         transaction.as_mut(),
         subscriber_email.as_ref(),
     )
-    .await?
+    .await
+    .map_err(StoreTokenError::from)?
     {
         Some(subscriber_id) => subscriber_id,
-        None => return Err(sqlx::Error::RowNotFound),
+        None => {
+            return Err(SubscriberError::StoreTokenError(
+                sqlx::Error::RowNotFound.into(),
+            ));
+        }
     };
 
     while let Err(e) = update_token(transaction.as_mut(), &subscriber_id, new_token).await {
@@ -122,17 +135,23 @@ async fn update_token_when_subscribe_twice(
                 if let Some(code) = db_err.code() {
                     // https://postgresql.kr/docs/10/errcodes-appendix.html 이곳의 에러 코드를 참고했다.
                     if code != "25P02" {
-                        transaction = pgpool.begin().await?;
+                        transaction = pgpool
+                            .begin()
+                            .await
+                            .map_err(SubscriberError::TransactionCommitError)?;
                     } else {
-                        return Err(e);
+                        return Err(StoreTokenError(e.into()).into());
                     }
                 }
             }
-            _ => return Err(e),
+            _ => return Err(StoreTokenError::from(e).into()),
         }
     }
 
-    transaction.commit().await?;
+    transaction
+        .commit()
+        .await
+        .map_err(SubscriberError::TransactionCommitError)?;
 
     Ok(subscriber_id)
 }
@@ -197,8 +216,8 @@ fn generate_subscription_token() -> String {
 
 #[tracing::instrument(
     name = "Store subscription token in the database",
-    skip(subscription_token, transaction),
-    err
+    skip(subscription_token, transaction)
+    err(Debug),
 )]
 pub async fn store_token(
     transaction: &mut Transaction<'_, Postgres>,
@@ -210,7 +229,7 @@ pub async fn store_token(
     Ok(())
 }
 
-pub struct StoreTokenError(axum::Error);
+pub struct StoreTokenError(anyhow::Error);
 
 impl std::fmt::Display for StoreTokenError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -223,13 +242,13 @@ impl std::fmt::Display for StoreTokenError {
 
 impl From<sqlx::Error> for StoreTokenError {
     fn from(error: sqlx::Error) -> Self {
-        StoreTokenError(axum::Error::new(error))
+        StoreTokenError(anyhow::anyhow!(error))
     }
 }
 
 impl std::error::Error for StoreTokenError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
-        Some(&self.0)
+        Some(self.0.as_ref())
     }
 }
 
@@ -253,8 +272,90 @@ fn error_chain_fmt(
     Ok(())
 }
 
-
-#[derive(Debug)]
 pub enum SubscriberError {
-    
+    ValidationError(String),
+    StoreTokenError(StoreTokenError),
+    SendEmailError(reqwest::Error),
+    PoolError(sqlx::Error),
+    InsertSubscriberError(sqlx::Error),
+    TransactionCommitError(sqlx::Error),
+}
+
+impl From<reqwest::Error> for SubscriberError {
+    fn from(e: reqwest::Error) -> Self {
+        SubscriberError::SendEmailError(e)
+    }
+}
+
+impl From<StoreTokenError> for SubscriberError {
+    fn from(e: StoreTokenError) -> Self {
+        SubscriberError::StoreTokenError(e)
+    }
+}
+
+impl From<String> for SubscriberError {
+    fn from(e: String) -> Self {
+        SubscriberError::ValidationError(e)
+    }
+}
+
+impl std::fmt::Display for SubscriberError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SubscriberError::ValidationError(e) => e.fmt(f),
+
+            SubscriberError::StoreTokenError(_) => write!(
+                f,
+                "Failed to store the confirmation token for a new subscriber."
+            ),
+            SubscriberError::SendEmailError(_) => write!(f, "Failed to send a confirmation email."),
+            SubscriberError::PoolError(_) => {
+                write!(f, "Failed to acquire a Postgres connection from the pool.")
+            }
+            SubscriberError::InsertSubscriberError(_) => {
+                write!(f, "Failed to insert a new subscriber into the database.")
+            }
+            SubscriberError::TransactionCommitError(_) => write!(
+                f,
+                "Failed to commit SQL transaction to store a new subscriber."
+            ),
+        }
+    }
+}
+
+impl std::fmt::Debug for SubscriberError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        error_chain_fmt(self, f)
+    }
+}
+
+impl std::error::Error for SubscriberError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            SubscriberError::ValidationError(_) => None,
+            SubscriberError::StoreTokenError(e) => Some(e),
+            SubscriberError::SendEmailError(e) => Some(e),
+            SubscriberError::PoolError(e) => Some(e),
+            SubscriberError::InsertSubscriberError(e) => Some(e),
+            SubscriberError::TransactionCommitError(e) => Some(e),
+        }
+    }
+}
+
+impl IntoResponse for SubscriberError {
+    fn into_response(self) -> Response {
+        tracing::Span::current().record("exception.message", tracing::field::display(&self));
+        tracing::Span::current().record("exception.detail", tracing::field::debug(&self));
+
+        match self {
+            SubscriberError::ValidationError(_) => StatusCode::BAD_REQUEST.into_response(),
+            SubscriberError::StoreTokenError(_)
+            | SubscriberError::SendEmailError(_)
+            | SubscriberError::PoolError(_)
+            | SubscriberError::InsertSubscriberError(_)
+            | SubscriberError::TransactionCommitError(_) => {
+                StatusCode::INTERNAL_SERVER_ERROR.into_response()
+            }
+        }
+    }
 }

@@ -73,6 +73,8 @@ fn make_span(request: &Request<Body>) -> Span {
         method = %request.method(),
         path = %request.uri(),
         remote_addr = ?remote_addr,
+        exception.message = tracing::field::Empty,
+        exception.detail = tracing::field::Empty,
     )
 }
 
