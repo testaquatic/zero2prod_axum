@@ -4,10 +4,9 @@
 
 저자 깃허브 : [zero-to-production](https://github.com/LukeMathWalker/zero-to-production)
 
-[Actix Web](https://actix.rs/) 대신 [axum](https://github.com/tokio-rs/axum)을 사용했다.  
-[sqlx](https://docs.rs/sqlx/latest/sqlx/) 대신 [sea-orm](https://www.sea-ql.org/SeaORM/)을 사용했다.
+[Actix Web](https://actix.rs/)과 [sqlx](https://docs.rs/sqlx/latest/sqlx/) 대신 [axum](https://github.com/tokio-rs/axum), [sea-orm](https://www.sea-ql.org/SeaORM/)을 사용했다.
 
-내용이 알찬 책이다.
+내용이 알찬 책이다.  
 언어의 문법을 배우면 뭔가를 만들어 보고 싶은 생각이 든다.  
 단순한 지식 제공을 넘어서 단계적인 접근법을 책 한권에 잘 압축해 놨다.
 
@@ -25,6 +24,7 @@
 ```
 go run ./go/init_db.go
 ```
+
 ```
 go run ./go/init_db.go -h
 Usage of init_db
@@ -32,13 +32,12 @@ Usage of init_db
         Skip Docker
 ```
 
-
 ### configuration.json5
 
 -   JSON5 형식이다.
 
-
 예시
+
 ```json5
 {
     application_port: 8000,
@@ -73,4 +72,11 @@ Usage of init_db
 -   POST
 
     x-www-form-urlencoded  
-    name과 email 필드는 반드시 있어야 한다.
+     name과 email 필드는 반드시 있어야 한다.
+
+    ```
+    http -v --form POST http://127.0.0.1:8000/subscriptions \
+    Content-Type:application/x-www-form-urlencoded \
+    email=thomas_mann@hotmail.com \
+    name=Tom
+    ```

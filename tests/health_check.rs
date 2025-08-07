@@ -7,8 +7,11 @@ use zero2prod_axum::{
     startup::run,
 };
 
+/// 테스트용 어플리케이션 구조체
 pub struct TestApp {
+    /// 서버의 주소
     pub address: String,
+    /// 데이터베이스 연결 풀
     pub db_pool: DatabaseConnection,
 }
 
@@ -58,7 +61,7 @@ async fn configure_database(config: &DatabaseSettings) -> DatabaseConnection {
         .await
         .expect("Failed to connect to Postgres.");
     // 데이터베이스를 마이그레이션 한다.
-    // https://www.sea-ql.org/SeaORM/docs/migration/setting-up-migration/ 이 문서를 참고했다.
+    // https://www.sea-ql.org/SeaORM/docs/migration/setting-up-migration/ 문서를 참고했다.
     migration::Migrator::up(&connection_pool, None)
         .await
         .expect("Failed to migrate database.");

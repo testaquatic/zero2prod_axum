@@ -5,6 +5,7 @@ use axum::{
     routing::{get, post},
 };
 use sea_orm::DatabaseConnection;
+use tower_http::trace::TraceLayer;
 
 use crate::routes::{health_check, subscribe};
 
@@ -17,6 +18,7 @@ pub fn run(
     let app = Router::new()
         .route("/health_check", get(health_check))
         .route("/subscriptions", post(subscribe))
+        .layer(TraceLayer::new_for_http())
         .with_state(db_pool);
     axum::serve(listener, app).into_future()
 }
