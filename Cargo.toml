@@ -3,6 +3,28 @@ name = "zero2prod_axum"
 version = "0.1.0"
 edition = "2024"
 
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+path = "src/main.rs"
+name = "zero2prod_axum"
+
+[workspace]
+members = [".", "migration"]
+
 [dependencies]
 axum = "0.8"
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+config = "0.15"
+sea-orm = { version = "1.1", features = [
+    "sqlx-postgres",
+    "runtime-tokio-rustls",
+] }
+serde = { version = "1.0", features = ["derive"] }
 tokio = { version = "1.47", features = ["macros", "rt-multi-thread"] }
+uuid = { version = "1.17", features = ["v4"] }
+
+[dev-dependencies]
+reqwest = "0.12"
+migration = { path = "./migration" }
