@@ -17,16 +17,22 @@ members = [".", "migration"]
 axum = "0.8"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 config = "0.15"
-env_logger = "0.11.8"
-log = "0.4"
 sea-orm = { version = "1.1", features = [
     "sqlx-postgres",
     "runtime-tokio-rustls",
 ] }
+secrecy = { version = "0.10", features = ["serde"] }
 serde = { version = "1.0", features = ["derive"] }
 tokio = { version = "1.47", features = ["macros", "rt-multi-thread"] }
+tower = { version = "0.5", features = ["make"] }
 tower-http = { version = "0.6", features = ["trace"] }
 tracing = { version = "0.1.41", features = ["log"] }
+tracing-log = "0.2"
+tracing-subscriber = { version = "0.3", features = [
+    "registry",
+    "env-filter",
+    "json",
+] }
 uuid = { version = "1.17", features = ["v4"] }
 
 [dev-dependencies]

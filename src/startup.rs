@@ -1,8 +1,7 @@
-use std::sync::Arc;
+use std::{net::SocketAddr, sync::Arc};
 
 use axum::{
-    Router,
-    routing::{get, post},
+    extract::{ ConnectInfo, MatchedPath, Request}, routing::{get, post}, Router
 };
 use sea_orm::DatabaseConnection;
 use tower_http::trace::TraceLayer;
@@ -15,10 +14,31 @@ pub fn run(
     db_pool: DatabaseConnection,
 ) -> impl Future<Output = Result<(), std::io::Error>> {
     let db_pool = Arc::new(db_pool);
-    let app = Router::new()
+    let app = get_app(db_pool);
+    axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>()).into_future()
+}
+
+/// Router 인스턴스를 얻는다.
+pub fn get_app(db_pool: Arc<DatabaseConnection>) -> Router//IntoMakeServiceWithConnectInfo<Router, SocketAddr>
+{
+    Router::new()
         .route("/health_check", get(health_check))
         .route("/subscriptions", post(subscribe))
-        .layer(TraceLayer::new_for_http())
-        .with_state(db_pool);
-    axum::serve(listener, app).into_future()
+        .layer(
+            // https://github.com/tokio-rs/axum/blob/main/examples/tracing-aka-logging/src/main.rs 이곳의 소스코드를 참고로 했다
+            TraceLayer::new_for_http().make_span_with(|request: &Request<_>| {
+                let matched_path = request
+                    .extensions()
+                    .get::<MatchedPath>()
+                    .map(MatchedPath::as_str);
+                // https://docs.rs/axum/latest/axum/struct.Router.html#method.into_make_service_with_connect_info 이 문서를 참고로 했다.
+                let remote_addr = request.extensions().get::<ConnectInfo<SocketAddr>>().map(|addr| addr.0);           
+
+                tracing::info_span!(
+                    "http_request", method = ?request.method(), matched_path, request_id = %uuid::Uuid::new_v4(), ?remote_addr
+                )
+            }),
+        )
+        .with_state(db_pool)
+
 }

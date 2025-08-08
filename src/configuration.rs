@@ -1,3 +1,5 @@
+use secrecy::{ExposeSecret, SecretString};
+
 /// 애플리케이션 설정을 저장하는 구조체이다.
 #[derive(serde::Deserialize)]
 pub struct Settings {
@@ -9,7 +11,7 @@ pub struct Settings {
 #[derive(serde::Deserialize)]
 pub struct DatabaseSettings {
     pub username: String,
-    pub password: String,
+    pub password: SecretString,
     pub host: String,
     pub port: u16,
     pub database_name: String,
@@ -30,19 +32,28 @@ pub fn get_configuration() -> Result<Settings, config::ConfigError> {
 impl DatabaseSettings {
     /// 데이터베이스 연결 문자열을 반환한다.
     /// 예: "postgres://username:password@host:port/database_name"
-    pub fn connection_string(&self) -> String {
+    pub fn connection_string(&self) -> SecretString {
         format!(
             "postgres://{}:{}@{}:{}/{}",
-            self.username, self.password, self.host, self.port, self.database_name
+            self.username,
+            self.password.expose_secret(),
+            self.host,
+            self.port,
+            self.database_name
         )
+        .into()
     }
 
     /// 데이터베이스 연결 문자열에서 데이터베이스 이름을 제외한 부분을 반환한다.
     /// 예: "postgres://username:password@host:port"
-    pub fn connection_string_without_db(&self) -> String {
+    pub fn connection_string_without_db(&self) -> SecretString {
         format!(
             "postgres://{}:{}@{}:{}",
-            self.username, self.password, self.host, self.port
+            self.username,
+            self.password.expose_secret(),
+            self.host,
+            self.port
         )
+        .into()
     }
 }

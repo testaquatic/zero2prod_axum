@@ -1,11 +1,31 @@
+use std::sync::LazyLock;
+
 use migration::MigratorTrait;
 use sea_orm::{ConnectionTrait, Database, DatabaseConnection, EntityTrait};
+use secrecy::ExposeSecret;
 use uuid::Uuid;
 use zero2prod_axum::{
     configuration::{DatabaseSettings, get_configuration},
     entities::prelude::Subscriptions,
     startup::run,
+    telemetry::{get_subscriber, init_subscriber},
 };
+
+/// `LazyLock`을 사용해서 한번만 초기화 되는 것을 보장한다.
+static TRACING: LazyLock<()> = LazyLock::new(|| {
+    let default_filter_level = "info".to_string();
+
+    std::env::var("TEST_LOG")
+        .map(|_| {
+            let subscriber = get_subscriber(default_filter_level.clone(), std::io::stdout);
+            init_subscriber(subscriber);
+        })
+        // `unwrap_or`는 부지런하기 때문에 오류가 발생한다.
+        .unwrap_or_else(|_| {
+            let subscriber = get_subscriber(default_filter_level, std::io::sink);
+            init_subscriber(subscriber);
+        });
+});
 
 /// 테스트용 어플리케이션 구조체
 pub struct TestApp {
@@ -18,6 +38,8 @@ pub struct TestApp {
 /// 서버를 실행하는 헬퍼 함수
 /// 서버의 주소를 반환한다.(예: http://localhost:8000)
 async fn spawn_app() -> TestApp {
+    LazyLock::force(&TRACING);
+
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
         .await
         .expect("Failed to bind random port");
@@ -43,7 +65,7 @@ async fn spawn_app() -> TestApp {
 /// 테스트용 데이터베이스를 설정하는 헬퍼 함수
 /// 데이터베이스를 생성하고, 마이그레이션을 적용한다.
 async fn configure_database(config: &DatabaseSettings) -> DatabaseConnection {
-    let connection = Database::connect(config.connection_string_without_db())
+    let connection = Database::connect(config.connection_string_without_db().expose_secret())
         .await
         .expect("Failed to connect to Postgres.");
 
@@ -57,7 +79,7 @@ async fn configure_database(config: &DatabaseSettings) -> DatabaseConnection {
         .await
         .expect("Failed to create database.");
 
-    let connection_pool = Database::connect(config.connection_string())
+    let connection_pool = Database::connect(config.connection_string().expose_secret())
         .await
         .expect("Failed to connect to Postgres.");
     // 데이터베이스를 마이그레이션 한다.
