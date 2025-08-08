@@ -32,21 +32,38 @@ Usage of init_db
         Skip Docker
 ```
 
-### configuration.json5
+### /configuration
 
--   JSON5 형식이다.
+설정 파일을 저장하는 디렉토리이다.  
+json5 형식으로 저장해야 한다.
+
+-   base.json5  
+    기본적인 설정을 지정한다.  
+    가장 순위가 낮다.
+
+-   local.json5
+    APP_ENVIRONMENT 환경변수가 설정되어 있지 않았을 때 읽는다.  
+    base.json5보다 순위가 높다.
+
+-   {APP_ENVIRONMENT}.json5  
+    APP_ENVIRONMENT 환경변수가 'production'이라면 'production.json5'을 읽는다.
+    local.json5보다 순위가 높다.
 
 예시
 
 ```json5
 {
-    application_port: 8000,
+    application: {
+        host: "127.0.0.1",
+        port: 8000,
+    },
     database: {
         host: "127.0.0.1",
         port: 5432,
         username: "postgres",
         password: "password",
         database_name: "newsletter",
+        require_ssl: true,
     },
 }
 ```
@@ -58,7 +75,7 @@ Usage of init_db
 -   GET
 
     ```
-    http GET http://localhost:8000/health_check -v
+    http -v GET http://localhost:8000/health_check
     ```
 
     -   응답
@@ -80,3 +97,11 @@ Usage of init_db
     email=thomas_mann@hotmail.com \
     name=Tom
     ```
+
+## Dcokerfile
+
+이미지 생성
+
+```
+docker buildx build --file Dockerfile .
+```

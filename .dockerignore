@@ -1,0 +1,5 @@
+/go/
+/target/
+/tests/
+/.git/
+/Dockerfile

@@ -9,13 +9,13 @@ use tower_http::trace::TraceLayer;
 use crate::routes::{health_check, subscribe};
 
 /// axum 서버를 시작하고, 지정된 리스너에서 요청을 처리한다.
-pub fn run(
+pub async fn run(
     listener: tokio::net::TcpListener,
     db_pool: DatabaseConnection,
-) -> impl Future<Output = Result<(), std::io::Error>> {
+) -> Result<(), std::io::Error> {
     let db_pool = Arc::new(db_pool);
     let app = get_app(db_pool);
-    axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>()).into_future()
+    axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>()).await
 }
 
 /// Router 인스턴스를 얻는다.
@@ -35,7 +35,7 @@ pub fn get_app(db_pool: Arc<DatabaseConnection>) -> Router//IntoMakeServiceWithC
                 let remote_addr = request.extensions().get::<ConnectInfo<SocketAddr>>().map(|addr| addr.0);           
 
                 tracing::info_span!(
-                    "http_request", method = ?request.method(), matched_path, request_id = %uuid::Uuid::new_v4(), ?remote_addr
+                    "zero2prod_axum", method = ?request.method(), matched_path, request_id = %uuid::Uuid::new_v4(), ?remote_addr
                 )
             }),
         )

@@ -31,6 +31,7 @@ func runDocker(dbUser, dbPassword, dbName, dbPort string) error {
 
 }
 
+// 주어진 명령어가 설치되어 있는지 확인한다.
 func checkRequiredCommand(command string) error {
 	_, err := exec.LookPath(command)
 	if err != nil {

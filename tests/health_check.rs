@@ -1,8 +1,7 @@
 use std::sync::LazyLock;
 
 use migration::MigratorTrait;
-use sea_orm::{ConnectionTrait, Database, DatabaseConnection, EntityTrait};
-use secrecy::ExposeSecret;
+use sea_orm::{ConnectionTrait, DatabaseConnection, EntityTrait, sqlx::PgPool};
 use uuid::Uuid;
 use zero2prod_axum::{
     configuration::{DatabaseSettings, get_configuration},
@@ -65,9 +64,11 @@ async fn spawn_app() -> TestApp {
 /// 테스트용 데이터베이스를 설정하는 헬퍼 함수
 /// 데이터베이스를 생성하고, 마이그레이션을 적용한다.
 async fn configure_database(config: &DatabaseSettings) -> DatabaseConnection {
-    let connection = Database::connect(config.connection_string_without_db().expose_secret())
-        .await
-        .expect("Failed to connect to Postgres.");
+    let connection = sea_orm::SqlxPostgresConnector::from_sqlx_postgres_pool(
+        PgPool::connect_with(config.without_db())
+            .await
+            .expect("Failed to connect to Postgres."),
+    );
 
     // 데이터 생성과 관련한 API를 찾지 못했다.
     // 날SQL을 사용하여 데이터베이스를 생성한다.
@@ -79,9 +80,11 @@ async fn configure_database(config: &DatabaseSettings) -> DatabaseConnection {
         .await
         .expect("Failed to create database.");
 
-    let connection_pool = Database::connect(config.connection_string().expose_secret())
-        .await
-        .expect("Failed to connect to Postgres.");
+    let connection_pool = sea_orm::SqlxPostgresConnector::from_sqlx_postgres_pool(
+        PgPool::connect_with(config.with_db())
+            .await
+            .expect("Failed to connect to Postgres."),
+    );
     // 데이터베이스를 마이그레이션 한다.
     // https://www.sea-ql.org/SeaORM/docs/migration/setting-up-migration/ 문서를 참고했다.
     migration::Migrator::up(&connection_pool, None)

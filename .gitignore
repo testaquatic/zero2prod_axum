@@ -1,4 +1,4 @@
-/target
+/configuration/
+/target/
 
 Cargo.lock
-configuration.json5
