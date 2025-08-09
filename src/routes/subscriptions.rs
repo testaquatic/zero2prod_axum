@@ -1,4 +1,7 @@
-use crate::entities::{self, prelude::Subscriptions, subscriptions};
+use crate::{
+    domain::{NewSubscriber, SubscriberEmail, SubscriberName},
+    entities::{self, prelude::Subscriptions, subscriptions},
+};
 use std::sync::Arc;
 
 use axum::{Form, extract::State, http::StatusCode};
@@ -9,6 +12,16 @@ use sea_orm::{DatabaseConnection, DbErr, EntityTrait, InsertResult};
 pub struct FormData {
     name: String,
     email: String,
+}
+
+impl TryFrom<FormData> for NewSubscriber {
+    type Error = String;
+
+    fn try_from(value: FormData) -> Result<Self, Self::Error> {
+        let name = SubscriberName::parse(value.name)?;
+        let email = SubscriberEmail::parse(value.email)?;
+        Ok(Self { email, name })
+    }
 }
 
 /// /subscriptions - POST 핸들러
@@ -22,7 +35,11 @@ pub struct FormData {
     )
 )]
 pub async fn subscribe(pool: State<Arc<DatabaseConnection>>, form: Form<FormData>) -> StatusCode {
-    insert_subscriber(pool.as_ref(), &form)
+    let Ok(new_subscriber) = form.0.try_into() else {
+        return StatusCode::BAD_REQUEST;
+    };
+
+    insert_subscriber(pool.as_ref(), &new_subscriber)
         .await
         // 쿼리 실행 결과를 확인하고, 성공 시 200 OK를 반환한다.
         .map(|_| StatusCode::OK)
@@ -37,13 +54,13 @@ pub async fn subscribe(pool: State<Arc<DatabaseConnection>>, form: Form<FormData
 #[tracing::instrument(name = "Saving new subscriber details in the database", skip_all)]
 async fn insert_subscriber(
     pool: &DatabaseConnection,
-    form: &FormData,
+    new_subscriber: &NewSubscriber,
 ) -> Result<InsertResult<subscriptions::ActiveModel>, DbErr> {
     // 폼 데이터에서 name과 email을 추출하고 ActiveModel을 생성한다.
     let new_subscription = entities::subscriptions::ActiveModel {
         id: sea_orm::Set(uuid::Uuid::new_v4()),
-        name: sea_orm::Set(form.name.clone()),
-        email: sea_orm::Set(form.email.clone()),
+        name: sea_orm::Set(new_subscriber.name.as_ref().into()),
+        email: sea_orm::Set(new_subscriber.email.as_ref().into()),
         subscribed_at: sea_orm::Set(chrono::Utc::now().into()),
     };
 

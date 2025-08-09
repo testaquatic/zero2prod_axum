@@ -1,7 +1,9 @@
 use std::{net::SocketAddr, sync::Arc};
 
 use axum::{
-    extract::{ ConnectInfo, MatchedPath, Request}, routing::{get, post}, Router
+    Router,
+    extract::{ConnectInfo, MatchedPath, Request},
+    routing::{get, post},
 };
 use sea_orm::DatabaseConnection;
 use tower_http::trace::TraceLayer;
@@ -15,11 +17,16 @@ pub async fn run(
 ) -> Result<(), std::io::Error> {
     let db_pool = Arc::new(db_pool);
     let app = get_app(db_pool);
-    axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>()).await
+    tracing::info!("Server started");
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .await
 }
 
 /// Router 인스턴스를 얻는다.
-pub fn get_app(db_pool: Arc<DatabaseConnection>) -> Router//IntoMakeServiceWithConnectInfo<Router, SocketAddr>
+pub fn get_app(db_pool: Arc<DatabaseConnection>) -> Router //IntoMakeServiceWithConnectInfo<Router, SocketAddr>
 {
     Router::new()
         .route("/health_check", get(health_check))
@@ -32,7 +39,7 @@ pub fn get_app(db_pool: Arc<DatabaseConnection>) -> Router//IntoMakeServiceWithC
                     .get::<MatchedPath>()
                     .map(MatchedPath::as_str);
                 // https://docs.rs/axum/latest/axum/struct.Router.html#method.into_make_service_with_connect_info 이 문서를 참고로 했다.
-                let remote_addr = request.extensions().get::<ConnectInfo<SocketAddr>>().map(|addr| addr.0);           
+                let remote_addr = request.extensions().get::<ConnectInfo<SocketAddr>>().map(|addr| addr.0);
 
                 tracing::info_span!(
                     "zero2prod_axum", method = ?request.method(), matched_path, request_id = %uuid::Uuid::new_v4(), ?remote_addr
@@ -40,5 +47,4 @@ pub fn get_app(db_pool: Arc<DatabaseConnection>) -> Router//IntoMakeServiceWithC
             }),
         )
         .with_state(db_pool)
-
 }

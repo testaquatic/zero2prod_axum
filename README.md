@@ -21,12 +21,12 @@
 
 1과 2의 작업은 ./go/init_db.go를 사용한다.
 
-```
+```bash
 go run ./go/init_db.go
 ```
 
-```
-go run ./go/init_db.go -h
+```bash
+go run ./go/init_db.go --help
 Usage of init_db
   -skip-docker
         Skip Docker
@@ -49,7 +49,7 @@ json5 형식으로 저장해야 한다.
     APP_ENVIRONMENT 환경변수가 'production'이라면 'production.json5'을 읽는다.
     local.json5보다 순위가 높다.
 
-예시
+높은 순위의 설정이 우선 적용된다.
 
 ```json5
 {
@@ -74,34 +74,57 @@ json5 형식으로 저장해야 한다.
 
 -   GET
 
-    ```
+    ```bash
     http -v GET http://localhost:8000/health_check
     ```
 
     -   응답
 
-        -   200 OK
+        -   200 OK  
+            응답본문은 비어 있다.
 
 ---
 
 ### /subscriptions
 
--   POST
+#### POST
 
-    x-www-form-urlencoded  
-     name과 email 필드는 반드시 있어야 한다.
-
-    ```
+    ```bash
     http -v --form POST http://127.0.0.1:8000/subscriptions \
     Content-Type:application/x-www-form-urlencoded \
     email=thomas_mann@hotmail.com \
     name=Tom
     ```
 
+-   x-www-form-urlencoded  
+    name과 email 필드는 반드시 있어야 한다.
+
+    하나 이상의 필수적인 필드가 비어 있을 때는 422 Unprocessable Entity를 반환한다.
+
+-   name 필드
+
+    1. 최소길이는 1이다.
+    1. 공백문자만 넣을 수 없다.
+    2. 256자 이하이어야 한다.
+    3. '/', '(', ')', '"', '<', '>', '\\', '{', '}', ';'은 넣을 수 없다.
+
+    유효성 검증에 실패하면 400 Bad Request를 반환한다.
+
+-   응답
+    1. 200 OK
+    2. 400 Bad Request
+    3. 422 Unprocessable Entity
+
 ## Dcokerfile
 
 이미지 생성
 
+```bash
+docker buildx build --tag zero2prod_axum  --file Dockerfile .
 ```
-docker buildx build --file Dockerfile .
+
+이미지 실행
+
+```bash
+docker run -p 8000:8000 zero2prod_axum
 ```

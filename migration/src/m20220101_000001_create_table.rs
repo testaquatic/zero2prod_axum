@@ -23,11 +23,7 @@ impl MigrationTrait for Migration {
                             .not_null()
                             .unique_key(),
                     )
-                    .col(
-                        ColumnDef::new(Subscriptions::Name)
-                            .string()
-                            .not_null(),
-                    )
+                    .col(ColumnDef::new(Subscriptions::Name).string().not_null())
                     .col(
                         ColumnDef::new(Subscriptions::SubscribedAt)
                             .timestamp_with_time_zone()

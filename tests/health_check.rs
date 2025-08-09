@@ -200,3 +200,37 @@ async fn subscribe_returns_a_400_when_data_is_missing() {
         );
     }
 }
+
+/// 필드의 내용이 유효하지 않으면 400 Bad Request를 반환한다.
+#[tokio::test]
+async fn subscribe_returns_a_400_when_fields_are_present_but_invalid() {
+    // 준비
+    let app = spawn_app().await;
+    let client = reqwest::Client::new();
+    let test_cases = vec![
+        ("name=&email=ursula_le_guin%40gmail.com", "empty name"),
+        ("name=Ursula&email=", "empty email"),
+        ("name=Ursula&email=definitly-not-an-email", "invalid email"),
+    ];
+
+    for (body, description) in test_cases {
+        // 실행
+        let response = client
+            .post(&format!("{}/subscriptions", app.address.as_str()))
+            .header(
+                reqwest::header::CONTENT_TYPE,
+                "application/x-www-form-urlencoded",
+            )
+            .body(body)
+            .send()
+            .await
+            .expect("Failed to execute request.");
+
+        // 확인
+        assert_eq!(
+            response.status(),
+            reqwest::StatusCode::BAD_REQUEST,
+            "The API did not return a 200 OK when the payload was {description}."
+        );
+    }
+}
