@@ -5,11 +5,14 @@ use sea_orm::sqlx::{
 use secrecy::{ExposeSecret, SecretString};
 use serde_aux::field_attributes::deserialize_number_from_string;
 
+use crate::domain::SubscriberEmail;
+
 /// 설정을 저장하는 구조체이다.
 #[derive(serde::Deserialize)]
 pub struct Settings {
     pub database: DatabaseSettings,
     pub application: ApplicationSettings,
+    pub email_client: EmailClientSettings,
 }
 
 /// 애플리케이션 설정을 저장하는 구조체이다.
@@ -30,6 +33,15 @@ pub struct DatabaseSettings {
     pub port: u16,
     pub database_name: String,
     pub require_ssl: bool,
+}
+
+/// 이메일 클라이언트 설정을 저장하는 구조체이다.
+#[derive(serde::Deserialize)]
+pub struct EmailClientSettings {
+    pub base_url: String,
+    pub sender_email: String,
+    pub authorization_token: SecretString,
+    pub timeout_milliseconds: u64,
 }
 
 /// 구성 파일(configuration.json5)을 읽어 Settings 구조체로 변환한다.
@@ -114,5 +126,17 @@ impl DatabaseSettings {
             .username(&self.username)
             .password(self.password.expose_secret())
             .ssl_mode(ssl_mode)
+    }
+}
+
+impl EmailClientSettings {
+    /// 발신자 주소를 반환한다.
+    pub fn sender(&self) -> Result<SubscriberEmail, String> {
+        SubscriberEmail::parse(self.sender_email.clone())
+    }
+
+    /// `EmailClientSettings`로부터 `std::time::Duration`을 생성한다.
+    pub fn timeout(&self) -> std::time::Duration {
+        std::time::Duration::from_millis(self.timeout_milliseconds)
     }
 }

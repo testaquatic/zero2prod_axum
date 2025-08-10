@@ -14,9 +14,10 @@ name = "zero2prod_axum"
 members = [".", "migration"]
 
 [dependencies]
-axum = "0.8"
+axum = { version = "0.8", features = ["macros"] }
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 config = "0.15"
+reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
 sea-orm = { version = "1.1", features = [
     "sqlx-postgres",
     "runtime-tokio-rustls",
@@ -38,9 +39,10 @@ uuid = { version = "1.17", features = ["v4"] }
 validator = "0.20"
 
 [dev-dependencies]
-reqwest = "0.12"
 migration = { path = "./migration" }
 claim = "0.5"
 fake = "4.4"
 quickcheck = "1.0"
 quickcheck_macros = "1.1"
+wiremock = "0.6"
+serde_json = "1.0"

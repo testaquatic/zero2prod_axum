@@ -65,6 +65,12 @@ json5 형식으로 저장해야 한다.
         database_name: "newsletter",
         require_ssl: true,
     },
+    email_client: {
+        base_url: "localhost",
+        sender_email: "test@gmail.com",
+        authorization_token: "token",
+        timeout_milliseconds: 10000,
+    },
 }
 ```
 
@@ -105,10 +111,14 @@ json5 형식으로 저장해야 한다.
 
     1. 최소길이는 1이다.
     1. 공백문자만 넣을 수 없다.
-    2. 256자 이하이어야 한다.
-    3. '/', '(', ')', '"', '<', '>', '\\', '{', '}', ';'은 넣을 수 없다.
+    1. 256자 이하이어야 한다.
+    1. '/', '(', ')', '"', '<', '>', '\\', '{', '}', ';'은 넣을 수 없다.
 
     유효성 검증에 실패하면 400 Bad Request를 반환한다.
+
+-   email 필드
+
+    유효한 형식의 이메일 주소를 입력해야 한다.
 
 -   응답
     1. 200 OK

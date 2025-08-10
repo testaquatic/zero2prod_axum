@@ -5,6 +5,7 @@ use sea_orm::{ConnectionTrait, DatabaseConnection, EntityTrait, sqlx::PgPool};
 use uuid::Uuid;
 use zero2prod_axum::{
     configuration::{DatabaseSettings, get_configuration},
+    email_client::EmailClient,
     entities::prelude::Subscriptions,
     startup::run,
     telemetry::{get_subscriber, init_subscriber},
@@ -49,8 +50,22 @@ async fn spawn_app() -> TestApp {
     configuration.database.database_name = Uuid::new_v4().to_string();
     let connection_pool = configure_database(&configuration.database).await;
 
-    let server = run(listener, connection_pool.clone());
-    let _ = tokio::spawn(server);
+    let sender_email = configuration
+        .email_client
+        .sender()
+        .expect("Invalid sender email address.");
+    let timeout = configuration.email_client.timeout();
+    let email_client = EmailClient::new(
+        configuration.email_client.base_url,
+        sender_email,
+        configuration.email_client.authorization_token,
+        timeout,
+    );
+
+    let server = run(listener, connection_pool.clone(), email_client);
+    let _ = tokio::spawn(async {
+        server.await.expect("Failed to start server");
+    });
     // 서버의 시작을 기다린다.
     // 이 부분이 없어도 오류가 발생하지 않아서 임시로 주석처리 했다.
     // tokio::time::sleep(Duration::from_millis(100)).await;
@@ -227,10 +242,11 @@ async fn subscribe_returns_a_400_when_fields_are_present_but_invalid() {
             .expect("Failed to execute request.");
 
         // 확인
+        // 필드의 내용이 유효하지 않으면 400 Bad Request를 반환해야 한다.
         assert_eq!(
             response.status(),
             reqwest::StatusCode::BAD_REQUEST,
-            "The API did not return a 200 OK when the payload was {description}."
+            "The API did not return a 400 Bad Request when the payload was {description}."
         );
     }
 }
