@@ -9,7 +9,8 @@ name = "migration"
 path = "src/lib.rs"
 
 [dependencies]
-tokio = { version = "1.47", features = ["macros", "rt-multi-thread"] }
+async-std = { version = "1", features = ["attributes", "tokio1"] }
+entities = { path = "../entities" }
 
 [dependencies.sea-orm-migration]
 version = "1.1.0"

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 )
 
@@ -43,9 +44,11 @@ func checkRequiredCommand(command string) error {
 
 // 도커 설정을 건너뛸지 여부를 나타내는 플래그이다.
 var SKIP_DOKER bool
+var entity string
 
 func init() {
 	flag.BoolVar(&SKIP_DOKER, "skip-docker", false, "Skip Docker setup")
+	flag.StringVar(&entity, "entity", "", "Specifies the directory in which to store a entity. If not specified, the entity will not be created.")
 }
 
 func main() {
@@ -126,11 +129,14 @@ func main() {
 		os.Exit(1)
 	}
 
-	// 엔티티를 생성한다.
-	// 엔티티는 ./src/entities 디렉토리에 생성된다.
-	if err := runCommand("sea-orm-cli", "generate", "entity", "-o", "./src/entities"); err != nil {
-		os.Stderr.WriteString("Failed to generate entities: " + err.Error() + "\n")
-		os.Exit(1)
+	if entity = strings.TrimSpace(entity); entity != "" {
+		// 엔티티를 생성한다.
+		if err := runCommand("sea-orm-cli", "generate", "entity", "-o", entity); err != nil {
+			os.Stderr.WriteString("Failed to generate a entity: " + err.Error() + "\n")
+			os.Exit(1)
+		}
+		fmt.Printf("Saved the entity in %s.\n", entity)
+
 	}
 
 	fmt.Println("Database migrations completed successfully.")

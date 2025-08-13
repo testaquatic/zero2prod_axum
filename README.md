@@ -19,7 +19,7 @@
 2. 데이터베이스 마이그레이션  
    자세한 내용은 [Setting Up Migration](https://www.sea-ql.org/SeaORM/docs/migration/setting-up-migration/) 문서를 참고한다.
 
-1과 2의 작업은 ./go/init_db.go를 사용한다.
+1과 2의 작업은 ./go/init_db.go를 사용해서 쉽게 할 수 있다.
 
 ```bash
 go run ./go/init_db.go
@@ -27,9 +27,11 @@ go run ./go/init_db.go
 
 ```bash
 go run ./go/init_db.go --help
-Usage of init_db
+Usage of ./go/init_db:
+  -entity string
+        Specifies the directory in which to store a entity. If not specified, the entity will not be created.
   -skip-docker
-        Skip Docker
+        Skip Docker setup
 ```
 
 ### /configuration
@@ -121,9 +123,16 @@ json5 형식으로 저장해야 한다.
     유효한 형식의 이메일 주소를 입력해야 한다.
 
 -   응답
+
     1. 200 OK
+
     2. 400 Bad Request
+
     3. 422 Unprocessable Entity
+
+    4. 500 Internal Server Error  
+       데이터베이스 오류  
+       이메일 전송 오류
 
 ## Dcokerfile
 

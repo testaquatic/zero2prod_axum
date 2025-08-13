@@ -1,0 +1,6 @@
+pub mod m20220101_000001_create_table;
+pub mod m20250811_000001_add_status_to_subscriptions;
+pub mod m20250811_000002_add_make_status_not_null_in_subscriptions;
+pub mod m20250811_000003_create_subscription_token_table;
+
+pub use m20250811_000003_create_subscription_token_table::*;

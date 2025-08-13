@@ -10,13 +10,12 @@ path = "src/lib.rs"
 path = "src/main.rs"
 name = "zero2prod_axum"
 
-[workspace]
-members = [".", "migration"]
-
 [dependencies]
 axum = { version = "0.8", features = ["macros"] }
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 config = "0.15"
+entities = { path = "./entities" }
+rand = "0.9"
 reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
 sea-orm = { version = "1.1", features = [
     "sqlx-postgres",
@@ -46,3 +45,4 @@ quickcheck = "1.0"
 quickcheck_macros = "1.1"
 wiremock = "0.6"
 serde_json = "1.0"
+linkify = "0.10"
