@@ -50,42 +50,35 @@ pub async fn subscribe(
     State(email_client): State<Arc<EmailClient>>,
     State(base_url): State<Arc<ApplicationBaseUrl>>,
     Form(form): Form<FormData>,
-) -> Result<StatusCode, Response> {
+) -> Result<StatusCode, SubscriberError> {
     // 잘못된 요청이 들어오면 400 Bad Request를 반환한다.
-    let new_subscriber =
-        NewSubscriber::try_from(form).map_err(|_| StatusCode::BAD_REQUEST.into_response())?;
+    let new_subscriber = NewSubscriber::try_from(form)?;
 
     // 트랜잭션을 시작한다.
-    let transaction = pool
-        .begin()
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR.into_response())?;
+    let transaction = pool.begin().await.map_err(SubscriberError::PoolError)?;
 
     // 이미 가입한 이메일인지 확인한다.
-    let subscriber_id = match check_subscriber_exists(&transaction, &new_subscriber.email).await {
-        // 데이터베이스 오류
-        Err(_) => return Err(StatusCode::INTERNAL_SERVER_ERROR.into_response()),
+    let subscriber_id = match check_subscriber_exists(&transaction, &new_subscriber.email)
+        .await
+        .map_err(SubscriberError::InsertSubscriberError)?
+    {
         // 이미 가입했을 때
         // 기존의 subscriber_id을 재활용한다.
         // subscription_tokens테이블의 해당 항목을 무효화도 생각해 봤지만 여기에서는 별 의미가 없는 것 같다.
-        Ok(Some(subscriber_id)) => subscriber_id.id,
+        Some(subscriber_id) => subscriber_id.id,
         // 가입하지 않았을 때
-        Ok(None) => {
+        None => {
             // 데이터베이스에 가입자 정보를 저장한다.
             // 실패하면 500 Internal Server Error를 반환한다.
-            let Ok(subscriber_id) = insert_subscriber(&transaction, &new_subscriber).await else {
-                // 실패 시 에러 메시지를 출력하고, 500 Internal Server Error를 반환한다.
-                return Err(StatusCode::INTERNAL_SERVER_ERROR.into_response());
-            };
-            subscriber_id
+            insert_subscriber(&transaction, &new_subscriber)
+                .await
+                .map_err(SubscriberError::InsertSubscriberError)?
         }
     };
 
     // 데이터베이스에 이메일 인증용 토큰을 저장한다.
     let subscription_token = generate_subscription_token();
-    store_token(&transaction, subscriber_id, &subscription_token)
-        .await
-        .map_err(IntoResponse::into_response)?;
+    store_token(&transaction, subscriber_id, &subscription_token).await?;
     //  .map_err(|e| IntoResponse::into_response(e))?;
 
     // 일단은 테스트 용으로 무의미한 이메일을 신규 가입자에서 전송한다.
@@ -96,15 +89,15 @@ pub async fn subscribe(
         base_url.0.as_ref(),
         subscription_token.as_ref(),
     )
-    .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR.into_response())?;
+    .await?;
 
     // 트랜잭션이 실패하면 500 Internal Server Error를 반환한다.
     transaction
         .commit()
         .await
-        .map(|_| StatusCode::OK)
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR.into_response())
+        .map_err(SubscriberError::TransactionCommitError)?;
+
+    Ok(StatusCode::OK)
 }
 
 /// 데이터베이스에 구독자 정보를 저장한다.
@@ -176,10 +169,7 @@ async fn store_token(
     entities::prelude::SubscriptionTokens::insert(new_subscription_token)
         .exec(pool)
         .await
-        .map_err(|e| {
-            tracing::error!("Failed to execute query: {e:?}");
-            StoreTokenError(e)
-        })
+        .map_err(StoreTokenError)
 }
 
 #[derive(sea_orm::FromQueryResult)]
@@ -204,11 +194,10 @@ pub async fn check_subscriber_exists(
 }
 
 /// axum의 오류의 취급과 관련해서는 [Module error_handling](https://docs.rs/axum/latest/axum/error_handling/index.html)을 참고로 했다.
-#[derive(Debug)]
 pub struct StoreTokenError(sea_orm::DbErr);
 
 impl std::fmt::Display for StoreTokenError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         write!(
             f,
             "A database error was encountered while trying to store subscription token."
@@ -216,9 +205,114 @@ impl std::fmt::Display for StoreTokenError {
     }
 }
 
-impl IntoResponse for StoreTokenError {
+impl std::fmt::Debug for StoreTokenError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        error_chain_fmt(self, f)
+    }
+}
+
+impl std::error::Error for StoreTokenError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(&self.0)
+    }
+}
+
+/// 오류의 체인을 반복하면서 출력한다.
+fn error_chain_fmt(
+    e: &impl std::error::Error,
+    f: &mut std::fmt::Formatter<'_>,
+) -> Result<(), std::fmt::Error> {
+    writeln!(f, "{e}\n")?;
+    let mut current = e.source();
+    while let Some(cause) = current {
+        writeln!(f, "Caused by:\n\t{cause}\n")?;
+        current = cause.source();
+    }
+
+    Ok(())
+}
+
+pub enum SubscriberError {
+    ValidationError(String),
+    StoreTokenError(StoreTokenError),
+    SendEmailError(reqwest::Error),
+    PoolError(sea_orm::DbErr),
+    InsertSubscriberError(sea_orm::DbErr),
+    TransactionCommitError(sea_orm::DbErr),
+}
+
+impl From<reqwest::Error> for SubscriberError {
+    fn from(e: reqwest::Error) -> Self {
+        Self::SendEmailError(e)
+    }
+}
+
+impl From<StoreTokenError> for SubscriberError {
+    fn from(e: StoreTokenError) -> Self {
+        Self::StoreTokenError(e)
+    }
+}
+
+impl From<String> for SubscriberError {
+    fn from(e: String) -> Self {
+        Self::ValidationError(e)
+    }
+}
+
+impl std::error::Error for SubscriberError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::ValidationError(_) => None,
+            Self::StoreTokenError(e) => Some(e),
+            Self::SendEmailError(e) => Some(e),
+            Self::PoolError(e) => Some(e),
+            Self::InsertSubscriberError(e) => Some(e),
+            Self::TransactionCommitError(e) => Some(e),
+        }
+    }
+}
+
+impl std::fmt::Display for SubscriberError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SubscriberError::ValidationError(e) => write!(f, "{}", e),
+            SubscriberError::StoreTokenError(_) => write!(
+                f,
+                "Failed to store subscription token for a new subscriber.",
+            ),
+            SubscriberError::SendEmailError(_) => write!(f, "Failed to send a confirmation email."),
+            SubscriberError::PoolError(_) => {
+                write!(f, "Failed to acquire a Postgres connection from the pool.")
+            }
+            SubscriberError::InsertSubscriberError(_) => {
+                write!(f, "Failed to insert a new subscriber into the database.")
+            }
+            SubscriberError::TransactionCommitError(_) => {
+                write!(
+                    f,
+                    "Failed to commit SQL transaction to store a new subscriber."
+                )
+            }
+        }
+    }
+}
+
+impl std::fmt::Debug for SubscriberError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        error_chain_fmt(self, f)
+    }
+}
+
+impl IntoResponse for SubscriberError {
     fn into_response(self) -> Response {
-        tracing::error!(exception.message = %self);
-        StatusCode::INTERNAL_SERVER_ERROR.into_response()
+        tracing::error!("Subscriber error: {:?}", self);
+        match self {
+            Self::ValidationError(_) => StatusCode::BAD_REQUEST.into_response(),
+            Self::StoreTokenError(_)
+            | Self::SendEmailError(_)
+            | Self::PoolError(_)
+            | Self::InsertSubscriberError(_)
+            | Self::TransactionCommitError(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        }
     }
 }

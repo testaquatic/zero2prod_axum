@@ -2,12 +2,8 @@ use std::{net::SocketAddr, sync::Arc};
 
 use axum::{
     Router,
-    extract::{
-        ConnectInfo, FromRef, MatchedPath, Request, connect_info::IntoMakeServiceWithConnectInfo,
-    },
-    middleware::AddExtension,
+    extract::{ConnectInfo, FromRef, MatchedPath, Request},
     routing::{get, post},
-    serve::Serve,
 };
 use sea_orm::{DatabaseConnection, sqlx::postgres::PgPoolOptions};
 use tokio::net::TcpListener;
@@ -28,37 +24,19 @@ struct AppState {
     base_url: Arc<ApplicationBaseUrl>,
 }
 
-/// `AppState`에서 사용하기 편하도록 래퍼타입을 적용한다.
-pub struct ApplicationBaseUrl(pub String);
+impl AppState {
+    /// `AppState`를 생성한다.
+    pub fn new(db_pool: DatabaseConnection, email_client: EmailClient, base_url: String) -> Self {
+        Self {
+            db_pool: Arc::new(db_pool),
+            email_client: Arc::new(email_client),
+            base_url: Arc::new(ApplicationBaseUrl(base_url)),
+        }
+    }
 
-/// axum 서버를 시작하고, 지정된 리스너에서 요청을 처리한다.
-pub fn run(
-    listener: tokio::net::TcpListener,
-    db_pool: DatabaseConnection,
-    email_client: EmailClient,
-    base_url: String,
-) -> Server {
-    let app = get_app(db_pool, email_client, base_url);
-    tracing::info!("Server started");
-    axum::serve(
-        listener,
-        app.into_make_service_with_connect_info::<SocketAddr>(),
-    )
-}
-
-/// Router 인스턴스를 얻는다.
-pub fn get_app(db_pool: DatabaseConnection, email_client: EmailClient, base_url: String) -> Router //IntoMakeServiceWithConnectInfo<Router, SocketAddr>
-{
-    let db_pool = Arc::new(db_pool);
-    let email_client = Arc::new(email_client);
-    let base_url = Arc::new(ApplicationBaseUrl(base_url));
-    let app_state = AppState {
-        db_pool,
-        email_client,
-        base_url,
-    };
-
-    Router::new()
+    /// `Router`인스턴스를 얻는다.
+    pub fn create_app(self) -> Router {
+        Router::new()
         .route("/health_check", get(health_check))
         .route("/subscriptions", post(subscribe))
         .route("/subscriptions/confirm", get(confirm))
@@ -77,19 +55,17 @@ pub fn get_app(db_pool: DatabaseConnection, email_client: EmailClient, base_url:
                 )
             })
         )
-        .with_state(app_state)
+        .with_state(self)
+    }
 }
 
-/// IDE의 도움을 받았다.
-type Server = Serve<
-    TcpListener,
-    IntoMakeServiceWithConnectInfo<Router, SocketAddr>,
-    AddExtension<Router, ConnectInfo<SocketAddr>>,
->;
+/// `AppState`에서 사용하기 편하도록 래퍼타입을 적용한다.
+pub struct ApplicationBaseUrl(pub String);
 
+/// `zero2prod_axum` 실행을 위한 구조체
 pub struct Applicaton {
-    port: u16,
-    server: Server,
+    listener: TcpListener,
+    router: Router,
 }
 
 impl Applicaton {
@@ -113,22 +89,28 @@ impl Applicaton {
             configuration.application.host, configuration.application.port
         );
         let listener = tokio::net::TcpListener::bind(address).await?;
-        let port = listener.local_addr().unwrap().port();
 
         let base_url = configuration.application.base_url.clone();
-        let server = run(listener, connection_pool, email_client, base_url);
+        let app_state = AppState::new(connection_pool, email_client, base_url);
+        let router = app_state.create_app();
 
-        Ok(Self { port, server })
+        Ok(Self { listener, router })
     }
 
     /// 포트 번호를 반환한다.
     pub fn port(&self) -> u16 {
-        self.port
+        self.listener.local_addr().unwrap().port()
     }
 
     /// 서버가 중지되어야 값이 반환된다.
     pub async fn run_until_stopped(self) -> Result<(), std::io::Error> {
-        self.server.await
+        // 복잡한 타입에 대한 설명을 피하기 위해서 여기에 넣었다.
+        // 논리의 흐름상 어색하다.
+        let make_service = self
+            .router
+            .into_make_service_with_connect_info::<SocketAddr>();
+
+        axum::serve(self.listener, make_service).await
     }
 }
 
