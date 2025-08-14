@@ -11,6 +11,7 @@ path = "src/main.rs"
 name = "zero2prod_axum"
 
 [dependencies]
+anyhow = "1.0"
 axum = { version = "0.8", features = ["macros"] }
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 config = "0.15"
@@ -25,6 +26,7 @@ secrecy = { version = "0.10", features = ["serde"] }
 serde = { version = "1.0", features = ["derive"] }
 serde-aux = "4.7"
 tokio = { version = "1.47", features = ["macros", "rt-multi-thread"] }
+tower = "0.5"
 tower-http = { version = "0.6", features = ["trace"] }
 tracing = { version = "0.1", features = ["log"] }
 tracing-log = "0.2"

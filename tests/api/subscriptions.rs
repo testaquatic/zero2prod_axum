@@ -1,7 +1,8 @@
 use crate::{helpers::spawn_app, subscriptions_confirm::SubscriptionSaved};
 use entities::prelude::*;
+use migration::Table;
 use reqwest::{Method, StatusCode};
-use sea_orm::{EntityTrait, QuerySelect};
+use sea_orm::{ConnectionTrait, DbBackend, EntityTrait, QuerySelect, StatementBuilder};
 use wiremock::{
     Mock, ResponseTemplate,
     matchers::{method, path},
@@ -153,7 +154,7 @@ async fn subscribe_sends_a_confirmation_email_for_with_a_link() {
 
 /// 이메일 주소가 중복됐을 때 확인 이메일을 다시 보낸다.
 #[tokio::test]
-async fn if_clicked_twice() {
+async fn subscribe_sends_two_confirmation_emails_if_enter_the_same_email_address() {
     // 준비
     let app = spawn_app().await;
     let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
@@ -196,6 +197,7 @@ async fn if_clicked_twice() {
 
     // 확인
     // 인증 여부를 확인한다.
+    // 이 부분은 코드 중복이 한번 더 반복되면 함수화한다.
     let saved = entities::prelude::Subscriptions::find()
         .select_only()
         .columns([
@@ -208,7 +210,35 @@ async fn if_clicked_twice() {
         .await
         .expect("Failed to fetch saved subscription.")
         .unwrap();
+
     assert_eq!(saved.email, "ursula_le_guin@gmail.com");
     assert_eq!(saved.name, "le guin");
     assert_eq!(saved.status, "confirmed");
+}
+
+#[tokio::test]
+async fn subscribe_fails_if_there_is_a_fatal_database_error() {
+    // 준비
+    let app = spawn_app().await;
+    let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
+
+    // 작동에 필요한 필수적인 행을 삭제한다.
+    app.db_pool
+        .execute(StatementBuilder::build(
+            Table::alter()
+                .table(entities::prelude::SubscriptionTokens)
+                .drop_column(entities::subscription_tokens::Column::SubscriptionToken),
+            &DbBackend::Postgres,
+        ))
+        .await
+        .unwrap();
+
+    // 실행
+    let response = app.post_subscriptions(body.into()).await;
+
+    // 확인
+    assert_eq!(
+        response.status(),
+        reqwest::StatusCode::INTERNAL_SERVER_ERROR
+    );
 }

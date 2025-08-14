@@ -36,12 +36,12 @@ pub async fn confirm_subscriber(
     subscriber_id: uuid::Uuid,
 ) -> Result<(), sea_orm::DbErr> {
     let insert_active_model = entities::subscriptions::ActiveModel {
+        id: sea_orm::ActiveValue::Set(subscriber_id),
         status: sea_orm::ActiveValue::Set("confirmed".into()),
         ..Default::default()
     };
 
-    entities::prelude::Subscriptions::update_many()
-        .set(insert_active_model)
+    entities::prelude::Subscriptions::update(insert_active_model)
         .filter(entities::subscriptions::Column::Id.eq(subscriber_id))
         .exec(pool)
         .await

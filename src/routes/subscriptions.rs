@@ -5,7 +5,12 @@ use crate::{
 };
 use std::sync::Arc;
 
-use axum::{Form, extract::State, http::StatusCode};
+use axum::{
+    Form,
+    extract::State,
+    http::StatusCode,
+    response::{IntoResponse, Response},
+};
 use entities::{prelude::Subscriptions, subscriptions};
 use rand::distr::{Alphabetic, SampleString};
 use sea_orm::{
@@ -45,27 +50,32 @@ pub async fn subscribe(
     State(email_client): State<Arc<EmailClient>>,
     State(base_url): State<Arc<ApplicationBaseUrl>>,
     Form(form): Form<FormData>,
-) -> StatusCode {
+) -> Result<StatusCode, Response> {
     // 잘못된 요청이 들어오면 400 Bad Request를 반환한다.
-    let Ok(new_subscriber) = NewSubscriber::try_from(form) else {
-        return StatusCode::BAD_REQUEST;
-    };
+    let new_subscriber =
+        NewSubscriber::try_from(form).map_err(|_| StatusCode::BAD_REQUEST.into_response())?;
 
     // 트랜잭션을 시작한다.
-    let Ok(transaction) = pool.begin().await else {
-        return StatusCode::INTERNAL_SERVER_ERROR;
-    };
+    let transaction = pool
+        .begin()
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR.into_response())?;
 
     // 이미 가입한 이메일인지 확인한다.
     let subscriber_id = match check_subscriber_exists(&transaction, &new_subscriber.email).await {
-        Err(_) => return StatusCode::INTERNAL_SERVER_ERROR,
+        // 데이터베이스 오류
+        Err(_) => return Err(StatusCode::INTERNAL_SERVER_ERROR.into_response()),
+        // 이미 가입했을 때
+        // 기존의 subscriber_id을 재활용한다.
+        // subscription_tokens테이블의 해당 항목을 무효화도 생각해 봤지만 여기에서는 별 의미가 없는 것 같다.
         Ok(Some(subscriber_id)) => subscriber_id.id,
+        // 가입하지 않았을 때
         Ok(None) => {
             // 데이터베이스에 가입자 정보를 저장한다.
             // 실패하면 500 Internal Server Error를 반환한다.
             let Ok(subscriber_id) = insert_subscriber(&transaction, &new_subscriber).await else {
                 // 실패 시 에러 메시지를 출력하고, 500 Internal Server Error를 반환한다.
-                return StatusCode::INTERNAL_SERVER_ERROR;
+                return Err(StatusCode::INTERNAL_SERVER_ERROR.into_response());
             };
             subscriber_id
         }
@@ -73,33 +83,28 @@ pub async fn subscribe(
 
     // 데이터베이스에 이메일 인증용 토큰을 저장한다.
     let subscription_token = generate_subscription_token();
-    if store_token(&transaction, subscriber_id, &subscription_token)
+    store_token(&transaction, subscriber_id, &subscription_token)
         .await
-        .is_err()
-    {
-        return StatusCode::INTERNAL_SERVER_ERROR;
-    }
+        .map_err(IntoResponse::into_response)?;
+    //  .map_err(|e| IntoResponse::into_response(e))?;
 
     // 일단은 테스트 용으로 무의미한 이메일을 신규 가입자에서 전송한다.
     // 가입자 확인 이메일을 전송하고 실패하면 500 Internal Server Error를 반환한다.
-    if send_confirmation_email(
+    send_confirmation_email(
         email_client.as_ref(),
         new_subscriber,
         base_url.0.as_ref(),
         subscription_token.as_ref(),
     )
     .await
-    .is_err()
-    {
-        return StatusCode::INTERNAL_SERVER_ERROR;
-    }
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR.into_response())?;
 
     // 트랜잭션이 실패하면 500 Internal Server Error를 반환한다.
     transaction
         .commit()
         .await
         .map(|_| StatusCode::OK)
-        .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR.into_response())
 }
 
 /// 데이터베이스에 구독자 정보를 저장한다.
@@ -162,7 +167,7 @@ async fn store_token(
     pool: &DatabaseTransaction,
     subscriber_id: uuid::Uuid,
     subscription_token: &str,
-) -> Result<InsertResult<entities::subscription_tokens::ActiveModel>, DbErr> {
+) -> Result<InsertResult<entities::subscription_tokens::ActiveModel>, StoreTokenError> {
     let new_subscription_token = entities::subscription_tokens::ActiveModel {
         subscriber_id: sea_orm::Set(subscriber_id),
         subscription_token: sea_orm::Set(subscription_token.into()),
@@ -173,7 +178,7 @@ async fn store_token(
         .await
         .map_err(|e| {
             tracing::error!("Failed to execute query: {e:?}");
-            e
+            StoreTokenError(e)
         })
 }
 
@@ -196,4 +201,24 @@ pub async fn check_subscriber_exists(
         .into_model::<SubscriberID>()
         .one(transaction)
         .await
+}
+
+/// axum의 오류의 취급과 관련해서는 [Module error_handling](https://docs.rs/axum/latest/axum/error_handling/index.html)을 참고로 했다.
+#[derive(Debug)]
+pub struct StoreTokenError(sea_orm::DbErr);
+
+impl std::fmt::Display for StoreTokenError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "A database error was encountered while trying to store subscription token."
+        )
+    }
+}
+
+impl IntoResponse for StoreTokenError {
+    fn into_response(self) -> Response {
+        tracing::error!(exception.message = %self);
+        StatusCode::INTERNAL_SERVER_ERROR.into_response()
+    }
 }

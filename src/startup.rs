@@ -75,7 +75,7 @@ pub fn get_app(db_pool: DatabaseConnection, email_client: EmailClient, base_url:
                 tracing::info_span!(
                     "zero2prod_axum", method = ?request.method(), matched_path, request_id = %uuid::Uuid::new_v4(), ?remote_addr
                 )
-            }),
+            })
         )
         .with_state(app_state)
 }

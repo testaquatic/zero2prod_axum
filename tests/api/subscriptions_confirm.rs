@@ -78,7 +78,8 @@ async fn clicking_on_the_confirmation_link_confirms_a_subscription() {
         .unwrap();
 
     // 확인
-
+    // 인증 여부를 확인한다.
+    // 이 부분은 코드 중복이 한번 더 반복되면 함수화한다.
     let saved = entities::prelude::Subscriptions::find()
         .select_only()
         .columns([
