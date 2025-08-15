@@ -226,8 +226,8 @@ async fn subscribe_fails_if_there_is_a_fatal_database_error() {
     app.db_pool
         .execute(StatementBuilder::build(
             Table::alter()
-                .table(entities::prelude::SubscriptionTokens)
-                .drop_column(entities::subscription_tokens::Column::SubscriptionToken),
+                .table(entities::prelude::Subscriptions)
+                .drop_column(entities::subscriptions::Column::Email),
             &DbBackend::Postgres,
         ))
         .await
