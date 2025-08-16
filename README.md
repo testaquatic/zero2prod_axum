@@ -52,12 +52,14 @@ json5 형식으로 저장해야 한다.
     local.json5보다 순위가 높다.
 
 높은 순위의 설정이 우선 적용된다.
+아래의 예시를 참고한다.
 
 ```json5
 {
     application: {
         host: "127.0.0.1",
         port: 8000,
+        base_url: "http://127.0.0.1",
     },
     database: {
         host: "127.0.0.1",
@@ -133,6 +135,34 @@ json5 형식으로 저장해야 한다.
     4. 500 Internal Server Error  
        데이터베이스 오류  
        이메일 전송 오류
+
+### /subscriptions/confirm
+
+#### GET
+
+이메일의 유효성을 확인한다.
+아래와 같은 쿼리 스트링을 사용한다.
+
+```
+{base_url}/subscriptions/confirm?subscription_token={subscription_token}
+```
+
+### /newsletters
+
+#### POST
+
+뉴스레터를 전달한다.  
+요청바디는 아래의 예시와 같은 json 형식이다.
+
+```json
+{
+    "title": "Newsletter title",
+    "content": {
+        "text": "Newsletter body as plain text",
+        "html": "<p>Newsletter body as HTML</p>"
+    }
+}
+```
 
 ## Dcokerfile
 

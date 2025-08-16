@@ -155,7 +155,7 @@ pub async fn send_confirmation_email(
 
     // 이메일을 전송한다.
     email_client
-        .send_email(new_subscriber.email, "Welcome!", &plain_body, &html_body)
+        .send_email(&new_subscriber.email, "Welcome!", &plain_body, &html_body)
         .await
 }
 
@@ -236,7 +236,7 @@ impl std::error::Error for StoreTokenError {
 }
 
 /// 오류의 체인을 반복하면서 출력한다.
-fn error_chain_fmt(
+pub fn error_chain_fmt(
     e: &impl std::error::Error,
     f: &mut std::fmt::Formatter<'_>,
 ) -> Result<(), std::fmt::Error> {
@@ -267,7 +267,7 @@ impl std::fmt::Debug for SubscriberError {
 
 impl IntoResponse for SubscriberError {
     fn into_response(self) -> Response {
-        tracing::error!("Subscriber error: {:?}", self);
+        tracing::error!("Error: {:?}", self);
         match self {
             Self::ValidationError(_) => (StatusCode::BAD_REQUEST).into_response(),
             Self::UnexpectedError(_) => (StatusCode::INTERNAL_SERVER_ERROR).into_response(),

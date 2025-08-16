@@ -2,6 +2,7 @@ use std::{net::SocketAddr, sync::Arc};
 
 use axum::{
     Router,
+    body::Body,
     extract::{ConnectInfo, FromRef, MatchedPath, Request},
     routing::{get, post},
 };
@@ -12,7 +13,7 @@ use tower_http::trace::TraceLayer;
 use crate::{
     configuration::{DatabaseSettings, Settings},
     email_client::EmailClient,
-    routes::{confirm, health_check, subscribe},
+    routes::{confirm, health_check, publish_newsletter, subscribe},
 };
 
 /// 상태를 저장한다.
@@ -36,26 +37,31 @@ impl AppState {
 
     /// `Router`인스턴스를 얻는다.
     pub fn create_app(self) -> Router {
-        Router::new()
-        .route("/health_check", get(health_check))
-        .route("/subscriptions", post(subscribe))
-        .route("/subscriptions/confirm", get(confirm))
-        .layer(
-            // https://github.com/tokio-rs/axum/blob/main/examples/tracing-aka-logging/src/main.rs 이곳의 소스코드를 참고로 했다
-            TraceLayer::new_for_http().make_span_with(|request: &Request<_>| {
-                let matched_path = request
-                    .extensions()
-                    .get::<MatchedPath>()
-                    .map(MatchedPath::as_str);
-                // https://docs.rs/axum/latest/axum/struct.Router.html#method.into_make_service_with_connect_info 이 문서를 참고로 했다.
-                let remote_addr = request.extensions().get::<ConnectInfo<SocketAddr>>().map(|addr| addr.0);
+        // https://github.com/tokio-rs/axum/blob/main/examples/tracing-aka-logging/src/main.rs 이곳의 소스코드를 참고로 했다
+        let trace_layer = TraceLayer::new_for_http().make_span_with(|request: &Request<Body>| {
+            let matched_path = request
+                .extensions()
+                .get::<MatchedPath>()
+                .map(MatchedPath::as_str);
+            // https://docs.rs/axum/latest/axum/struct.Router.html#method.into_make_service_with_connect_info 이 문서를 참고로 했다.
+            let remote_addr = request.extensions().get::<ConnectInfo<SocketAddr>>().map(|addr| addr.0);
 
-                tracing::info_span!(
-                    "zero2prod_axum", method = ?request.method(), matched_path, request_id = %uuid::Uuid::new_v4(), ?remote_addr
-                )
-            })
-        )
-        .with_state(self)
+            tracing::info_span!(
+                "zero2prod_axum", method = ?request.method(), matched_path, request_id = %uuid::Uuid::new_v4(), ?remote_addr
+            )
+        });
+
+        Router::new()
+            .route("/health_check", get(health_check))
+            .nest(
+                "/subscriptions",
+                Router::new()
+                    .route("/", post(subscribe))
+                    .route("/confirm", get(confirm)),
+            )
+            .route("/newsletters", post(publish_newsletter))
+            .layer(trace_layer)
+            .with_state(self)
     }
 }
 

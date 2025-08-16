@@ -21,6 +21,12 @@ impl AsRef<str> for SubscriberEmail {
     }
 }
 
+impl std::fmt::Display for SubscriberEmail {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
 /// 함수 이름으로 충분하니 자세한 주석을 생략한다.
 #[cfg(test)]
 mod tests {

@@ -42,7 +42,7 @@ impl EmailClient {
     ///   아래의 [SendEmailRequest]를 참조한다.
     pub async fn send_email(
         &self,
-        recipient: SubscriberEmail,
+        recipient: &SubscriberEmail,
         subject: &str,
         html_content: &str,
         text_content: &str,
@@ -190,7 +190,7 @@ mod tests {
 
         // 실행
         let _ = email_client
-            .send_email(email(), &subject(), &content(), &content())
+            .send_email(&email(), &subject(), &content(), &content())
             .await;
 
         // 확인
@@ -213,7 +213,7 @@ mod tests {
 
         // 실행
         let outcome = email_client
-            .send_email(email(), &subject(), &content(), &content())
+            .send_email(&email(), &subject(), &content(), &content())
             .await;
 
         // 확인
@@ -236,7 +236,7 @@ mod tests {
 
         // 실행
         let outcome = email_client
-            .send_email(email(), &subject(), &content(), &content())
+            .send_email(&email(), &subject(), &content(), &content())
             .await;
 
         // 확인
@@ -260,7 +260,7 @@ mod tests {
 
         // 실행
         let coutcome = email_client
-            .send_email(email(), &subject(), &content(), &content())
+            .send_email(&email(), &subject(), &content(), &content())
             .await;
 
         // 확인

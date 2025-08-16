@@ -85,6 +85,16 @@ impl TestApp {
 
         confirmation_link
     }
+
+    /// /newsletters 엔드포인트에 POST 요청을 보내는 헬퍼 메서드이다.
+    pub async fn post_newsletters(&self, body: serde_json::Value) -> reqwest::Response {
+        reqwest::Client::new()
+            .post(&format!("{}/newsletters", &self.address))
+            .json(&body)
+            .send()
+            .await
+            .expect("Failed to execute request.")
+    }
 }
 
 /// 서버를 실행하는 헬퍼 함수
