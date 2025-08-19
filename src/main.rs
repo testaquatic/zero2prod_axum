@@ -7,7 +7,7 @@ use zero2prod_axum::{
 #[tokio::main]
 async fn main() -> Result<(), std::io::Error> {
     // tracing 관련 초기화를 한다.
-    let subscriber = get_subscriber("info".into(), std::io::stdout);
+    let subscriber = get_subscriber("debug,axum::rejection=trace".into(), std::io::stdout);
     init_subscriber(subscriber);
 
     let configuration = get_configuration().expect("Failed to read configuration");

@@ -44,10 +44,14 @@ impl AppState {
                 .get::<MatchedPath>()
                 .map(MatchedPath::as_str);
             // https://docs.rs/axum/latest/axum/struct.Router.html#method.into_make_service_with_connect_info 이 문서를 참고로 했다.
-            let remote_addr = request.extensions().get::<ConnectInfo<SocketAddr>>().map(|addr| addr.0);
+            let remote_addr = request
+                .extensions()
+                .get::<ConnectInfo<SocketAddr>>()
+                .map(|addr| addr.0.to_string())
+                .unwrap_or_else(|| "Unknown".to_string());
 
             tracing::info_span!(
-                "zero2prod_axum", method = ?request.method(), matched_path, request_id = %uuid::Uuid::new_v4(), ?remote_addr
+                "zero2prod_axum", request_id = %uuid::Uuid::new_v4(), method = ?request.method(), matched_path, ?remote_addr
             )
         });
 

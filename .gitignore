@@ -1,5 +1,5 @@
 /configuration/
-/*/target/
+/go/phc_string_gen/go.sum
 /target/
-
+/*/target/
 Cargo.lock

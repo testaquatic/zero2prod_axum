@@ -1,10 +1,21 @@
-use reqwest::{Method, StatusCode};
+use reqwest::{Method, StatusCode, header};
+use uuid::Uuid;
 use wiremock::{
     Mock, ResponseTemplate,
     matchers::{any, method, path},
 };
 
 use crate::helpers::{ConfirmationLinks, TestApp, spawn_app};
+
+/// 이메일 유효성을 확인한 구독자를 생성한다.
+async fn create_confirmed_subscriber(app: &TestApp) {
+    let confirmation_link = create_unconfirmed_subscriber(app).await;
+    reqwest::get(confirmation_link.html)
+        .await
+        .unwrap()
+        .error_for_status()
+        .unwrap();
+}
 
 /// 이메일 주소를 확인하지 않은 사용자에게 뉴스레터를 전달하지 않아야 한다.
 #[tokio::test]
@@ -100,6 +111,34 @@ async fn newsletters_returns_400_for_invalid_data() {
         );
     }
 }
+
+/// 인증이 없는 요청은 거절해야 한다.
+#[tokio::test]
+async fn requests_missing_authentication_are_rejected() {
+    // 준비
+    let app = spawn_app().await;
+
+    let response = reqwest::Client::new()
+        .post(&format!("{}/newsletters", &app.address))
+        .json(&serde_json::json!({
+            "title": "Newsletter title",
+            "content": {
+                "text": "Newsletter body as plain text",
+                "html": "<p>Newsletter body as HTML</p>"
+            }
+        }))
+        .send()
+        .await
+        .expect("Failed to execute request.");
+
+    // 확인
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    assert_eq!(
+        response.headers()[header::WWW_AUTHENTICATE],
+        r#"Basic realm="publish""#
+    );
+}
+
 /// 테스트 대상 애플리케이션의 퍼블릭 API를 사용해서 확인하지 않은 구독자를 생성한다.
 async fn create_unconfirmed_subscriber(app: &TestApp) -> ConfirmationLinks {
     let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
@@ -127,12 +166,64 @@ async fn create_unconfirmed_subscriber(app: &TestApp) -> ConfirmationLinks {
     app.get_confirmation_links(&email_request)
 }
 
-/// 이메일 유효성을 확인한 구독자를 생성한다.
-async fn create_confirmed_subscriber(app: &TestApp) {
-    let confirmation_link = create_unconfirmed_subscriber(app).await;
-    reqwest::get(confirmation_link.html)
+/// 존재하지 않은 사용자로 뉴스레터를 보낼 수 없다.
+#[tokio::test]
+async fn non_existing_user_is_rejected() {
+    // 준비
+    let app = spawn_app().await;
+    // 무작위 크리덴셜
+    let username = Uuid::new_v4().to_string();
+    let password = Uuid::new_v4().to_string();
+
+    let response = reqwest::Client::new()
+        .post(&format!("{}/newsletters", &app.address))
+        .basic_auth(username, Some(password))
+        .json(&serde_json::json!({
+            "title": "Newsletter title",
+            "content": {
+                "text": "Newsletter body as plain text",
+                "html": "<p>Newsletter body as HTML</p>"
+            }
+        }))
+        .send()
         .await
-        .unwrap()
-        .error_for_status()
-        .unwrap();
+        .expect("Failed to execute request.");
+
+    // 확인
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    assert_eq!(
+        response.headers()[header::WWW_AUTHENTICATE],
+        r#"Basic realm="publish""#
+    );
+}
+
+// 잘못된 비밀번호는 거부되어야 한다.
+#[tokio::test]
+async fn invalid_password_is_rejected() {
+    // 준비
+    let app = spawn_app().await;
+    let username = app.test_user.username;
+    let password = Uuid::new_v4().to_string();
+    assert_ne!(app.test_user.password, password);
+
+    let response = reqwest::Client::new()
+        .post(&format!("{}/newsletters", &app.address))
+        .basic_auth(username, Some(password))
+        .json(&serde_json::json!({
+            "title": "Newsletter title",
+            "content": {
+                "text": "Newsletter body as plain text",
+                "html": "<p>Newsletter body as HTML</p>"
+            }
+        }))
+        .send()
+        .await
+        .expect("Failed to execute request.");
+
+    // 확인
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    assert_eq!(
+        response.headers()[header::WWW_AUTHENTICATE],
+        r#"Basic realm="publish""#
+    );
 }

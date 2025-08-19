@@ -22,12 +22,12 @@
 1과 2의 작업은 ./go/init_db.go를 사용해서 쉽게 할 수 있다.
 
 ```bash
-go run ./go/init_db.go
+go run ./go/init_db/init_db.go
 ```
 
 ```bash
-go run ./go/init_db.go --help
-Usage of ./go/init_db:
+go run ./go/init_db/init_db.go --help
+Usage of ./go/init_db/init_db:
   -entity string
         Specifies the directory in which to store a entity. If not specified, the entity will not be created.
   -skip-docker
@@ -163,6 +163,8 @@ json5 형식으로 저장해야 한다.
     }
 }
 ```
+
+HTTP 기본 인증을 사용한다.
 
 ## Dcokerfile
 

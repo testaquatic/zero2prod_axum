@@ -1,8 +1,11 @@
 use std::sync::LazyLock;
 
+use argon2::{Algorithm, Argon2, Params, Version};
 use migration::MigratorTrait;
+use password_hash::{PasswordHasher, Salt};
+use rand::distr::SampleString;
 use reqwest::header;
-use sea_orm::{ConnectionTrait, DatabaseConnection, sqlx::PgPool};
+use sea_orm::{ActiveValue, ConnectionTrait, DatabaseConnection, EntityTrait, sqlx::PgPool};
 use uuid::Uuid;
 use wiremock::MockServer;
 use zero2prod_axum::{
@@ -13,7 +16,7 @@ use zero2prod_axum::{
 
 /// `LazyLock`을 사용해서 한번만 초기화 되는 것을 보장한다.
 static TRACING: LazyLock<()> = LazyLock::new(|| {
-    let default_filter_level = "info".to_string();
+    let default_filter_level = "info,axum::rejection=trace,tower_http=debug".to_string();
 
     std::env::var("TEST_LOG")
         .map(|_| {
@@ -37,12 +40,21 @@ pub struct TestApp {
     pub email_server: MockServer,
     /// 이메일 서버의 포트이다.
     pub port: u16,
+    /// 테스트용 사용자 정보이다.
+    pub test_user: TestUser,
 }
 
 /// 이메일 API에 대한 요청에 포함된 확인 링크
 pub struct ConfirmationLinks {
     pub html: reqwest::Url,
     pub plain_text: reqwest::Url,
+}
+
+/// 테스트용 사용자 정보를 나타내는 구조체
+pub struct TestUser {
+    pub user_id: Uuid,
+    pub username: String,
+    pub password: String,
 }
 
 impl TestApp {
@@ -90,10 +102,50 @@ impl TestApp {
     pub async fn post_newsletters(&self, body: serde_json::Value) -> reqwest::Response {
         reqwest::Client::new()
             .post(&format!("{}/newsletters", &self.address))
+            .basic_auth(&self.test_user.username, Some(&self.test_user.password))
             .json(&body)
             .send()
             .await
             .expect("Failed to execute request.")
+    }
+}
+
+impl TestUser {
+    /// 테스트용 유저 정보를 생성한다.
+    pub fn generate() -> Self {
+        Self {
+            user_id: Uuid::new_v4(),
+            username: Uuid::new_v4().to_string(),
+            password: Uuid::new_v4().to_string(),
+        }
+    }
+
+    /// 데이터베이스에 테스트용 유저를 저장한다.
+    async fn store(&self, pool: &DatabaseConnection) {
+        // rand 0.9는 SaltString::generate를 사용할 수 없어서 좀 돌아갔다.
+        let salt_string =
+            rand::distr::Alphanumeric.sample_string(&mut rand::rng(), Salt::MAX_LENGTH);
+        let salt = Salt::from_b64(&salt_string).unwrap();
+
+        let password_hash = Argon2::new(
+            Algorithm::Argon2id,
+            Version::V0x13,
+            Params::new(19 * 1024, 2, 1, None).unwrap(),
+        )
+        .hash_password(self.password.as_bytes(), salt)
+        .unwrap()
+        .to_string();
+
+        let new_user_model = entities::users::ActiveModel {
+            user_id: ActiveValue::Set(self.user_id),
+            username: ActiveValue::Set(self.username.to_string()),
+            password_hash: ActiveValue::Set(password_hash),
+        };
+
+        entities::users::Entity::insert(new_user_model)
+            .exec(pool)
+            .await
+            .expect("Failed to store test user.");
     }
 }
 
@@ -127,12 +179,16 @@ pub async fn spawn_app() -> TestApp {
     // 이 부분이 없어도 오류가 발생하지 않아서 임시로 주석처리 했다.
     // tokio::time::sleep(Duration::from_millis(100)).await;
 
-    TestApp {
+    let test_app = TestApp {
         address: format!("http://127.0.0.1:{}", application_port),
         db_pool: get_connection_pool(&configuration.database),
         email_server,
         port: application_port,
-    }
+        test_user: TestUser::generate(),
+    };
+    test_app.test_user.store(&test_app.db_pool).await;
+
+    test_app
 }
 
 /// 테스트용 데이터베이스를 설정하는 헬퍼 함수
