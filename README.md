@@ -34,6 +34,13 @@ Usage of ./go/init_db/init_db:
         Skip Docker setup
 ```
 
+### /web
+
+웹 프론트 엔드이다.
+```bash
+npm run build
+```
+
 ### /configuration
 
 설정 파일을 저장하는 디렉토리이다.  
@@ -99,12 +106,12 @@ json5 형식으로 저장해야 한다.
 
 #### POST
 
-    ```bash
-    http -v --form POST http://127.0.0.1:8000/subscriptions \
-    Content-Type:application/x-www-form-urlencoded \
-    email=thomas_mann@hotmail.com \
-    name=Tom
-    ```
+```bash
+http -v --form POST http://127.0.0.1:8000/subscriptions \
+Content-Type:application/x-www-form-urlencoded \
+email=thomas_mann@hotmail.com \
+name=Tom
+```
 
 -   x-www-form-urlencoded  
     name과 email 필드는 반드시 있어야 한다.

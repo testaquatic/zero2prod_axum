@@ -11,10 +11,12 @@ import (
 
 // PHC string 생성을 위한 구조체
 type Argon2idGen struct {
-	salt                 []byte
-	password             []byte
-	time, keyLen, memory uint32
-	threads              uint8
+	salt,
+	password []byte
+	time,
+	keyLen,
+	memory uint32
+	threads uint8
 }
 
 // Argon2id 해시를 생성한다.
@@ -25,9 +27,11 @@ func (gen *Argon2idGen) Generate() []byte {
 // PHC string은
 // $argon2id$v=19$m=65536,t=2,p=1$gZiV/M1gPc22ElAH/Jh1Hw$CWOrkoo7oJBQ/iyh7uJ0LO2aLEfrHwTWllSAxT0zRno
 // 이런 형식이다.
+// https://github.com/P-H-C/phc-string-format/blob/master/phc-sf-spec.md 이 문서를 참고로 했다.
 func (gen *Argon2idGen) GetPHCString() string {
 	id := gen.Generate()
-	return fmt.Sprintf("$argon2id$v=19$m=%d,t=%d,p=%d$%s$%s", gen.memory, gen.time, gen.threads, base64.RawStdEncoding.EncodeToString(gen.salt), base64.RawStdEncoding.EncodeToString(id))
+	return fmt.Sprintf("$argon2id$v=19$m=%d,t=%d,p=%d$%s$%s",
+		gen.memory, gen.time, gen.threads, base64.RawStdEncoding.EncodeToString(gen.salt), base64.RawStdEncoding.EncodeToString(id))
 }
 
 // 생성에 필요한 필드를 담고 있는 전역 변수

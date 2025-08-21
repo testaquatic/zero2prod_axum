@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use anyhow::Context;
-use argon2::{Argon2, PasswordHash, PasswordVerifier};
 use axum::{
     Json,
     extract::State,
@@ -9,13 +8,14 @@ use axum::{
     response::IntoResponse,
 };
 use base64::{Engine, prelude::BASE64_STANDARD};
-use sea_orm::{ColumnTrait, Condition, DatabaseConnection, EntityTrait, QueryFilter, QuerySelect};
-use secrecy::{ExposeSecret, SecretString};
-use uuid::Uuid;
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QuerySelect};
+use secrecy::SecretString;
 
 use crate::{
-    domain::SubscriberEmail, email_client::EmailClient, routes::error_chain_fmt,
-    telemetry::spawn_blocking_with_tracing,
+    authentication::{AuthError, Credentials, validate_credentials},
+    domain::SubscriberEmail,
+    email_client::EmailClient,
+    routes::error_chain_fmt,
 };
 /// /newsletters POST 요청에 사용하는 핸들러이다.
 /// 요청 본문의 형식은 [BodyData]를 참고로 한다.
@@ -33,7 +33,12 @@ pub async fn publish_newsletter(
 ) -> Result<StatusCode, PublishError> {
     let credentials = basic_authentication(headers).map_err(PublishError::AuthError)?;
     tracing::Span::current().record("username", tracing::field::display(&credentials.username));
-    let user_id = validate_credentials(credentials, &pool).await?;
+    let user_id = validate_credentials(credentials, &pool)
+        .await
+        .map_err(|e| match e {
+            AuthError::InvalidCredentials(_) => PublishError::AuthError(e.into()),
+            AuthError::UnexpectedError(_) => PublishError::UnexpectedError(e.into()),
+        })?;
     tracing::Span::current().record("user_id", tracing::field::display(user_id));
     let subscribers = get_confirmed_subscribers(&pool).await?;
     for subscriber in subscribers {
@@ -151,11 +156,6 @@ impl IntoResponse for PublishError {
     }
 }
 
-struct Credentials {
-    username: String,
-    password: SecretString,
-}
-
 /// HTTP 기본인증의 헤더를 처리한다.
 fn basic_authentication(headers: HeaderMap) -> Result<Credentials, anyhow::Error> {
     // 해더값이 존재한다면 유효한 UTF8 문자열이다.
@@ -188,72 +188,4 @@ fn basic_authentication(headers: HeaderMap) -> Result<Credentials, anyhow::Error
         username,
         password: SecretString::from(password),
     })
-}
-
-/// `Credentials`과 데이터베이스에 저장한 정보를 비교한다.
-#[tracing::instrument(name = "Validate credentials", skip_all)]
-async fn validate_credentials(
-    credentials: Credentials,
-    pool: &DatabaseConnection,
-) -> Result<uuid::Uuid, PublishError> {
-    // https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html이 문서의 권장에 맞춰서 파라미터를 조정했다.
-    let (user_id, expected_password_hash) = get_stored_credentials(pool, &credentials.username)
-        .await
-        .map_err(PublishError::UnexpectedError)?
-        .map(|(stored_user_id, stored_password_hash)| (Some(stored_user_id), stored_password_hash))
-        .unwrap_or_else(|| (
-            None,
-            SecretString::from(
-                "$argon2id$v=19$m=19456,t=2,p=1$Z3NWOTh1SHk$n8OcMbBpmGuRmX2w5WnB1BbwHFfZhmJLxYyXzs1DYnY",
-            ),
-        ));
-
-    spawn_blocking_with_tracing(move || {
-        verify_password_hash(expected_password_hash, credentials.password)
-    })
-    .await
-    .context("Failed to spawn blocking task.")
-    .map_err(PublishError::UnexpectedError)??;
-
-    user_id.ok_or_else(|| PublishError::AuthError(anyhow::anyhow!("Unknown username.")))
-}
-
-/// DB에 users 테이블의 user_id와 password_hash를 질의한다.
-#[tracing::instrument(name = "Get stored credentials", skip_all)]
-async fn get_stored_credentials(
-    pool: &DatabaseConnection,
-    username: &str,
-) -> Result<Option<(Uuid, SecretString)>, anyhow::Error> {
-    let row = entities::users::Entity::find()
-        .select_only()
-        .columns([
-            entities::users::Column::UserId,
-            entities::users::Column::PasswordHash,
-        ])
-        .filter(Condition::all().add(entities::users::Column::Username.eq(username)))
-        .into_tuple::<(Uuid, String)>()
-        .one(pool)
-        .await
-        .context("Failed to perform a query to retrieve stored credentials.")?
-        .map(|row| (row.0, SecretString::from(row.1)));
-
-    Ok(row)
-}
-
-/// 비밀번호의 유효성을 확인한다.
-#[tracing::instrument(name = "Verify password hash.", skip_all)]
-fn verify_password_hash(
-    expected_password_hash: SecretString,
-    password_candidate: SecretString,
-) -> Result<(), PublishError> {
-    let expected_password_hash = PasswordHash::new(expected_password_hash.expose_secret())
-        .context("Failed to parse hash in PHC string format.")
-        .map_err(PublishError::UnexpectedError)?;
-    Argon2::default()
-        .verify_password(
-            password_candidate.expose_secret().as_bytes(),
-            &expected_password_hash,
-        )
-        .context("Invalid password.")
-        .map_err(PublishError::AuthError)
 }

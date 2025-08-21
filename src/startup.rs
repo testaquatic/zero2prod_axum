@@ -8,12 +8,12 @@ use axum::{
 };
 use sea_orm::{DatabaseConnection, sqlx::postgres::PgPoolOptions};
 use tokio::net::TcpListener;
-use tower_http::trace::TraceLayer;
+use tower_http::{services::ServeDir, trace::TraceLayer};
 
 use crate::{
     configuration::{DatabaseSettings, Settings},
     email_client::EmailClient,
-    routes::{confirm, health_check, publish_newsletter, subscribe},
+    routes::{confirm, health_check, home, login, login_form, publish_newsletter, subscribe},
 };
 
 /// 상태를 저장한다.
@@ -64,6 +64,10 @@ impl AppState {
                     .route("/confirm", get(confirm)),
             )
             .route("/newsletters", post(publish_newsletter))
+            .route("/home", get(home))
+            .route("/login", get(login_form).post(login))
+            // https://github.com/tokio-rs/axum/tree/main/examples/static-file-server 이 문서를 참고로 했다.
+            .fallback_service(ServeDir::new("web/dist"))
             .layer(trace_layer)
             .with_state(self)
     }
