@@ -18,6 +18,9 @@ base64 = "0.22"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 config = "0.15"
 entities = { path = "./entities" }
+hex = "0.4"
+hmac = "0.12"
+htmlescape = "0.3"
 password-hash = "0.5"
 rand = "0.9"
 reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
@@ -28,6 +31,7 @@ sea-orm = { version = "1.1", features = [
 secrecy = { version = "0.10", features = ["serde"] }
 serde = { version = "1.0", features = ["derive"] }
 serde-aux = "4.7"
+sha3 = "0.10"
 thiserror = "2.0"
 tokio = { version = "1.47", features = ["macros", "rt-multi-thread"] }
 tower = { version = "0.5", features = ["util"] }
@@ -41,6 +45,7 @@ tracing-subscriber = { version = "0.3", features = [
     "json",
 ] }
 unicode-segmentation = "1.12"
+urlencoding = "2.1"
 uuid = { version = "1.17", features = ["v4"] }
 validator = "0.20"
 

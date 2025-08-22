@@ -3,10 +3,11 @@ use std::{net::SocketAddr, sync::Arc};
 use axum::{
     Router,
     body::Body,
-    extract::{ConnectInfo, FromRef, MatchedPath, Request},
+    extract::{ConnectInfo, FromRef, Request},
     routing::{get, post},
 };
 use sea_orm::{DatabaseConnection, sqlx::postgres::PgPoolOptions};
+use secrecy::SecretString;
 use tokio::net::TcpListener;
 use tower_http::{services::ServeDir, trace::TraceLayer};
 
@@ -23,15 +24,25 @@ struct AppState {
     db_pool: Arc<DatabaseConnection>,
     email_client: Arc<EmailClient>,
     base_url: Arc<ApplicationBaseUrl>,
+    hmac_secret: Arc<HmacSecret>,
 }
+
+#[derive(Clone)]
+pub struct HmacSecret(pub SecretString);
 
 impl AppState {
     /// `AppState`를 생성한다.
-    pub fn new(db_pool: DatabaseConnection, email_client: EmailClient, base_url: String) -> Self {
+    pub fn new(
+        db_pool: DatabaseConnection,
+        email_client: EmailClient,
+        base_url: String,
+        hmac_secret: SecretString,
+    ) -> Self {
         Self {
             db_pool: Arc::new(db_pool),
             email_client: Arc::new(email_client),
             base_url: Arc::new(ApplicationBaseUrl(base_url)),
+            hmac_secret: Arc::new(HmacSecret(hmac_secret)),
         }
     }
 
@@ -39,10 +50,7 @@ impl AppState {
     pub fn create_app(self) -> Router {
         // https://github.com/tokio-rs/axum/blob/main/examples/tracing-aka-logging/src/main.rs 이곳의 소스코드를 참고로 했다
         let trace_layer = TraceLayer::new_for_http().make_span_with(|request: &Request<Body>| {
-            let matched_path = request
-                .extensions()
-                .get::<MatchedPath>()
-                .map(MatchedPath::as_str);
+            let request_uri = request.uri().to_string();
             // https://docs.rs/axum/latest/axum/struct.Router.html#method.into_make_service_with_connect_info 이 문서를 참고로 했다.
             let remote_addr = request
                 .extensions()
@@ -51,7 +59,7 @@ impl AppState {
                 .unwrap_or_else(|| "Unknown".to_string());
 
             tracing::info_span!(
-                "zero2prod_axum", request_id = %uuid::Uuid::new_v4(), method = ?request.method(), matched_path, ?remote_addr
+                "zero2prod_axum", request_id = %uuid::Uuid::new_v4(), method = ?request.method(), request_uri, ?remote_addr
             )
         });
 
@@ -105,7 +113,12 @@ impl Applicaton {
         let listener = tokio::net::TcpListener::bind(address).await?;
 
         let base_url = configuration.application.base_url.clone();
-        let app_state = AppState::new(connection_pool, email_client, base_url);
+        let app_state = AppState::new(
+            connection_pool,
+            email_client,
+            base_url,
+            configuration.application.hmac_secret.clone(),
+        );
         let router = app_state.create_app();
 
         Ok(Self { listener, router })

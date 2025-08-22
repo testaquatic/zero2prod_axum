@@ -1,4 +1,13 @@
-export const Login = () => <>
+import { useSearchParams } from "react-router-dom";
+
+export const Login = () => {
+    const [searchParams, _]= useSearchParams()
+    const errorHtml = searchParams.get("error");
+
+    return<>
+    {
+        errorHtml!==null?<div className="loginError">{errorHtml}</div>:null
+    }
     <form method="post" action="/login">
         <div className="inputUser">
             <div className="inputUsername">
@@ -16,4 +25,5 @@ export const Login = () => <>
             </div>
         </div>
     </form>
-</>
+    </>
+};
