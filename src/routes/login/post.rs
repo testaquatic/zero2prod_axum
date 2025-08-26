@@ -4,17 +4,14 @@ use axum::{
     Form,
     extract::State,
     http::{StatusCode, header},
-    response::{ErrorResponse, IntoResponse, Response},
+    response::{AppendHeaders, ErrorResponse, IntoResponse, Response},
 };
-use hmac::{Hmac, Mac};
+use axum_extra::extract::cookie::Cookie;
 use sea_orm::DatabaseConnection;
-use secrecy::ExposeSecret;
-use sha3::Sha3_256;
 
 use crate::{
     authentication::{AuthError, Credentials, validate_credentials},
     routes::error_chain_fmt,
-    startup::HmacSecret,
 };
 
 /// Form의 정보를 저장한다.
@@ -28,7 +25,7 @@ pub struct FormData {
 #[tracing::instrument(skip_all, fields(username = tracing::field::Empty, user_id = tracing::field::Empty))]
 pub async fn login(
     State(pool): State<Arc<DatabaseConnection>>,
-    State(secret): State<Arc<HmacSecret>>,
+    State(index_html): State<Arc<String>>,
     Form(form): Form<FormData>,
 ) -> axum::response::Result<Response, ErrorResponse> {
     let credentials = Credentials {
@@ -50,23 +47,15 @@ pub async fn login(
             };
             tracing::error!(?e);
 
-            let query_string = format!(
-                "error={}",
-                urlencoding::Encoded::new(htmlescape::encode_minimal(&e.to_string()))
-            );
-            let hmac_tag = {
-                let mut mac =
-                    Hmac::<Sha3_256>::new_from_slice(secret.0.expose_secret().as_bytes()).unwrap();
-                mac.update(query_string.as_bytes());
-                mac.finalize().into_bytes()
-            };
-
+            // https://docs.rs/axum-extra/latest/axum_extra/extract/cookie/struct.Cookie.html 이 문서를 참고로 했다.
+            let cookies = Cookie::new("_flash", htmlescape::encode_minimal(&e.to_string()));
             let response = (
-                StatusCode::SEE_OTHER,
-                [(
-                    header::LOCATION,
-                    format!("/login?{query_string}&tag={hmac_tag:x}"),
-                )],
+                StatusCode::UNAUTHORIZED,
+                AppendHeaders([
+                    (header::CONTENT_TYPE, "text/html; charset=utf-8"),
+                    (header::SET_COOKIE, &cookies.to_string()),
+                ]),
+                index_html.to_string(),
             )
                 .into_response();
 

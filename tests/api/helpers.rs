@@ -1,4 +1,4 @@
-use std::sync::LazyLock;
+use std::sync::{Arc, LazyLock};
 
 use argon2::{Algorithm, Argon2, Params, Version};
 use migration::MigratorTrait;
@@ -42,6 +42,10 @@ pub struct TestApp {
     pub port: u16,
     /// 테스트용 사용자 정보이다.
     pub test_user: TestUser,
+    /// 테스트용 reqwest 인스턴스이다.
+    pub api_client: reqwest::Client,
+    /// 쿠키를 저장한다.
+    pub cookie_store: Arc<reqwest_cookie_store::CookieStoreMutex>,
 }
 
 /// 이메일 API에 대한 요청에 포함된 확인 링크
@@ -60,7 +64,7 @@ pub struct TestUser {
 impl TestApp {
     /// /subscriptions 엔드포인트에 POST 요청을 보내는 헬퍼 메서드이다.
     pub async fn post_subscriptions(&self, body: String) -> reqwest::Response {
-        reqwest::Client::new()
+        self.api_client
             .post(&format!("{}/subscriptions", &self.address))
             .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
             .body(body)
@@ -100,13 +104,39 @@ impl TestApp {
 
     /// /newsletters 엔드포인트에 POST 요청을 보내는 헬퍼 메서드이다.
     pub async fn post_newsletters(&self, body: serde_json::Value) -> reqwest::Response {
-        reqwest::Client::new()
+        self.api_client
             .post(&format!("{}/newsletters", &self.address))
             .basic_auth(&self.test_user.username, Some(&self.test_user.password))
             .json(&body)
             .send()
             .await
             .expect("Failed to execute request.")
+    }
+
+    /// /login 엔드포인트에 POST 요청을 보내는 헬퍼 메서드이다.
+    pub async fn post_login<Body>(&self, body: &Body) -> reqwest::Response
+    where
+        Body: serde::Serialize,
+    {
+        self.api_client
+            .post(&format!("{}/login", &self.address))
+            .form(body)
+            .send()
+            .await
+            .expect("Failed to execute request.")
+    }
+
+    /// _flash 쿠기의 내용을 확인하다.
+    pub async fn get_flash_cookie(&self) -> Option<String> {
+        // https://docs.rs/reqwest_cookie_store/0.9.0/reqwest_cookie_store/index.html 이 문서를 참고로 했다.
+        let cookie_header = self.cookie_store.lock().unwrap();
+
+        dbg!(&cookie_header);
+        dbg!(&self.address);
+
+        cookie_header
+            .get("127.0.0.1", "/", "_flash")
+            .map(|cookie| cookie.value_trimmed().to_string())
     }
 }
 
@@ -178,6 +208,15 @@ pub async fn spawn_app() -> TestApp {
     // 서버의 시작을 기다린다.
     // 이 부분이 없어도 오류가 발생하지 않아서 임시로 주석처리 했다.
     // tokio::time::sleep(Duration::from_millis(100)).await;
+    let cookie_store = Arc::new(reqwest_cookie_store::CookieStoreMutex::new(
+        reqwest_cookie_store::CookieStore::new(),
+    ));
+
+    let client = reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
+        .cookie_provider(Arc::clone(&cookie_store))
+        .build()
+        .unwrap();
 
     let test_app = TestApp {
         address: format!("http://127.0.0.1:{}", application_port),
@@ -185,6 +224,8 @@ pub async fn spawn_app() -> TestApp {
         email_server,
         port: application_port,
         test_user: TestUser::generate(),
+        api_client: client,
+        cookie_store,
     };
     test_app.test_user.store(&test_app.db_pool).await;
 

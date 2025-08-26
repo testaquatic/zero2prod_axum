@@ -1,13 +1,12 @@
-import { useSearchParams } from "react-router-dom";
+import { useCookies } from "react-cookie";
 
 export const Login = () => {
-    const [searchParams, _]= useSearchParams()
-    const errorHtml = searchParams.get("error");
+    // https://www.npmjs.com/package/react-cookie 이 문서를 참고로 했다.
+    const [flashCookie, _] = useCookies<"_flash", {_flash?: string;}>(["_flash"]);
+
 
     return<>
-    {
-        errorHtml!==null?<div className="loginError">{errorHtml}</div>:null
-    }
+    <div className="loginError">{flashCookie._flash}</div>
     <form method="post" action="/login">
         <div className="inputUser">
             <div className="inputUsername">

@@ -14,16 +14,18 @@ name = "zero2prod_axum"
 anyhow = "1.0"
 argon2 = { version = "0.5", features = ["std"] }
 axum = { version = "0.8", features = ["macros"] }
+axum-extra = { version = "0.10", features = ["cookie"] }
 base64 = "0.22"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 config = "0.15"
+cookie = "0.18"
 entities = { path = "./entities" }
 hex = "0.4"
 hmac = "0.12"
 htmlescape = "0.3"
 password-hash = "0.5"
 rand = "0.9"
-reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
+reqwest = { version = "0.12", features = ["cookies", "json", "rustls-tls"] }
 sea-orm = { version = "1.1", features = [
     "sqlx-postgres",
     "runtime-tokio-rustls",
@@ -58,3 +60,4 @@ quickcheck_macros = "1.1"
 wiremock = "0.6"
 serde_json = "1.0"
 linkify = "0.10"
+reqwest_cookie_store = "0.9"

@@ -1,15 +1,8 @@
-use axum::{extract::Request, http::StatusCode, response::IntoResponse};
-use tower_http::services::ServeFile;
+use std::sync::Arc;
 
-pub async fn home(request: Request) -> impl IntoResponse {
-    serve_index_file(request).await.map_err(|e| {
-        tracing::error!("Failed to serve file.\n\tError: {e}");
-        StatusCode::INTERNAL_SERVER_ERROR.into_response()
-    })
-}
+use axum::{extract::State, http::StatusCode, response::IntoResponse};
 
-pub async fn serve_index_file(request: Request) -> Result<impl IntoResponse, std::io::Error> {
-    ServeFile::new("web/dist/index.html")
-        .try_call(request)
-        .await
+/// /home GET을 담당하는 핸들러이다.
+pub async fn home(State(index_html): State<Arc<String>>) -> impl IntoResponse {
+    (StatusCode::OK, index_html.to_string()).into_response()
 }

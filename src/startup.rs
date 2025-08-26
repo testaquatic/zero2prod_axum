@@ -25,6 +25,7 @@ struct AppState {
     email_client: Arc<EmailClient>,
     base_url: Arc<ApplicationBaseUrl>,
     hmac_secret: Arc<HmacSecret>,
+    index_html: Arc<String>,
 }
 
 #[derive(Clone)]
@@ -37,12 +38,14 @@ impl AppState {
         email_client: EmailClient,
         base_url: String,
         hmac_secret: SecretString,
+        index_html: String,
     ) -> Self {
         Self {
             db_pool: Arc::new(db_pool),
             email_client: Arc::new(email_client),
             base_url: Arc::new(ApplicationBaseUrl(base_url)),
             hmac_secret: Arc::new(HmacSecret(hmac_secret)),
+            index_html: Arc::new(index_html),
         }
     }
 
@@ -113,11 +116,13 @@ impl Applicaton {
         let listener = tokio::net::TcpListener::bind(address).await?;
 
         let base_url = configuration.application.base_url.clone();
+        let index_html = std::fs::read_to_string("web/dist/index.html")?;
         let app_state = AppState::new(
             connection_pool,
             email_client,
             base_url,
             configuration.application.hmac_secret.clone(),
+            index_html,
         );
         let router = app_state.create_app();
 
