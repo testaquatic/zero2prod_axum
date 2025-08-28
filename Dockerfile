@@ -18,6 +18,7 @@ RUN apt update -y \
     && apt clean -y
 
 COPY --from=builder /app/target/release/zero2prod_axum zero2prod_axum
+COPY web/dist web/dist
 COPY configuration configuration
 
 # production.json5를 읽는다.

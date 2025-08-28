@@ -35,9 +35,12 @@ serde = { version = "1.0", features = ["derive"] }
 serde-aux = "4.7"
 sha3 = "0.10"
 thiserror = "2.0"
-tokio = { version = "1.47", features = ["macros", "rt-multi-thread"] }
+tokio = { version = "1.47", features = ["macros", "rt-multi-thread", "signal"] }
 tower = { version = "0.5", features = ["util"] }
 tower-http = { version = "0.6", features = ["fs", "request-id", "trace"] }
+tower-sessions = { version = "0.14", features = ["private", "signed"] }
+tower-sessions-moka-store = "0.15"
+tower-sessions-sqlx-store = { version = "0.15", features = ["postgres"] }
 tracing = { version = "0.1", features = ["log"] }
 tracing-bunyan-formatter = "0.3.10"
 tracing-log = "0.2"

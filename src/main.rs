@@ -1,3 +1,4 @@
+use anyhow::Context;
 use zero2prod_axum::{
     configuration::get_configuration,
     startup::Applicaton,
@@ -5,13 +6,15 @@ use zero2prod_axum::{
 };
 
 #[tokio::main]
-async fn main() -> Result<(), std::io::Error> {
+async fn main() -> Result<(), anyhow::Error> {
     // tracing 관련 초기화를 한다.
     let subscriber = get_subscriber("debug,axum::rejection=trace".into(), std::io::stdout);
     init_subscriber(subscriber);
 
-    let configuration = get_configuration().expect("Failed to read configuration");
+    let configuration = get_configuration().context("Failed to read configuration")?;
 
-    let server = Applicaton::build(&configuration).await?;
-    server.run_until_stopped().await
+    let application = Applicaton::from_settings(&configuration)
+        .await
+        .context("Failed to build application")?;
+    application.run().await.context("Failed to run server")
 }

@@ -14,25 +14,12 @@
 
 ### POSTGRES
 
-1. 도커 이미지 생성
+데이터베이스 마이그레이션  
+자세한 내용은 [Setting Up Migration](https://www.sea-ql.org/SeaORM/docs/migration/setting-up-migration/) 문서를 참고한다.
 
-2. 데이터베이스 마이그레이션  
-   자세한 내용은 [Setting Up Migration](https://www.sea-ql.org/SeaORM/docs/migration/setting-up-migration/) 문서를 참고한다.
+./go/init_db.go를 사용해서 쉽게 할 수 있다.
 
-1과 2의 작업은 ./go/init_db.go를 사용해서 쉽게 할 수 있다.
-
-```bash
-go run ./go/init_db/init_db.go
-```
-
-```bash
-go run ./go/init_db/init_db.go --help
-Usage of ./go/init_db/init_db:
-  -entity string
-        Specifies the directory in which to store a entity. If not specified, the entity will not be created.
-  -skip-docker
-        Skip Docker setup
-```
+## 소스코드 디렉토리
 
 ### /web
 
@@ -83,6 +70,45 @@ json5 형식으로 저장해야 한다.
         timeout_milliseconds: 10000,
     },
 }
+```
+
+### /go
+
+편의를 위해서 GO로 작성한 작은 프로그램
+
+#### /init_db
+
+데이터베이스와 관련한 작업을 처리한다.
+```bash
+go run ./go/init_db/init_db.go --help
+Usage of ./go/init_db/init_db:
+  -entity string
+        Specifies the directory in which to store a entity. If not specified, the entity will not be created.
+  -skip-docker
+        Skip Docker setup
+```
+
+### /phc_string_gen
+
+PHC 문자열을 생성한다.
+
+```bash
+go run ./phc_string_gen.go --help
+Usage of phc_string_gen:
+  -l uint
+        [l]ength (default 32)
+  -m uint
+        [m]emory (default 19456)
+  -p string
+        [p]assword
+        Automatically generated if not entered
+  -s string
+        [s]alt
+        Automatically generated if not entered
+  -t uint
+        [t]ime (default 2)
+  -th uint
+        [th]reads (default 1)
 ```
 
 ## API

@@ -210,12 +210,12 @@ pub async fn spawn_app() -> TestApp {
 
     configure_database(&configuration.database).await;
 
-    let application = Applicaton::build(&configuration)
+    let application = Applicaton::from_settings(&configuration)
         .await
         .expect("Failed to build application.");
     let application_port = application.port();
 
-    let _ = tokio::spawn(application.run_until_stopped());
+    let _ = tokio::spawn(application.run());
 
     // 서버의 시작을 기다린다.
     // 이 부분이 없어도 오류가 발생하지 않아서 임시로 주석처리 했다.

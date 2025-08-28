@@ -39,7 +39,7 @@ export const Login = () => {
         });
     }, [flashCookie, flashHmacCookie]);
     
-    return<>
+    return(<>
     {message && <div className="loginError">{message}</div>}
     <form method="post" action="/login">
         <div className="inputUser">
@@ -59,5 +59,5 @@ export const Login = () => {
             </div>
         </div>
     </form>
-    </>
+    </>);
 };
