@@ -55,7 +55,7 @@ pub async fn login(
             // 쿠키를 설정한다.
             // https://docs.rs/axum-extra/latest/axum_extra/extract/cookie/struct.Cookie.html 이 문서를 참고로 했다.
             let message = Cookie::new("_flash", e.to_string());
-            let Ok(hmac) = generate_hmac(secret.as_ref(), &message.value()) else {
+            let Ok(hmac) = generate_hmac(secret.as_ref(), message.value()) else {
                 return ErrorResponse::from(StatusCode::INTERNAL_SERVER_ERROR.into_response());
             };
             let cookie_jar = cookie_jar

@@ -18,16 +18,23 @@ async fn an_error_flash_message_is_set_on_failure() {
 
     // 확인
     assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
-    let flash_cookies = response.cookies().find(|c| c.name() == "_flash").unwrap();
-    assert_eq!(
-        flash_cookies.value(),
-        urlencoding::encode("Authentication failed")
-    );
-
-    // 실행 2
     let (flash_cookie, _) = app.get_flash_cookies().await;
     assert_eq!(
         flash_cookie.expect("Empty cookie."),
         urlencoding::encode("Authentication failed")
-    )
+    );
+
+    // 실행2 - 다시 login 페이지를 로드하면 쿠키가 삭제되어야 한다.
+    let response = app
+        .api_client
+        .get(format!("{}/login", app.address))
+        .send()
+        .await
+        .unwrap();
+
+    // 확인
+    assert_eq!(response.status(), StatusCode::OK);
+    let (flash_cookie, hamc_cookie) = app.get_flash_cookies().await;
+    assert!(flash_cookie.is_none());
+    assert!(hamc_cookie.is_none());
 }

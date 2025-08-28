@@ -177,6 +177,21 @@ HTTP 기본 인증을 사용한다.
 
 웹브라우저를 통해서 접근 가능한 엔드포인트이다.
 
+### /check/hmac
+
+hmac의 유효성을 확인한다.
+JSON 형식을 사용하고 요청본문은 아래와 같다.
+
+```json
+    {
+        "message": "message",
+        "hmac": "hmac"
+    }
+```
+
+message필드와 hmac이 일치하면 200 OK를 반환한다.
+
+
 ## Dcokerfile
 
 이미지 생성

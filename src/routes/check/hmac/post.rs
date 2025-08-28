@@ -13,6 +13,7 @@ pub struct FlashMessage {
     pub hmac: String,
 }
 
+/// POST /check/hmac 핸들러이다.
 /// hmac을 검증한다.
 pub async fn hmac_check(
     State(hmac_secret): State<Arc<HmacSecret>>,

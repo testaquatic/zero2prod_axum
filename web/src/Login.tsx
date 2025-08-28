@@ -2,9 +2,9 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useCookies } from "react-cookie";
 
-const checkFlash = async (data: {message: string, hmac: string}) => {
+const checkFlash = async (data: {message: string|undefined, hmac: string|undefined}) => {
     // 입력중에 하나가 비어 있으면 검증할 이유가 없다.
-    if (!data.message || !data.hmac) {
+    if (data.message === undefined || data.hmac === undefined) {
         return;
     }
 
@@ -25,14 +25,14 @@ export const Login = () => {
     // https://www.npmjs.com/package/react-cookie 이 문서를 참고로 했다.
     const [flashCookie] = useCookies<"_flash", {_flash?: string;}>(["_flash"]);
     const [flashHmacCookie] = useCookies<"_flash_hmac", {_flash_hmac?: string;}>(["_flash_hmac"]);
-    const [message, setMessage] = useState("");
-    const queryCheckFlash = useQuery({queryKey: ["checkFlash"], queryFn: () => checkFlash({message: flashCookie._flash??"", hmac: flashHmacCookie._flash_hmac??""}), enabled: false});
+    const [message, setMessage] = useState<string|undefined>(undefined);
+    const queryCheckFlash = useQuery({queryKey: ["checkFlash"], queryFn: () => checkFlash({message: flashCookie._flash, hmac: flashHmacCookie._flash_hmac}), enabled: false});
     useEffect(() => {
         queryCheckFlash.refetch().then((response) => {
             if (response.data === 200) {
-                setMessage(flashCookie._flash??"");
+                setMessage(flashCookie._flash);
             } else {
-                setMessage("");
+                setMessage(undefined);
             }
         }).catch((error) => {
             setMessage(error);
@@ -40,7 +40,7 @@ export const Login = () => {
     }, [flashCookie, flashHmacCookie]);
     
     return<>
-    {flashCookie._flash && <div className="loginError">{message}</div>}
+    {message && <div className="loginError">{message}</div>}
     <form method="post" action="/login">
         <div className="inputUser">
             <div className="inputUsername">
