@@ -10,6 +10,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.85.5",
+    "@types/crypto-js": "^4.2.2",
+    "crypto-js": "^4.2.0",
     "react": "^19.1.1",
     "react-cookie": "^8.0.1",
     "react-dom": "^19.1.1",

@@ -127,16 +127,28 @@ impl TestApp {
     }
 
     /// _flash 쿠기의 내용을 확인하다.
-    pub async fn get_flash_cookie(&self) -> Option<String> {
+    /// 반환 값은 (message, hmac)이다.
+    pub async fn get_flash_cookies(&self) -> (Option<String>, Option<String>) {
         // https://docs.rs/reqwest_cookie_store/0.9.0/reqwest_cookie_store/index.html 이 문서를 참고로 했다.
         let cookie_header = self.cookie_store.lock().unwrap();
 
-        dbg!(&cookie_header);
-        dbg!(&self.address);
-
-        cookie_header
+        let message = cookie_header
             .get("127.0.0.1", "/", "_flash")
-            .map(|cookie| cookie.value_trimmed().to_string())
+            .map(|cookie| cookie.value().to_string());
+        let hmac = cookie_header
+            .get("127.0.0.1", "/", "_flash_hmac")
+            .map(|cookie| cookie.value().to_string());
+
+        (message, hmac)
+    }
+
+    pub async fn post_check_hmac(&self, body: serde_json::Value) -> reqwest::Response {
+        self.api_client
+            .post(&format!("{}/check/hmac", &self.address))
+            .json(&body)
+            .send()
+            .await
+            .expect("Failed to execute request")
     }
 }
 

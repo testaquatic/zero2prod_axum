@@ -147,7 +147,9 @@ impl IntoResponse for PublishError {
             PublishError::AuthError(_) => {
                 let status_code = StatusCode::UNAUTHORIZED;
                 let mut headers = HeaderMap::new();
-                let header_value = HeaderValue::from_str(r#"Basic realm="publish""#).unwrap();
+                let Ok(header_value) = HeaderValue::from_str(r#"Basic realm="publish""#) else {
+                    return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+                };
                 headers.insert(http::header::WWW_AUTHENTICATE, header_value);
 
                 (status_code, headers).into_response()

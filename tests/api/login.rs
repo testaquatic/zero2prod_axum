@@ -19,9 +19,15 @@ async fn an_error_flash_message_is_set_on_failure() {
     // 확인
     assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
     let flash_cookies = response.cookies().find(|c| c.name() == "_flash").unwrap();
-    assert_eq!(flash_cookies.value(), "Authentication failed");
+    assert_eq!(
+        flash_cookies.value(),
+        urlencoding::encode("Authentication failed")
+    );
 
     // 실행 2
-    let flash_cookie = app.get_flash_cookie().await.expect("Empty cookie.");
-    assert_eq!(flash_cookie, "Authentication failed")
+    let (flash_cookie, _) = app.get_flash_cookies().await;
+    assert_eq!(
+        flash_cookie.expect("Empty cookie."),
+        urlencoding::encode("Authentication failed")
+    )
 }

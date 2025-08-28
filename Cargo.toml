@@ -18,7 +18,7 @@ axum-extra = { version = "0.10", features = ["cookie"] }
 base64 = "0.22"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 config = "0.15"
-cookie = "0.18"
+cookie = { version = "0.18", features = ["percent-encode"] }
 entities = { path = "./entities" }
 hex = "0.4"
 hmac = "0.12"
@@ -37,7 +37,7 @@ sha3 = "0.10"
 thiserror = "2.0"
 tokio = { version = "1.47", features = ["macros", "rt-multi-thread"] }
 tower = { version = "0.5", features = ["util"] }
-tower-http = { version = "0.6", features = ["fs", "trace"] }
+tower-http = { version = "0.6", features = ["fs", "request-id", "trace"] }
 tracing = { version = "0.1", features = ["log"] }
 tracing-bunyan-formatter = "0.3.10"
 tracing-log = "0.2"

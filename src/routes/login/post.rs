@@ -6,12 +6,14 @@ use axum::{
     http::{StatusCode, header},
     response::{AppendHeaders, ErrorResponse, IntoResponse, Response},
 };
+use axum_extra::extract::CookieJar;
 use axum_extra::extract::cookie::Cookie;
 use sea_orm::DatabaseConnection;
 
 use crate::{
     authentication::{AuthError, Credentials, validate_credentials},
-    routes::error_chain_fmt,
+    routes::{error_chain_fmt, generate_hmac},
+    startup::HmacSecret,
 };
 
 /// Form의 정보를 저장한다.
@@ -26,8 +28,11 @@ pub struct FormData {
 pub async fn login(
     State(pool): State<Arc<DatabaseConnection>>,
     State(index_html): State<Arc<String>>,
+    State(secret): State<Arc<HmacSecret>>,
+    cookie_jar: CookieJar,
     Form(form): Form<FormData>,
 ) -> axum::response::Result<Response, ErrorResponse> {
+    // 로그인을 처리한다.
     let credentials = Credentials {
         username: form.username,
         password: form.password.into(),
@@ -47,14 +52,20 @@ pub async fn login(
             };
             tracing::error!(?e);
 
+            // 쿠키를 설정한다.
             // https://docs.rs/axum-extra/latest/axum_extra/extract/cookie/struct.Cookie.html 이 문서를 참고로 했다.
-            let cookies = Cookie::new("_flash", htmlescape::encode_minimal(&e.to_string()));
+            let message = Cookie::new("_flash", e.to_string());
+            let Ok(hmac) = generate_hmac(secret.as_ref(), &message.value()) else {
+                return ErrorResponse::from(StatusCode::INTERNAL_SERVER_ERROR.into_response());
+            };
+            let cookie_jar = cookie_jar
+                .add(message)
+                .add(Cookie::new("_flash_hmac", hmac));
+
             let response = (
                 StatusCode::UNAUTHORIZED,
-                AppendHeaders([
-                    (header::CONTENT_TYPE, "text/html; charset=utf-8"),
-                    (header::SET_COOKIE, &cookies.to_string()),
-                ]),
+                AppendHeaders([(header::CONTENT_TYPE, "text/html; charset=utf-8")]),
+                cookie_jar,
                 index_html.to_string(),
             )
                 .into_response();

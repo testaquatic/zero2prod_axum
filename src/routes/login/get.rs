@@ -10,7 +10,9 @@ use cookie::Cookie;
 
 /// GET /login을 담당하는 핸들러
 pub async fn login_form(State(index_html): State<Arc<String>>, cookie_jar: CookieJar) -> Response {
-    let flash_cookie = cookie_jar.remove(Cookie::from("_flash"));
+    let flash_cookie = cookie_jar
+        .remove(Cookie::from("_flash"))
+        .remove(Cookie::from("_flash_hmac"));
 
     (
         // 응답코드
