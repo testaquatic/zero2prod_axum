@@ -1,3 +1,4 @@
+mod admin_dashboard;
 mod check;
 mod health_check;
 mod helpers;

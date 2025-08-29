@@ -4,7 +4,7 @@ use argon2::{Algorithm, Argon2, Params, Version};
 use migration::MigratorTrait;
 use password_hash::{PasswordHasher, Salt};
 use rand::distr::SampleString;
-use reqwest::header;
+use reqwest::{StatusCode, header};
 use sea_orm::{ActiveValue, ConnectionTrait, DatabaseConnection, EntityTrait, sqlx::PgPool};
 use uuid::Uuid;
 use wiremock::MockServer;
@@ -150,6 +150,14 @@ impl TestApp {
             .await
             .expect("Failed to execute request")
     }
+
+    pub async fn get_admin_dashboard(&self) -> reqwest::Response {
+        self.api_client
+            .get(&format!("{}/admin/dashboard", &self.address))
+            .send()
+            .await
+            .expect("Failed to execute request")
+    }
 }
 
 impl TestUser {
@@ -275,4 +283,9 @@ async fn configure_database(config: &DatabaseSettings) -> DatabaseConnection {
         .expect("Failed to migrate database.");
 
     connection_pool
+}
+
+pub fn assert_is_redirect_to(response: &reqwest::Response, location: &str) {
+    assert_eq!(response.status(), StatusCode::SEE_OTHER);
+    assert_eq!(response.headers().get(header::LOCATION).unwrap(), location);
 }

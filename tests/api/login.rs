@@ -1,7 +1,7 @@
 use reqwest::StatusCode;
 use uuid::Uuid;
 
-use crate::helpers::spawn_app;
+use crate::helpers::{assert_is_redirect_to, spawn_app};
 
 /// 로그인에 실패했을 때 _flash 쿠키가 제대로 설정되는지 확인한다.
 #[tokio::test]
@@ -37,4 +37,19 @@ async fn an_error_flash_message_is_set_on_failure() {
     let (flash_cookie, hamc_cookie) = app.get_flash_cookies().await;
     assert!(flash_cookie.is_none());
     assert!(hamc_cookie.is_none());
+}
+
+/// 로그인에 성공하면 대시보드로 리다이렉트 한다.
+#[tokio::test]
+async fn redirect_to_dashboard_after_login_success() {
+    // 준비
+    let app = spawn_app().await;
+
+    // 실행 1 - 로그인
+    let login_body = serde_json::json!({
+        "username": app.test_user.username,
+        "password": app.test_user.password,
+    });
+    let response = app.post_login(&login_body).await;
+    assert_is_redirect_to(&response, "/admin/dashboard");
 }

@@ -1,3 +1,4 @@
+mod admin;
 mod check;
 mod health_check;
 mod home;
@@ -6,6 +7,7 @@ mod newsletters;
 mod subscriptions;
 mod subscriptions_confirm;
 
+pub use admin::admin_dashbaord;
 pub use check::{generate_hmac, hmac_check};
 pub use health_check::health_check;
 pub use home::home;

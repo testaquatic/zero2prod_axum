@@ -21,7 +21,8 @@ use crate::{
     configuration::{DatabaseSettings, Settings},
     email_client::EmailClient,
     routes::{
-        confirm, health_check, hmac_check, home, login, login_form, publish_newsletter, subscribe,
+        admin_dashbaord, confirm, health_check, hmac_check, home, login, login_form,
+        publish_newsletter, subscribe,
     },
 };
 
@@ -33,11 +34,18 @@ struct AppState {
     email_client: Arc<EmailClient>,
     base_url: Arc<ApplicationBaseUrl>,
     hmac_secret: Arc<HmacSecret>,
-    index_html: Arc<String>,
+    index_html: Arc<IndexHtml>,
 }
 
 #[derive(Clone)]
 pub struct HmacSecret(pub SecretString);
+
+/// 자주 사용하므로 미리 캐싱해 놓는다.
+/// 대신에 업데이트하려면 서버를 중지해야 한다.
+pub struct IndexHtml {
+    pub pub_html: String,
+    pub admin_html: String,
+}
 
 impl AppState {
     /// `AppState`를 생성한다.
@@ -46,7 +54,7 @@ impl AppState {
         email_client: EmailClient,
         base_url: String,
         hmac_secret: SecretString,
-        index_html: String,
+        index_html: IndexHtml,
     ) -> Self {
         Self {
             db_pool: Arc::new(db_pool),
@@ -94,7 +102,10 @@ impl Applicaton {
 
         let base_url = configuration.application.base_url.clone();
 
-        let index_html = std::fs::read_to_string("web/dist/index.html")?;
+        let index_html = IndexHtml {
+            pub_html: std::fs::read_to_string("web/public/dist/index.html")?,
+            admin_html: std::fs::read_to_string("web/admin/dist/index.html")?,
+        };
 
         let app_state = AppState::new(
             connection_pool,
@@ -121,12 +132,6 @@ impl Applicaton {
 
     /// 서버를 실행한다.
     pub async fn run(self) -> Result<(), anyhow::Error> {
-        // 복잡한 타입에 대한 설명을 피하기 위해서 여기에 넣었다.
-        // 논리의 흐름상 어색하다.
-        let make_service = self
-            .router
-            .into_make_service_with_connect_info::<SocketAddr>();
-
         // 세션저장소와 관련한 작업을 한다.
         self.pg_session_store
             .migrate()
@@ -137,9 +142,15 @@ impl Applicaton {
                 .continuously_delete_expired(time::Duration::from_secs(60)),
         );
 
-        axum::serve(self.listener, make_service)
-            .with_graceful_shutdown(shutdown_signal(deletion_task.abort_handle()))
-            .await?;
+        axum::serve(
+            self.listener,
+            self.router
+                // 복잡한 타입에 대한 설명을 피하기 위해서 여기에 넣었다.
+                // 논리의 흐름상 어색하다.
+                .into_make_service_with_connect_info::<SocketAddr>(),
+        )
+        .with_graceful_shutdown(shutdown_signal(deletion_task.abort_handle()))
+        .await?;
 
         deletion_task.await??;
 
@@ -178,6 +189,12 @@ async fn create_app(
     let router = Router::new()
         .route("/health_check", get(health_check))
         .nest(
+            "/admin",
+            Router::new()
+                .route("/dashboard", get(admin_dashbaord))
+                .fallback_service(ServeDir::new("web/admin/dist")),
+        )
+        .nest(
             "/subscriptions",
             Router::new()
                 .route("/", post(subscribe))
@@ -188,7 +205,7 @@ async fn create_app(
         .route("/login", get(login_form).post(login))
         .nest("/check", Router::new().route("/hmac", post(hmac_check)))
         // https://github.com/tokio-rs/axum/tree/main/examples/static-file-server 이 문서를 참고로 했다.
-        .fallback_service(ServeDir::new("web/dist"))
+        .fallback_service(ServeDir::new("web/public/dist"))
         .layer(ServiceBuilder::new().layer(trace_layer))
         .layer(session_layer)
         .with_state(app_state);
