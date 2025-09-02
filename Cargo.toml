@@ -15,7 +15,6 @@ anyhow = "1.0"
 argon2 = { version = "0.5", features = ["std"] }
 async-trait = "0.1.89"
 axum = { version = "0.8", features = ["macros"] }
-axum-extra = { version = "0.10", features = ["cookie"] }
 base64 = "0.22"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 config = "0.15"
@@ -34,10 +33,12 @@ sea-orm = { version = "1.1", features = [
 secrecy = { version = "0.10", features = ["serde"] }
 serde = { version = "1.0", features = ["derive"] }
 serde-aux = "4.7"
+serde_json = "1.0"
 sha3 = "0.10"
 thiserror = "2.0"
 tokio = { version = "1.47", features = ["macros", "rt-multi-thread", "signal"] }
 tower = { version = "0.5", features = ["util"] }
+tower-cookies = "0.11"
 tower-http = { version = "0.6", features = ["fs", "request-id", "trace"] }
 tower-sessions = { version = "0.14", features = ["private", "signed"] }
 tower-sessions-moka-store = "0.15"

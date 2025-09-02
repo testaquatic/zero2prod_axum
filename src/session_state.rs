@@ -8,7 +8,7 @@ pub struct TypedSession {
 }
 
 impl TypedSession {
-    const USER_ID_KEY: &'static str = "user_id";
+    const USER_ID_KEY: &'static str = "userid";
 
     /// 세션을 회전시킨다.
     pub async fn renew(&self) -> Result<(), tower_sessions::session::Error> {
@@ -26,6 +26,11 @@ impl TypedSession {
     /// 세션에서 user_id를 추출한다.
     pub async fn get_user_id(&self) -> Result<Option<Uuid>, tower_sessions::session::Error> {
         self.session.get(Self::USER_ID_KEY).await
+    }
+
+    /// 세션에 저장된 모든 데이터를 지운다.
+    pub async fn flush(&self) -> Result<(), tower_sessions::session::Error> {
+        self.session.flush().await
     }
 }
 

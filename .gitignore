@@ -1,6 +1,6 @@
 /configuration/
 /go/phc_string_gen/go.sum
 /target/
-/web/dist/
+/web/*/dist/
 /*/target/
 Cargo.lock

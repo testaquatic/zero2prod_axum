@@ -5,16 +5,16 @@ use crate::helpers::spawn_app;
 
 /// 빈 요청에 대해서 422 Unprocessable Entity를 반환한다.
 #[tokio::test]
-async fn check_hamc_returns_442_if_request_is_empty() {
+async fn check_hamc_returns_403_if_request_is_empty() {
     // 준비
     let app = spawn_app().await;
     let test_case = serde_json::json!({});
 
     // 실행
-    let response = app.post_check_hmac(test_case).await;
+    let response = app.post_check_cookie(test_case).await;
 
     // 검증
-    assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(response.status(), StatusCode::FORBIDDEN);
 }
 
 /// 올바른 요청에 대해서 200 Ok를 반환한다.
@@ -29,12 +29,11 @@ async fn check_hamc_returns_200_if_request_is_valid() {
         "password": Faker.fake::<String>(),
     }))
     .await;
-    let (message, hmac) = app.get_flash_cookies().await;
-    dbg!(message.as_ref().unwrap().as_str());
+    let cookie_feeder = app.get_manage_cookies("/").await.unwrap();
     let response = app
-        .post_check_hmac(serde_json::json!({
-            "message": urlencoding::decode(message.unwrap().as_str()).unwrap(),
-            "hmac": hmac.unwrap(),
+        .post_check_cookie(serde_json::json!({
+            "message": cookie_feeder.message.as_ref().unwrap(),
+            "hmac": cookie_feeder.hmac_ref(),
         }))
         .await;
 
@@ -54,12 +53,11 @@ async fn check_hamc_returns_403_if_request_is_invalid() {
         "password": Faker.fake::<String>(),
     }))
     .await;
-    let (message, hmac) = app.get_flash_cookies().await;
-    dbg!(message.as_ref().unwrap().as_str());
+    let manage_cookie = app.get_manage_cookies("/").await.unwrap();
     let response = app
-        .post_check_hmac(serde_json::json!({
+        .post_check_cookie(serde_json::json!({
             "message": urlencoding::decode("Invalid Message").unwrap(),
-            "hmac": hmac.unwrap(),
+            "hmac":manage_cookie.hmac_ref(),
         }))
         .await;
 

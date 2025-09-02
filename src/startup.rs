@@ -12,6 +12,7 @@ use sea_orm::{DatabaseConnection, sqlx::postgres::PgPoolOptions};
 use secrecy::{ExposeSecret, SecretString};
 use tokio::{net::TcpListener, signal, task::AbortHandle};
 use tower::ServiceBuilder;
+use tower_cookies::CookieManagerLayer;
 use tower_http::{services::ServeDir, trace::TraceLayer};
 use tower_sessions::{CachingSessionStore, ExpiredDeletion, SessionManagerLayer};
 use tower_sessions_moka_store::MokaStore;
@@ -19,6 +20,7 @@ use tower_sessions_sqlx_store::PostgresStore;
 
 use crate::{
     configuration::{DatabaseSettings, Settings},
+    cookie::HmacSecret,
     email_client::EmailClient,
     routes::{
         admin_dashbaord, confirm, health_check, hmac_check, home, login, login_form,
@@ -36,9 +38,6 @@ struct AppState {
     hmac_secret: Arc<HmacSecret>,
     index_html: Arc<IndexHtml>,
 }
-
-#[derive(Clone)]
-pub struct HmacSecret(pub SecretString);
 
 /// 자주 사용하므로 미리 캐싱해 놓는다.
 /// 대신에 업데이트하려면 서버를 중지해야 한다.
@@ -206,6 +205,7 @@ async fn create_app(
         .nest("/check", Router::new().route("/hmac", post(hmac_check)))
         // https://github.com/tokio-rs/axum/tree/main/examples/static-file-server 이 문서를 참고로 했다.
         .fallback_service(ServeDir::new("web/public/dist"))
+        .layer(CookieManagerLayer::new())
         .layer(ServiceBuilder::new().layer(trace_layer))
         .layer(session_layer)
         .with_state(app_state);

@@ -90,7 +90,7 @@ Usage of ./go/init_db/init_db:
 
 ### /phc_string_gen
 
-PHC 문자열을 생성한다.
+PHC 문자열과 UUID를 생성한다.
 
 ```bash
 go run ./phc_string_gen.go --help

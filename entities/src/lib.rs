@@ -6,5 +6,6 @@ pub mod m20250817_000001_create_users_table;
 pub mod m20250818_000001_rename_password_column;
 pub mod m20250818_000002_add_salt_to_users;
 pub mod m20250818_000003_remove_salt_from_users;
+pub mod m20250829_000001_seed_user;
 
-pub use m20250818_000003_remove_salt_from_users::*;
+pub use m20250829_000001_seed_user::*;

@@ -18,9 +18,9 @@ async fn an_error_flash_message_is_set_on_failure() {
 
     // 확인
     assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
-    let (flash_cookie, _) = app.get_flash_cookies().await;
+    let manage_cookie = app.get_manage_cookies("/").await.unwrap();
     assert_eq!(
-        flash_cookie.expect("Empty cookie."),
+        manage_cookie.message.expect("Empty Message"),
         urlencoding::encode("Authentication failed")
     );
 
@@ -34,9 +34,8 @@ async fn an_error_flash_message_is_set_on_failure() {
 
     // 확인
     assert_eq!(response.status(), StatusCode::OK);
-    let (flash_cookie, hamc_cookie) = app.get_flash_cookies().await;
-    assert!(flash_cookie.is_none());
-    assert!(hamc_cookie.is_none());
+    let manage_cookie = app.get_manage_cookies("/").await.unwrap();
+    assert!(manage_cookie.message.is_none());
 }
 
 /// 로그인에 성공하면 대시보드로 리다이렉트 한다.

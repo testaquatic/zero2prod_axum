@@ -10,6 +10,7 @@ use uuid::Uuid;
 use wiremock::MockServer;
 use zero2prod_axum::{
     configuration::{DatabaseSettings, get_configuration},
+    cookie::CookieFeeder,
     startup::{Applicaton, get_connection_pool},
     telemetry::{get_subscriber, init_subscriber},
 };
@@ -128,21 +129,24 @@ impl TestApp {
 
     /// _flash 쿠기의 내용을 확인하다.
     /// 반환 값은 (message, hmac)이다.
-    pub async fn get_flash_cookies(&self) -> (Option<String>, Option<String>) {
+    pub async fn get_manage_cookies(&self, path: &str) -> Option<CookieFeeder> {
         // https://docs.rs/reqwest_cookie_store/0.9.0/reqwest_cookie_store/index.html 이 문서를 참고로 했다.
         let cookie_header = self.cookie_store.lock().unwrap();
 
-        let message = cookie_header
-            .get("127.0.0.1", "/", "_flash")
-            .map(|cookie| cookie.value().to_string());
         let hmac = cookie_header
-            .get("127.0.0.1", "/", "_flash_hmac")
+            .get("127.0.0.1", path, CookieFeeder::HMAC)
+            .map(|cookie| cookie.value().to_string());
+        let message = cookie_header
+            .get("127.0.0.1", path, CookieFeeder::MESSAGE)
+            .map(|cookie| cookie.value().to_string());
+        let username = cookie_header
+            .get("127.0.0.1", path, CookieFeeder::USERNAME)
             .map(|cookie| cookie.value().to_string());
 
-        (message, hmac)
+        Some(CookieFeeder::new(message, username, hmac, None))
     }
 
-    pub async fn post_check_hmac(&self, body: serde_json::Value) -> reqwest::Response {
+    pub async fn post_check_cookie(&self, body: serde_json::Value) -> reqwest::Response {
         self.api_client
             .post(&format!("{}/check/hmac", &self.address))
             .json(&body)

@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 
+	"github.com/google/uuid"
 	"golang.org/x/crypto/argon2"
 )
 
@@ -44,6 +45,7 @@ func init() {
 	memory := flag.Uint("m", 19*1024, "[m]emory")
 	threads := flag.Uint("th", 1, "[th]reads")
 	keyLen := flag.Uint("l", 32, "[l]ength")
+	flag.Parse()
 
 	// 비밀번호를 입력하지 않으면 자동으로 생성한다.
 	if *password == "" {
@@ -73,8 +75,18 @@ func generateString(length int) string {
 }
 
 func main() {
-	flag.Parse()
+
+	var print_uuid uuid.UUID
+	for {
+		new_uuid, err := uuid.NewRandom()
+		if err == nil {
+			print_uuid = new_uuid
+			break
+		}
+	}
+
 	fmt.Printf("Password   : %s\n", Gen.password)
 	fmt.Printf("Salt       : %s\n", Gen.salt)
 	fmt.Printf("PHC string : %s\n", Gen.GetPHCString())
+	fmt.Printf("UUID       : %s\n", print_uuid.String())
 }

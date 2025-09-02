@@ -6,27 +6,20 @@ use axum::{
     http::{StatusCode, header},
     response::{AppendHeaders, IntoResponse, Response},
 };
-use axum_extra::extract::CookieJar;
-use cookie::Cookie;
+use tower_cookies::Cookies;
 
-use crate::startup::IndexHtml;
+use crate::{cookie::CookieFeeder, startup::IndexHtml};
 
 /// GET /login을 담당하는 핸들러
-pub async fn login_form(
-    State(index_html): State<Arc<IndexHtml>>,
-    cookie_jar: CookieJar,
-) -> Response {
-    let flash_cookie = cookie_jar
-        .remove(Cookie::from("_flash"))
-        .remove(Cookie::from("_flash_hmac"));
-
+pub async fn login_form(State(index_html): State<Arc<IndexHtml>>, cookies: Cookies) -> Response {
     (
         // 응답코드
         StatusCode::OK,
         // 헤더
         (
             AppendHeaders([(header::CONTENT_TYPE, "text/html")]),
-            flash_cookie,
+            // 쿠키를 삭제한다.
+            CookieFeeder::new(None, None, None, Some(cookies)),
         ),
         // 응답본문
         Body::new(index_html.pub_html.clone()),

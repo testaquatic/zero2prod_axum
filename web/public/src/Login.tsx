@@ -1,46 +1,28 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { useCookies } from "react-cookie";
+import { checkCookieFeeder, getCookieFeeder } from "./cookiefeeder";
 
-const checkFlash = async (data: {message: string|undefined, hmac: string|undefined}) => {
-    // 입력중에 하나가 비어 있으면 검증할 이유가 없다.
-    if (data.message === undefined || data.hmac === undefined) {
-        return;
-    }
-
-    const body = JSON.stringify(data);
-    // https://developer.mozilla.org/ko/docs/Web/API/Fetch_API/Using_Fetch 이 문서를 참고로 했다.
-    const response = await fetch("/check/hmac", {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json"
-        },
-        body
-    });
-
-    return response.status;
-}
 
 export const Login = () => {
     // https://www.npmjs.com/package/react-cookie 이 문서를 참고로 했다.
-    const [flashCookie] = useCookies<"_flash", {_flash?: string;}>(["_flash"]);
-    const [flashHmacCookie] = useCookies<"_flash_hmac", {_flash_hmac?: string;}>(["_flash_hmac"]);
+    const cookieFeeder = getCookieFeeder();
     const [message, setMessage] = useState<string|undefined>(undefined);
-    const queryCheckFlash = useQuery({queryKey: ["checkFlash"], queryFn: () => checkFlash({message: flashCookie._flash, hmac: flashHmacCookie._flash_hmac}), enabled: false});
+    const queryCheckCookieFeeder = useQuery(
+        {queryKey: ["cookieFeeder"], queryFn: () => checkCookieFeeder({message: cookieFeeder.message, hmac: cookieFeeder.hmac}), enabled: false});
     useEffect(() => {
-        queryCheckFlash.refetch().then((response) => {
+        queryCheckCookieFeeder.refetch().then((response) => {
             if (response.data === 200) {
-                setMessage(flashCookie._flash);
+                setMessage(cookieFeeder.message);
             } else {
                 setMessage(undefined);
             }
         }).catch((error) => {
             setMessage(error);
         });
-    }, [flashCookie, flashHmacCookie]);
+    }, [cookieFeeder.message]);
     
     return(<>
-    {message && <div className="loginError">{message}</div>}
+    {message && <div className="loginError">{decodeURI(message)}</div>}
     <form method="post" action="/login">
         <div className="inputUser">
             <div className="inputUsername">

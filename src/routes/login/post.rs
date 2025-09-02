@@ -6,15 +6,15 @@ use axum::{
     http::{StatusCode, header},
     response::{AppendHeaders, ErrorResponse, IntoResponse, Response},
 };
-use axum_extra::extract::CookieJar;
-use axum_extra::extract::cookie::Cookie;
 use sea_orm::DatabaseConnection;
+use tower_cookies::Cookies;
 
 use crate::{
     authentication::{AuthError, Credentials, validate_credentials},
-    routes::{error_chain_fmt, generate_hmac},
+    cookie::{CookieFeeder, HmacSecret},
+    routes::error_chain_fmt,
     session_state::TypedSession,
-    startup::{HmacSecret, IndexHtml},
+    startup::IndexHtml,
 };
 
 /// Form의 정보를 저장한다.
@@ -30,8 +30,8 @@ pub async fn login(
     State(pool): State<Arc<DatabaseConnection>>,
     State(html): State<Arc<IndexHtml>>,
     State(secret): State<Arc<HmacSecret>>,
-    cookie_jar: CookieJar,
     session: TypedSession,
+    cookies: Cookies,
     Form(form): Form<FormData>,
 ) -> axum::response::Result<Response, ErrorResponse> {
     // 로그인을 처리한다.
@@ -49,7 +49,7 @@ pub async fn login(
                     LoginError::UnexpectedError(e.into()),
                     &html.pub_html,
                     secret.as_ref(),
-                    cookie_jar.clone(),
+                    cookies.clone(),
                 )
             })?;
             // https://docs.rs/axum/latest/axum/response/index.html 이 문서를 참고로 했다.
@@ -59,12 +59,14 @@ pub async fn login(
                     LoginError::UnexpectedError(e.into()),
                     &html.pub_html,
                     secret.as_ref(),
-                    cookie_jar,
+                    cookies.clone(),
                 )
             })?;
 
             let response = (
                 StatusCode::SEE_OTHER,
+                // 관리자 패널로 넘어가기 전에 쿠키를 초기화한다.
+                CookieFeeder::new(None, None, None, Some(cookies)),
                 [(header::LOCATION, "/admin/dashboard")],
             )
                 .into_response();
@@ -78,7 +80,7 @@ pub async fn login(
                 AuthError::InvalidCredentials(_) => LoginError::AuthError(e.into()),
             };
             tracing::error!(?e);
-            Err(login_failed(e, &html.pub_html, secret.as_ref(), cookie_jar))
+            Err(login_failed(e, &html.pub_html, secret.as_ref(), cookies))
         }
     }
 }
@@ -101,32 +103,22 @@ impl std::fmt::Debug for LoginError {
 }
 
 /// 오류 메시지와 함께 login 페이지로 리다이렉트 한다.
-fn login_failed(
-    e: LoginError,
-    html: &str,
-    secret: &HmacSecret,
-    cookie_jar: CookieJar,
-) -> ErrorResponse {
+fn login_failed(e: LoginError, html: &str, secret: &HmacSecret, cookies: Cookies) -> ErrorResponse {
     // 쿠키를 설정한다.
     // https://docs.rs/axum-extra/latest/axum_extra/extract/cookie/struct.Cookie.html 이 문서를 참고로 했다.
-    let message = Cookie::new("_flash", e.to_string());
-    let hmac = match generate_hmac(secret, message.value()) {
-        Ok(hmac) => hmac,
-        // 이 분기로 들어올 가능성은 거의 없어 보이나 혹시 모르니 처리
+    let message = urlencoding::encode(e.to_string().as_str()).into_owned();
+    let cookie_feeder = match CookieFeeder::set_hmac(secret, Some(message), None, Some(cookies)) {
+        Ok(cookie_feeder) => cookie_feeder,
         Err(e) => {
-            tracing::error!("Failed to generate hmac: {e}");
+            tracing::error!("Failed to set hmac cookie: {e}");
             return ErrorResponse::from(StatusCode::INTERNAL_SERVER_ERROR);
         }
     };
 
-    let cookie_jar = cookie_jar
-        .add(message)
-        .add(Cookie::new("_flash_hmac", hmac));
-
     let response = (
         StatusCode::UNAUTHORIZED,
         AppendHeaders([(header::CONTENT_TYPE, "text/html; charset=utf-8")]),
-        cookie_jar,
+        cookie_feeder,
         html.to_string(),
     )
         .into_response();

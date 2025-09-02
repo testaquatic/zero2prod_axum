@@ -1,9 +1,18 @@
-import { RouterProvider } from "react-router-dom";
-import { routesPage } from "./routesPage";
+import { CookiesProvider } from "react-cookie";
+import { Dashboard } from "./Dashboard";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 
 function App() {
-  return <RouterProvider router={routesPage} />;
+  return (
+  <>
+    <QueryClientProvider client={new QueryClient()}>
+    <CookiesProvider>
+    <Dashboard />
+    </CookiesProvider>
+    </QueryClientProvider>
+  </>
+  );
 }
 
 export default App
