@@ -1,4 +1,7 @@
-use std::sync::Arc;
+use std::{
+    io::{BufRead, BufReader},
+    sync::Arc,
+};
 
 use axum::{Json, extract::State, http::StatusCode};
 
@@ -13,7 +16,6 @@ pub async fn hmac_check(
     if cookie.username.is_none() && cookie.message.is_none() {
         return StatusCode::FORBIDDEN;
     }
-
     cookie
         .check_hmac(&hmac_secret)
         .map(|ok| {

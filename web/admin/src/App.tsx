@@ -1,6 +1,7 @@
 import { CookiesProvider } from "react-cookie";
-import { Dashboard } from "./Dashboard";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { RouterProvider } from "react-router-dom";
+import { routesPage } from "./routesPage";
 
 
 function App() {
@@ -8,7 +9,7 @@ function App() {
   <>
     <QueryClientProvider client={new QueryClient()}>
     <CookiesProvider>
-    <Dashboard />
+    <RouterProvider router={routesPage} />
     </CookiesProvider>
     </QueryClientProvider>
   </>

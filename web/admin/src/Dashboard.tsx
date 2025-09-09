@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 
 import { useQuery } from "@tanstack/react-query";
-import { checkCookieFeeder, getCookieFeeder } from "./cookiefeeder";
+import { checkCookieFeeder, useCookieFeeder } from "./cookiefeeder";
 
 export function Dashboard() {
-    const cookieFeeder = getCookieFeeder();
+    const cookieFeeder = useCookieFeeder();
     const [userName, setUserName] = useState<string | undefined>(undefined);
     const queryCheckCookieFeeder  = useQuery(
         {queryKey: ["cookieFeeder"], queryFn: () => checkCookieFeeder({username: cookieFeeder.username, hmac: cookieFeeder.hmac}), enabled: false }, 

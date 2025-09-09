@@ -27,7 +27,7 @@ export async function checkCookieFeeder (data: CookieFeeder) {
     return response.status;
 }
 
-export function getCookieFeeder(): CookieFeeder {
+export function useCookieFeeder(): CookieFeeder {
     const [cookieMessage] = useCookies<"_cookie_feeder_messsage", {_cookie_feeder_messsage?: string;}>(["_cookie_feeder_messsage"]);
     const [cookieUsername] = useCookies<"_cookie_feeder_username", {_cookie_feeder_username?: string;}>(["_cookie_feeder_username"]);
     const [cookieHmac] = useCookies<"_cookie_feeder_hmac", {_cookie_feeder_hmac?: string;}>(["_cookie_feeder_hmac"]);

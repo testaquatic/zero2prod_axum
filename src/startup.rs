@@ -23,8 +23,8 @@ use crate::{
     cookie::HmacSecret,
     email_client::EmailClient,
     routes::{
-        admin_dashbaord, confirm, health_check, hmac_check, home, login, login_form,
-        publish_newsletter, subscribe,
+        admin_dashbaord, change_password, change_password_form, confirm, health_check, hmac_check,
+        home, login, login_form, publish_newsletter, subscribe,
     },
 };
 
@@ -191,13 +191,14 @@ async fn create_app(
             "/admin",
             Router::new()
                 .route("/dashboard", get(admin_dashbaord))
+                .route("/password", post(change_password))
                 .fallback_service(ServeDir::new("web/admin/dist")),
         )
         .nest(
             "/subscriptions",
             Router::new()
                 .route("/", post(subscribe))
-                .route("/confirm", get(confirm)),
+                .route("/confirm", get(confirm).post(change_password)),
         )
         .route("/newsletters", post(publish_newsletter))
         .route("/home", get(home))

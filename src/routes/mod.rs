@@ -7,7 +7,7 @@ mod newsletters;
 mod subscriptions;
 mod subscriptions_confirm;
 
-pub use admin::admin_dashbaord;
+pub use admin::*;
 pub use check::hmac_check;
 pub use health_check::health_check;
 pub use home::home;
