@@ -3,9 +3,22 @@ name = "zero2prod_axum"
 version = "0.1.0"
 edition = "2024"
 
+[lib]
+path = "src/lib.rs"
+
 [dependencies]
+# 웹 프레임워크
 axum = "0.8"
+
+# 비동기 처리
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+# swagger
 utoipa = { version = "5", features = ["axum_extras"] }
 utoipa-axum = "0.2"
 utoipa-swagger-ui = { version = "9", features = ["axum"] }
+
+[dev-dependencies]
+# axum에 각종 편의 기능 추가
+tower = { version = "0.5", features = ["util"] }
+# http 요청
+reqwest = "0.13"
