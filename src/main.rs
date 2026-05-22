@@ -1,4 +1,4 @@
-use axum::{extract::Path, routing};
+use axum::{http, routing};
 use tokio::net::TcpListener;
 use utoipa::OpenApi;
 use utoipa_axum::router::OpenApiRouter;
@@ -19,8 +19,7 @@ fn get_app_router() -> axum::Router {
     let openapi_router = get_swagger_router();
 
     axum::Router::new()
-        .route("/hello", routing::get(greet))
-        .route("/hello/{name}", axum::routing::get(greet_name))
+        .route("/health_check", routing::get(health_check))
         .merge(openapi_router)
 }
 
@@ -31,31 +30,18 @@ fn get_swagger_router() -> axum::Router {
 }
 
 #[utoipa::path(
-    description = "Hello World",
-    summary = "Hello World",
+    description = "작동 상태를 확인한다. 정상적으로 작동하다면 200 OK를 전달한다.",
+    summary = "작동 상태 확인",
     get,
-    path = "/hello",
+    path = "/health_check",
     responses(
-        (status = 200, description = "Hello World", body = String, example = "Hello World!")
+        (status = http::StatusCode::OK, description = "OK")
     )
 )]
-async fn greet() -> &'static str {
-    "Hello World!"
-}
-
-#[utoipa::path(
-    description = "Hello {name}",
-    summary = "Hello {name}",
-    get,
-    path = "/hello/{name}",
-    responses(
-        (status = 200, description = "Hello {name}", body = String, example = "Hello {name}!")
-    )
-)]
-async fn greet_name(Path(name): Path<String>) -> String {
-    format!("Hello {}!", name)
+async fn health_check() -> http::StatusCode {
+    http::StatusCode::OK
 }
 
 #[derive(utoipa::OpenApi)]
-#[openapi(paths(greet, greet_name))]
+#[openapi(paths(health_check))]
 struct ApiDoc;
