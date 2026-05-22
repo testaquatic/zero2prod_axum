@@ -1,11 +1,11 @@
 #[derive(serde::Deserialize)]
 pub struct Settings {
-    pub database: Databasettings,
+    pub database: DatabaseSettings,
     pub application_port: u16,
 }
 
 #[derive(serde::Deserialize)]
-pub struct Databasettings {
+pub struct DatabaseSettings {
     pub username: String,
     pub password: String,
     pub port: u16,
@@ -14,7 +14,7 @@ pub struct Databasettings {
 }
 
 #[derive(serde::Deserialize, utoipa::ToSchema)]
-pub struct SubscribeFormData {
+pub struct SubscribeData {
     pub name: String,
     pub email: String,
 }

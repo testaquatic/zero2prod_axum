@@ -6,7 +6,7 @@ use utoipa_swagger_ui::SwaggerUi;
 
 use crate::{
     app_state,
-    configuration::{self, DatabasettingsExt},
+    configuration::{self, DatabaseSettingsExt},
     handler::{
         health_check::{self, health_check},
         subscriptions::{self, subscribe},

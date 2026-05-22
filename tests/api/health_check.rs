@@ -1,19 +1,19 @@
 use reqwest::{StatusCode, header};
 use sqlx::PgPool;
-use zero2prod_axum::{configuration::DatabasettingsExt, domain::SubscribeFormData};
+use zero2prod_axum::{configuration::DatabaseSettingsExt, domain::SubscribeData};
 
 use crate::helper::spawn_app;
 
 /// /health_check가 작동하는지 확인한다.
 #[tokio::test]
 async fn health_check_works() {
-    let (_server_handle, settings) = spawn_app().await.expect("failed to spawn app");
+    let app = spawn_app().await;
 
     let client = reqwest::Client::new();
     let response = client
         .get(&format!(
             "http://localhost:{}/health_check",
-            settings.application_port
+            app.configuration.application_port
         ))
         .send()
         .await
@@ -25,8 +25,8 @@ async fn health_check_works() {
 
 #[tokio::test]
 async fn subscribe_returns_a_200_for_valid_form_data() {
-    let (_server_handle, configuration) = spawn_app().await.expect("failed to spawn app");
-    let connection_string = configuration.database.connection_string();
+    let app = spawn_app().await;
+    let connection_string = app.configuration.database.connection_string();
     let pool = PgPool::connect(&connection_string)
         .await
         .expect("failed to connect to db");
@@ -36,7 +36,7 @@ async fn subscribe_returns_a_200_for_valid_form_data() {
     let response = client
         .post(&format!(
             "http://localhost:{}/subscriptions",
-            configuration.application_port
+            app.configuration.application_port
         ))
         .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
         .body(body)
@@ -46,7 +46,7 @@ async fn subscribe_returns_a_200_for_valid_form_data() {
 
     assert_eq!(response.status(), StatusCode::OK);
 
-    let saved = sqlx::query_as!(SubscribeFormData, "SELECT email, name FROM subscriptions;")
+    let saved = sqlx::query_as!(SubscribeData, "SELECT email, name FROM subscriptions;")
         .fetch_one(&pool)
         .await
         .expect("failed to fetch saved subscription");
@@ -57,7 +57,7 @@ async fn subscribe_returns_a_200_for_valid_form_data() {
 
 #[tokio::test]
 async fn subscribe_returns_a_400_when_data_is_missing() {
-    let (_server_handle, configuration) = spawn_app().await.expect("failed to spawn app");
+    let app = spawn_app().await;
 
     let client = reqwest::Client::new();
     let test_cases = vec![
@@ -70,7 +70,7 @@ async fn subscribe_returns_a_400_when_data_is_missing() {
         let response = client
             .post(&format!(
                 "http://localhost:{}/subscriptions",
-                configuration.application_port
+                app.configuration.application_port
             ))
             .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
             .body(invalid_body)

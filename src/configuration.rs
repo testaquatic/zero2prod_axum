@@ -1,4 +1,4 @@
-use crate::domain::{Databasettings, Settings};
+use crate::domain::{DatabaseSettings, Settings};
 
 pub fn get_configuration() -> Result<Settings, config::ConfigError> {
     let settings = config::Config::builder()
@@ -11,15 +11,27 @@ pub fn get_configuration() -> Result<Settings, config::ConfigError> {
     settings.try_deserialize()
 }
 
-pub trait DatabasettingsExt {
-    fn connection_string(&self) -> String;
-}
-
-impl DatabasettingsExt for Databasettings {
+pub trait DatabaseSettingsExt {
+    fn database_name(&self) -> &str;
     fn connection_string(&self) -> String {
         format!(
-            "postgres://{}:{}@{}:{}/{}",
-            self.username, self.password, self.host, self.port, self.database_name
+            "{}/{}",
+            self.connection_string_without_db(),
+            self.database_name()
+        )
+    }
+    fn connection_string_without_db(&self) -> String;
+}
+
+impl DatabaseSettingsExt for DatabaseSettings {
+    fn database_name(&self) -> &str {
+        &self.database_name
+    }
+
+    fn connection_string_without_db(&self) -> String {
+        format!(
+            "postgres://{}:{}@{}:{}",
+            self.username, self.password, self.host, self.port,
         )
     }
 }
