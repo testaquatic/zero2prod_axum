@@ -2045,6 +2045,7 @@ version = "0.1.0"
 dependencies = [
  "axum",
  "reqwest",
+ "serde",
  "tokio",
  "tower",
  "utoipa",

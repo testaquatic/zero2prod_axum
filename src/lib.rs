@@ -1,7 +1,11 @@
-use axum::{http, routing};
+pub mod domain;
+
+use axum::{Form, http, routing};
 use utoipa::OpenApi;
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_swagger_ui::SwaggerUi;
+
+use crate::domain::SubscribeFormData;
 
 /// 앱 라우터를 생성한다.
 /// todo: 권한을 가지고 있는 사용자만 접근 가능하게 만들기
@@ -10,6 +14,7 @@ pub fn get_app_router() -> axum::Router {
 
     axum::Router::new()
         .route("/health_check", routing::get(health_check))
+        .route("/subscriptions", routing::post(subscribe))
         .merge(openapi_router)
 }
 
@@ -49,8 +54,23 @@ async fn test_health_check() {
     assert_eq!(response.status(), http::StatusCode::OK);
 }
 
+#[utoipa::path(
+    description = "구독 요청을 받는다.",
+    summary = "구독 요청",
+    post,
+    path = "/subscriptions",
+    request_body(content = inline(SubscribeFormData), content_type = "application/x-www-form-urlencoded"),
+    responses(
+      (status = http::StatusCode::OK, description = "OK"),
+      (status = http::StatusCode::UNPROCESSABLE_ENTITY, description = "누락되거나 유효하지 않은 필드가 있을 때")
+    )
+)]
+async fn subscribe(Form(form_data): Form<SubscribeFormData>) -> http::StatusCode {
+    http::StatusCode::OK
+}
+
 #[derive(utoipa::OpenApi)]
-#[openapi(paths(health_check))]
+#[openapi(paths(health_check, subscribe))]
 struct ApiDoc;
 
 pub async fn run() -> Result<(), std::io::Error> {
