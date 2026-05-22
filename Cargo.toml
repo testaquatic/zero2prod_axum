@@ -9,14 +9,20 @@ path = "src/lib.rs"
 [dependencies]
 # 웹 프레임워크
 axum = { version = "0.8", features = ["form"] }
+chrono = "0.4"
+config = "0.15"
+# 직렬화
 serde = { version = "1", features = ["derive"] }
-
+# Postgres
+sqlx = { version = "0.9", features = ["chrono", "postgres", "runtime-tokio", "tls-rustls", "uuid"] }
+thiserror = "2"
 # 비동기 처리
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 # swagger
 utoipa = { version = "5", features = ["axum_extras"] }
 utoipa-axum = "0.2"
 utoipa-swagger-ui = { version = "9", features = ["axum"] }
+uuid = { version = "1", features = ["v4"] }
 
 [dev-dependencies]
 # axum에 각종 편의 기능 추가

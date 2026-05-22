@@ -1,4 +1,6 @@
+use zero2prod_axum::startup;
+
 #[tokio::main]
 async fn main() -> Result<(), std::io::Error> {
-    zero2prod_axum::run().await
+    startup::run().await
 }
