@@ -1,6 +1,7 @@
 use reqwest::{StatusCode, header};
+use secrecy::ExposeSecret;
 use sqlx::PgPool;
-use zero2prod_axum::{configuration::DatabaseSettingsExt, domain::SubscribeData};
+use zero2prod_axum::domain::subscriber::SubscribeData;
 
 use crate::helper::spawn_app;
 
@@ -27,7 +28,7 @@ async fn health_check_works() {
 async fn subscribe_returns_a_200_for_valid_form_data() {
     let app = spawn_app().await;
     let connection_string = app.configuration.database.connection_string();
-    let pool = PgPool::connect(&connection_string)
+    let pool = PgPool::connect(&connection_string.expose_secret())
         .await
         .expect("failed to connect to db");
     let client = reqwest::Client::new();

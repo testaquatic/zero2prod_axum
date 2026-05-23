@@ -9,8 +9,12 @@ path = "src/lib.rs"
 [dependencies]
 # 웹 프레임워크
 axum = { version = "0.8", features = ["form"] }
+# 시간
 chrono = "0.4"
+# 설정
 config = "0.15"
+# 마킹
+secrecy = { version = "0.10", features = ["serde"] }
 # 직렬화
 serde = { version = "1", features = ["derive"] }
 # Postgres
@@ -18,10 +22,17 @@ sqlx = { version = "0.9", features = ["chrono", "postgres", "runtime-tokio", "tl
 thiserror = "2"
 # 비동기 처리
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+tower = "0.5"
+# axum 미들웨어
+tower-http = { version = "0.6", features = ["trace"] }
+# 로그
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 # swagger
 utoipa = { version = "5", features = ["axum_extras"] }
 utoipa-axum = "0.2"
 utoipa-swagger-ui = { version = "9", features = ["axum"] }
+# uuid
 uuid = { version = "1", features = ["v4"] }
 
 [dev-dependencies]

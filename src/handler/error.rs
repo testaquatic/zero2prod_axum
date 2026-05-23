@@ -10,12 +10,16 @@ pub enum AppError {
 
 impl IntoResponse for AppError {
     fn into_response(self) -> axum::response::Response {
-        match self {
-            AppError::InternalError(error) => (
-                axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-                error.to_string(),
-            )
-                .into_response(),
-        }
+        let (status, message) = match self {
+            AppError::InternalError(error) => {
+                tracing::error!("internal server error: {:?}", error);
+                (
+                    axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                    error.to_string(),
+                )
+            }
+        };
+
+        (status, message).into_response()
     }
 }

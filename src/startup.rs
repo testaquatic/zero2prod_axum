@@ -1,4 +1,5 @@
 use axum::routing;
+use secrecy::ExposeSecret;
 use sqlx::PgPool;
 use utoipa::OpenApi;
 use utoipa_axum::router::OpenApiRouter;
@@ -6,11 +7,12 @@ use utoipa_swagger_ui::SwaggerUi;
 
 use crate::{
     app_state,
-    configuration::{self, DatabaseSettingsExt},
+    configuration::{self},
     handler::{
         health_check::{self, health_check},
         subscriptions::{self, subscribe},
     },
+    middleware::request_id::RequestIdLayer,
 };
 
 /// 앱 라우터를 생성한다.
@@ -24,6 +26,8 @@ pub fn get_app_router(pool: sqlx::PgPool) -> axum::Router {
         .route("/subscriptions", routing::post(subscribe))
         .with_state(app_state)
         .merge(openapi_router)
+        .layer(tower_http::trace::TraceLayer::new_for_http())
+        .layer(RequestIdLayer)
 }
 
 /// 스웨거 라우터를 생성한다.
@@ -41,11 +45,12 @@ pub async fn run() -> Result<(), std::io::Error> {
 
     // 리스너 생성
     let address = format!("127.0.0.1:{}", configuration.application_port);
+    tracing::info!("listening on {}", address);
     let listener = tokio::net::TcpListener::bind(address).await?;
 
     // 데이터베이스 풀 생성
     let connection_string = configuration.database.connection_string();
-    let connection_pool = PgPool::connect(&connection_string)
+    let connection_pool = PgPool::connect(connection_string.expose_secret())
         .await
         .expect("failed to connect to db");
 

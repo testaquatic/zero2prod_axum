@@ -3,5 +3,7 @@ pub mod configuration;
 pub mod database;
 pub mod domain;
 pub mod handler;
+pub mod middleware;
 pub mod service;
 pub mod startup;
+pub mod telemetry;

@@ -1,4 +1,6 @@
-use crate::{database::PostgresDatabase, service::error::ServiceError};
+use crate::{
+    database::PostgresDatabase, domain::subscriber::SubscribeData, service::error::ServiceError,
+};
 
 pub struct SubscribeService {
     postgres_database: PostgresDatabase,
@@ -9,8 +11,10 @@ impl SubscribeService {
         Self { postgres_database }
     }
 
-    pub async fn subscribe(&self, email: &str, name: &str) -> Result<(), ServiceError> {
-        self.postgres_database.subscribe(email, name).await?;
+    pub async fn subscribe(&self, subscriber_data: &SubscribeData) -> Result<(), ServiceError> {
+        self.postgres_database
+            .insert_subscriber(&subscriber_data.email, &subscriber_data.name)
+            .await?;
 
         Ok(())
     }

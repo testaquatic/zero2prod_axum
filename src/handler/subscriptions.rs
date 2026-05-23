@@ -4,8 +4,16 @@ use axum::{
     http::{self},
 };
 
-use crate::{app_state::AppState, domain::SubscribeData, handler::error::AppError};
+use crate::{app_state::AppState, domain::subscriber::SubscribeData, handler::error::AppError};
 
+#[tracing::instrument(
+    name = "Adding a new subscriber",
+    skip_all,
+    fields(
+        subscriber_email = %form_data.email,
+        subscriber_name = %form_data.name
+    )
+)]
 #[utoipa::path(
   description = "구독 요청을 받는다.",
   summary = "구독 요청",
@@ -22,10 +30,7 @@ pub async fn subscribe(
     State(app_state): State<AppState>,
     Form(form_data): Form<SubscribeData>,
 ) -> Result<http::StatusCode, AppError> {
-    app_state
-        .subscribe_service
-        .subscribe(&form_data.email, &form_data.name)
-        .await?;
+    app_state.subscribe_service.subscribe(&form_data).await?;
 
     Ok(http::StatusCode::OK)
 }
