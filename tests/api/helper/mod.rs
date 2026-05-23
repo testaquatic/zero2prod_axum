@@ -1,11 +1,9 @@
 use std::sync::LazyLock;
 
-use secrecy::ExposeSecret;
 use sqlx::{Connection, QueryBuilder, postgres};
 use uuid::Uuid;
 use zero2prod_axum::{
-    configuration::{self},
-    domain::settings::DatabaseSettings,
+    configuration::{self, DatabaseSettings},
     startup, telemetry,
 };
 
@@ -44,7 +42,7 @@ pub async fn spawn_app() -> TestApp {
 
     let port = listner.local_addr().unwrap().port();
 
-    configuration.application_port = port;
+    configuration.application.port = port;
 
     let server_handle = tokio::spawn(async move {
         axum::serve(listner, router)
@@ -57,10 +55,9 @@ pub async fn spawn_app() -> TestApp {
 
 /// 테스트 DB를 생성한다.
 async fn configure_database(config: &DatabaseSettings) -> sqlx::PgPool {
-    let mut connection =
-        postgres::PgConnection::connect(&config.connection_string_without_db().expose_secret())
-            .await
-            .expect("failed to connect to db");
+    let mut connection = postgres::PgConnection::connect_with(&config.without_db())
+        .await
+        .expect("failed to connect to db");
 
     QueryBuilder::new(format!(r#"CREATE DATABASE "{}";"#, config.database_name))
         .build()
@@ -68,7 +65,7 @@ async fn configure_database(config: &DatabaseSettings) -> sqlx::PgPool {
         .await
         .expect("failed to create db");
 
-    let connection_pool = sqlx::PgPool::connect(&config.connection_string().expose_secret())
+    let connection_pool = sqlx::PgPool::connect_with(config.with_db())
         .await
         .expect("failed to connect to db");
     sqlx::migrate!("./migrations")

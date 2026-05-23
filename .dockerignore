@@ -1,0 +1,8 @@
+/scrtipts
+/target
+/tests
+.git
+.gitignore
+.dockerignore
+Dockerfile
+README.md

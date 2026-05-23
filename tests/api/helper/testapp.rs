@@ -1,4 +1,4 @@
-use zero2prod_axum::domain::settings::Settings;
+use zero2prod_axum::configuration::Settings;
 
 pub struct TestApp {
     pub configuration: Settings,

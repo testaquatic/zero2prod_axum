@@ -13,6 +13,7 @@ axum = { version = "0.8", features = ["form"] }
 chrono = "0.4"
 # 설정
 config = "0.15"
+log = "0.4"
 # 마킹
 secrecy = { version = "0.10", features = ["serde"] }
 # 직렬화

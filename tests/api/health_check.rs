@@ -1,5 +1,4 @@
 use reqwest::{StatusCode, header};
-use secrecy::ExposeSecret;
 use sqlx::PgPool;
 use zero2prod_axum::domain::subscriber::SubscribeData;
 
@@ -14,7 +13,7 @@ async fn health_check_works() {
     let response = client
         .get(&format!(
             "http://localhost:{}/health_check",
-            app.configuration.application_port
+            app.configuration.application.port
         ))
         .send()
         .await
@@ -27,8 +26,7 @@ async fn health_check_works() {
 #[tokio::test]
 async fn subscribe_returns_a_200_for_valid_form_data() {
     let app = spawn_app().await;
-    let connection_string = app.configuration.database.connection_string();
-    let pool = PgPool::connect(&connection_string.expose_secret())
+    let pool = PgPool::connect_with(app.configuration.database.with_db())
         .await
         .expect("failed to connect to db");
     let client = reqwest::Client::new();
@@ -37,7 +35,7 @@ async fn subscribe_returns_a_200_for_valid_form_data() {
     let response = client
         .post(&format!(
             "http://localhost:{}/subscriptions",
-            app.configuration.application_port
+            app.configuration.application.port
         ))
         .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
         .body(body)
@@ -71,7 +69,7 @@ async fn subscribe_returns_a_400_when_data_is_missing() {
         let response = client
             .post(&format!(
                 "http://localhost:{}/subscriptions",
-                app.configuration.application_port
+                app.configuration.application.port
             ))
             .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
             .body(invalid_body)

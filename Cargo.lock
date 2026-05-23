@@ -3405,6 +3405,7 @@ dependencies = [
  "axum",
  "chrono",
  "config",
+ "log",
  "reqwest",
  "secrecy",
  "serde",

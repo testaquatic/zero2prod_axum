@@ -1,6 +1,7 @@
+use std::time::Duration;
+
 use axum::routing;
-use secrecy::ExposeSecret;
-use sqlx::PgPool;
+use sqlx::postgres::PgPoolOptions;
 use utoipa::OpenApi;
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_swagger_ui::SwaggerUi;
@@ -44,15 +45,17 @@ pub async fn run() -> Result<(), std::io::Error> {
     let configuration = configuration::get_configuration().expect("failed to read configuration");
 
     // 리스너 생성
-    let address = format!("127.0.0.1:{}", configuration.application_port);
+    let address = format!(
+        "{}:{}",
+        configuration.application.host, configuration.application.port
+    );
     tracing::info!("listening on {}", address);
     let listener = tokio::net::TcpListener::bind(address).await?;
 
     // 데이터베이스 풀 생성
-    let connection_string = configuration.database.connection_string();
-    let connection_pool = PgPool::connect(connection_string.expose_secret())
-        .await
-        .expect("failed to connect to db");
+    let connection_pool = PgPoolOptions::new()
+        .acquire_timeout(Duration::from_secs(2))
+        .connect_lazy_with(configuration.database.with_db());
 
     // 앱 라우터
     let app = get_app_router(connection_pool);
