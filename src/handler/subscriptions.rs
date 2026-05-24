@@ -4,7 +4,7 @@ use axum::{
     http::{self},
 };
 
-use crate::{app_state::AppState, domain::subscriber::SubscribeData, handler::error::AppError};
+use crate::{app_state::AppState, handler::error::AppError};
 
 #[tracing::instrument(
     name = "Adding a new subscriber",
@@ -30,9 +30,20 @@ pub async fn subscribe(
     State(app_state): State<AppState>,
     Form(form_data): Form<SubscribeData>,
 ) -> Result<http::StatusCode, AppError> {
-    app_state.subscribe_service.subscribe(&form_data).await?;
+    app_state.subscribe_service.subscribe(form_data).await?;
 
     Ok(http::StatusCode::OK)
+}
+
+/// 가입 요청 데이터
+#[derive(serde::Deserialize, utoipa::ToSchema)]
+pub struct SubscribeData {
+    /// # 가입자의 이름
+    /// 1. 빈 문자열은 거부
+    /// 2. 최대 256자
+    /// 3. 특수 문자는 거부
+    pub name: String,
+    pub email: String,
 }
 
 #[derive(utoipa::OpenApi)]

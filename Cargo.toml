@@ -29,6 +29,7 @@ tower-http = { version = "0.6", features = ["trace"] }
 # 로그
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+unicode-segmentation = "1"
 # swagger
 utoipa = { version = "5", features = ["axum_extras"] }
 utoipa-axum = "0.2"
@@ -41,3 +42,5 @@ uuid = { version = "1", features = ["v4"] }
 tower = { version = "0.5", features = ["util"] }
 # http 요청
 reqwest = "0.13"
+
+

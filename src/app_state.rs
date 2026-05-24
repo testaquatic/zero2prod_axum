@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::{database, service};
+use crate::{database::postgres, service};
 
 #[derive(Clone)]
 pub struct AppState {
@@ -11,7 +11,7 @@ impl AppState {
     pub fn new(pool: sqlx::PgPool) -> Self {
         Self {
             subscribe_service: Arc::new(service::subscribe::SubscribeService::new(
-                database::PostgresDatabase::new(pool),
+                postgres::PostgresDatabase::new(pool),
             )),
         }
     }

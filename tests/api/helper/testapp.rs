@@ -12,4 +12,11 @@ impl TestApp {
             _server_handle: server_handle,
         }
     }
+
+    pub fn app_address(&self) -> String {
+        format!(
+            "http://{}:{}",
+            self.configuration.application.host, self.configuration.application.port
+        )
+    }
 }
