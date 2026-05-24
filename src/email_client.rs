@@ -1,4 +1,4 @@
-use std::time::Duration;
+use core::time;
 
 use secrecy::{ExposeSecret, SecretString};
 
@@ -31,10 +31,11 @@ impl EmailClient {
         base_url: String,
         sender: SubscriberEmail,
         authorization_token: SecretString,
+        timeout: time::Duration,
     ) -> Self {
         Self {
             http_client: reqwest::Client::builder()
-                .timeout(Duration::from_secs(10))
+                .timeout(timeout)
                 .build()
                 .expect("failed to build http client"),
             base_url,
@@ -110,15 +111,35 @@ mod tests {
         }
     }
 
+    /// 무작위 제목
+    fn subject() -> String {
+        Sentence(1..2).fake()
+    }
+
+    /// 무작위 텍스트
+    fn content() -> String {
+        Sentence(1..10).fake()
+    }
+
+    /// 무작위 이메일
+    fn email() -> SubscriberEmail {
+        SubscriberEmail::parse(SafeEmail().fake()).expect("failed to parse email address")
+    }
+
+    /// 테스트용 `EmailClient` 생성
+    fn email_client(base_url: String) -> EmailClient {
+        EmailClient::new(
+            base_url,
+            email(),
+            SecretString::new(Faker.fake::<String>().into()),
+            Duration::from_millis(200),
+        )
+    }
+
     #[tokio::test]
     async fn send_email_sends_the_expected_request() -> Result<(), anyhow::Error> {
         let mock_server = MockServer::start().await;
-        let sender = SubscriberEmail::parse(SafeEmail().fake()).map_err(|s| anyhow::anyhow!(s))?;
-        let email_client = EmailClient::new(
-            mock_server.uri(),
-            sender,
-            SecretString::new(Faker.fake::<String>().into()),
-        );
+        let email_client = email_client(mock_server.uri());
 
         Mock::given(matchers::header_exists("X-Postmark-Server-Token"))
             .and(matchers::header(header::CONTENT_TYPE, "application/json"))
@@ -130,12 +151,8 @@ mod tests {
             .mount(&mock_server)
             .await;
 
-        let subscriber_email = SubscriberEmail::parse(SafeEmail().fake()).unwrap();
-        let subject = Sentence(1..2).fake::<String>();
-        let content = Sentence(1..10).fake::<String>();
-
         let _ = email_client
-            .send_email(&subscriber_email, &subject, &content, &content)
+            .send_email(&email(), &subject(), &content(), &content())
             .await;
 
         Ok(())
@@ -144,12 +161,7 @@ mod tests {
     #[tokio::test]
     async fn send_email_succeeds_if_the_server_returns_200() -> Result<(), anyhow::Error> {
         let mock_server = MockServer::start().await;
-        let sender = SubscriberEmail::parse(SafeEmail().fake()).map_err(|s| anyhow::anyhow!(s))?;
-        let email_client = EmailClient::new(
-            mock_server.uri(),
-            sender,
-            SecretString::new(Faker.fake::<String>().into()),
-        );
+        let email_client = email_client(mock_server.uri());
 
         Mock::given(matchers::any())
             .respond_with(ResponseTemplate::new(StatusCode::OK))
@@ -157,12 +169,8 @@ mod tests {
             .mount(&mock_server)
             .await;
 
-        let subscriber_email = SubscriberEmail::parse(SafeEmail().fake()).unwrap();
-        let subject = Sentence(1..2).fake::<String>();
-        let content = Sentence(1..10).fake::<String>();
-
         let outcome = email_client
-            .send_email(&subscriber_email, &subject, &content, &content)
+            .send_email(&email(), &subject(), &content(), &content())
             .await;
 
         assert!(outcome.is_ok(), "expected Ok but got {outcome:?}");
@@ -173,12 +181,7 @@ mod tests {
     #[tokio::test]
     async fn send_email_fails_if_the_server_returns_500() -> Result<(), anyhow::Error> {
         let mock_server = MockServer::start().await;
-        let sender = SubscriberEmail::parse(SafeEmail().fake()).map_err(|s| anyhow::anyhow!(s))?;
-        let email_client = EmailClient::new(
-            mock_server.uri(),
-            sender,
-            SecretString::new(Faker.fake::<String>().into()),
-        );
+        let email_client = email_client(mock_server.uri());
 
         Mock::given(matchers::any())
             .respond_with(ResponseTemplate::new(StatusCode::INTERNAL_SERVER_ERROR))
@@ -186,12 +189,8 @@ mod tests {
             .mount(&mock_server)
             .await;
 
-        let subscriber_email = SubscriberEmail::parse(SafeEmail().fake()).unwrap();
-        let subject = Sentence(1..2).fake::<String>();
-        let content = Sentence(1..10).fake::<String>();
-
         let outcome = email_client
-            .send_email(&subscriber_email, &subject, &content, &content)
+            .send_email(&email(), &subject(), &content(), &content())
             .await;
 
         assert!(outcome.is_err(), "expected Err but got {outcome:?}");
@@ -202,12 +201,7 @@ mod tests {
     #[tokio::test]
     async fn send_email_times_out_if_the_server_takes_too_long() -> Result<(), anyhow::Error> {
         let mock_server = MockServer::start().await;
-        let sender = SubscriberEmail::parse(SafeEmail().fake()).map_err(|s| anyhow::anyhow!(s))?;
-        let email_client = EmailClient::new(
-            mock_server.uri(),
-            sender,
-            SecretString::new(Faker.fake::<String>().into()),
-        );
+        let email_client = email_client(mock_server.uri());
 
         let response = ResponseTemplate::new(StatusCode::OK).set_delay(Duration::from_secs(180));
 
@@ -217,12 +211,8 @@ mod tests {
             .mount(&mock_server)
             .await;
 
-        let subscriber_email = SubscriberEmail::parse(SafeEmail().fake()).unwrap();
-        let subject = Sentence(1..2).fake::<String>();
-        let content = Sentence(1..10).fake::<String>();
-
         let outcome = email_client
-            .send_email(&subscriber_email, &subject, &content, &content)
+            .send_email(&email(), &subject(), &content(), &content())
             .await;
 
         assert!(outcome.is_err(), "expected Err but got {outcome:?}");
