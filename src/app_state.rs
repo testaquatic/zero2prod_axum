@@ -1,18 +1,23 @@
 use std::sync::Arc;
 
-use crate::{database::postgres, service};
+use crate::{
+    database::postgres::PostgresDatabase,
+    email_client,
+    service::{self, subscribe::SubscribeService},
+};
 
-#[derive(Clone)]
 pub struct AppState {
-    pub subscribe_service: Arc<service::subscribe::SubscribeService>,
+    pub subscribe_service: service::subscribe::SubscribeService,
+    pub email_client: email_client::EmailClient,
 }
 
 impl AppState {
-    pub fn new(pool: sqlx::PgPool) -> Self {
-        Self {
-            subscribe_service: Arc::new(service::subscribe::SubscribeService::new(
-                postgres::PostgresDatabase::new(pool),
-            )),
-        }
+    pub fn new(pool: sqlx::PgPool, email_client: email_client::EmailClient) -> Arc<Self> {
+        let app_state = Self {
+            subscribe_service: SubscribeService::new(PostgresDatabase::new(pool)),
+            email_client,
+        };
+
+        Arc::new(app_state)
     }
 }

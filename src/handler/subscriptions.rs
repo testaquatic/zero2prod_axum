@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use axum::{
     Form,
     extract::State,
@@ -30,7 +32,7 @@ use crate::{
   )
 )]
 pub async fn subscribe(
-    State(app_state): State<AppState>,
+    State(app_state): State<Arc<AppState>>,
     Form(form_data): Form<SubscribeFormData>,
 ) -> Result<http::StatusCode, AppError> {
     app_state.subscribe_service.subscribe(form_data).await?;

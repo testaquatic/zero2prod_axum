@@ -2,6 +2,7 @@ pub mod app_state;
 pub mod configuration;
 pub mod database;
 pub mod domain;
+pub mod email_client;
 pub mod handler;
 pub mod middleware;
 pub mod service;

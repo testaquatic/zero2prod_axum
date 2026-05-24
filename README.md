@@ -6,6 +6,15 @@
 
 단순한 지식 제공을 넘어서 단계적인 접근법을 책 한권에 잘 압축해 놨다.
 
+# 테스트 환경 설정
+
+## Postgresql
+
+```bash
+./scripts/init_db.sh
+```
+
 # 환경변수
 
-TEST_LOG : 테스트에 로그를 표시한다.
+- TEST_LOG=true: 테스트에 로그를 표시한다.
+- SKIP_DOCKER=true : `./scripts/init_db.sh`를 실행할 때 도커 컨테이너 생성을 건너뛴다.

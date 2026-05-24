@@ -3,8 +3,10 @@ use std::sync::LazyLock;
 use sqlx::{Connection, QueryBuilder, postgres};
 use uuid::Uuid;
 use zero2prod_axum::{
+    app_state,
     configuration::{self, DatabaseSettings},
-    startup, telemetry,
+    startup::{self, get_email_client},
+    telemetry,
 };
 
 use crate::helper::testapp::TestApp;
@@ -35,12 +37,21 @@ pub async fn spawn_app() -> TestApp {
     configuration.database.database_name = Uuid::new_v4().to_string();
     let connection_pool = configure_database(&configuration.database).await;
 
-    let router = startup::get_app_router(connection_pool);
+    let email_client =
+        get_email_client(&configuration.email_client).expect("invalid sender email address");
+
+    // AppState 생성
+    let app_state = app_state::AppState::new(connection_pool, email_client);
+
+    let router = startup::get_app_router(app_state);
     let listner = tokio::net::TcpListener::bind("127.0.0.1:0")
         .await
         .expect("failed to bind address");
 
-    let port = listner.local_addr().unwrap().port();
+    let port = listner
+        .local_addr()
+        .expect("failed to get local addr")
+        .port();
 
     configuration.application.port = port;
 

@@ -14,6 +14,8 @@ chrono = "0.4"
 # 설정
 config = "0.15"
 log = "0.4"
+# HTTP Client
+reqwest = { version = "0.13", features = ["json", "brotli", "gzip", "zstd", "deflate"] }
 # 마킹
 secrecy = { version = "0.10", features = ["serde"] }
 # 직렬화
@@ -29,6 +31,7 @@ tower-http = { version = "0.6", features = ["trace"] }
 # 로그
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+# utf8 처리
 unicode-segmentation = "1"
 # swagger
 utoipa = { version = "5", features = ["axum_extras"] }
@@ -40,12 +43,15 @@ uuid = { version = "1", features = ["v4"] }
 validator = "0.20"
 
 [dev-dependencies]
+anyhow = "1"
 # 무작위 데이터 생성
 fake = "5"
 # 속성 테스트
 quickcheck = "1"
 quickcheck_macros = "1"
-# http 요청
-reqwest = "0.13"
+# json 직렬화, 역직렬화
+serde_json = "1"
 # axum에 각종 편의 기능 추가
 tower = { version = "0.5", features = ["util"] }
+# 테스트 웹 서버
+wiremock = "0.6"

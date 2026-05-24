@@ -7,3 +7,7 @@ database:
   port: 5432
 application:
   port: 8000
+email_client:
+  base_url: "localhost"
+  sender_email: "test@example.com"
+  authorization_token: "change-me"
