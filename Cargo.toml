@@ -36,11 +36,16 @@ utoipa-axum = "0.2"
 utoipa-swagger-ui = { version = "9", features = ["axum"] }
 # uuid
 uuid = { version = "1", features = ["v4"] }
+# 이메일 유효성 검증
+validator = "0.20"
 
 [dev-dependencies]
-# axum에 각종 편의 기능 추가
-tower = { version = "0.5", features = ["util"] }
+# 무작위 데이터 생성
+fake = "5"
+# 속성 테스트
+quickcheck = "1"
+quickcheck_macros = "1"
 # http 요청
 reqwest = "0.13"
-
-
+# axum에 각종 편의 기능 추가
+tower = { version = "0.5", features = ["util"] }

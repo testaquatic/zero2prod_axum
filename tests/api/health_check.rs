@@ -1,6 +1,6 @@
 use reqwest::{StatusCode, header};
 use sqlx::PgPool;
-use zero2prod_axum::handler::subscriptions::SubscribeData;
+use zero2prod_axum::domain::new_subscriber::SubscribeFormData;
 
 use crate::helper::spawn_app;
 
@@ -39,7 +39,7 @@ async fn subscribe_returns_a_200_for_valid_form_data() {
 
     assert_eq!(response.status(), StatusCode::OK);
 
-    let saved = sqlx::query_as!(SubscribeData, "SELECT email, name FROM subscriptions;")
+    let saved = sqlx::query_as!(SubscribeFormData, "SELECT email, name FROM subscriptions;")
         .fetch_one(&pool)
         .await
         .expect("failed to fetch saved subscription");

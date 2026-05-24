@@ -4,9 +4,9 @@ use crate::service::error::ServiceError;
 
 #[derive(thiserror::Error, Debug)]
 pub enum AppError {
-    #[error("내부 서버 오류")]
+    #[error("내부 서버 오류: {0}")]
     InternalError(ServiceError),
-    #[error("입력 오류")]
+    #[error("입력 오류 : {0}")]
     BadRequest(ServiceError),
 }
 

@@ -1,11 +1,9 @@
 use unicode_segmentation::UnicodeSegmentation;
 
-/// 가입을 요청한 사용자의 정보
-pub struct NewSubscriber {
-    pub email: String,
-    pub name: SubscriberName,
-}
-
+/// # 가입자의 이름
+/// 1. 빈 문자열은 거부
+/// 2. 최대 256자
+/// 3. 특수 문자는 거부
 pub struct SubscriberName(String);
 
 impl SubscriberName {
@@ -35,7 +33,7 @@ impl AsRef<str> for SubscriberName {
 
 #[cfg(test)]
 mod tests {
-    use crate::domain::subscriber::SubscriberName;
+    use crate::domain::subscriber_name::SubscriberName;
 
     #[test]
     fn a_256_grapheme_long_name_is_valid() {

@@ -4,7 +4,9 @@ use axum::{
     http::{self},
 };
 
-use crate::{app_state::AppState, handler::error::AppError};
+use crate::{
+    app_state::AppState, domain::new_subscriber::SubscribeFormData, handler::error::AppError,
+};
 
 #[tracing::instrument(
     name = "Adding a new subscriber",
@@ -19,31 +21,21 @@ use crate::{app_state::AppState, handler::error::AppError};
   summary = "구독 요청",
   post,
   path = "/subscriptions",
-  request_body(content = inline(SubscribeData), content_type = "application/x-www-form-urlencoded"),
+  request_body(content = inline(SubscribeFormData), content_type = "application/x-www-form-urlencoded"),
   responses(
     (status = http::StatusCode::OK, description = "OK"),
     (status = http::StatusCode::UNPROCESSABLE_ENTITY, description = "누락되거나 유효하지 않은 필드가 있음"),
-    (status = http::StatusCode::INTERNAL_SERVER_ERROR, description = "서버 내부 오류, 자세한 내용은 로그를 참고")
+    (status = http::StatusCode::INTERNAL_SERVER_ERROR, description = "서버 내부 오류"),
+    (status = http::StatusCode::BAD_REQUEST, description ="요청 데이터 유효성 검증 실패"),
   )
 )]
 pub async fn subscribe(
     State(app_state): State<AppState>,
-    Form(form_data): Form<SubscribeData>,
+    Form(form_data): Form<SubscribeFormData>,
 ) -> Result<http::StatusCode, AppError> {
     app_state.subscribe_service.subscribe(form_data).await?;
 
     Ok(http::StatusCode::OK)
-}
-
-/// 가입 요청 데이터
-#[derive(serde::Deserialize, utoipa::ToSchema)]
-pub struct SubscribeData {
-    /// # 가입자의 이름
-    /// 1. 빈 문자열은 거부
-    /// 2. 최대 256자
-    /// 3. 특수 문자는 거부
-    pub name: String,
-    pub email: String,
 }
 
 #[derive(utoipa::OpenApi)]
