@@ -1,5 +1,6 @@
 use reqwest::{Method, StatusCode};
 use wiremock::{Mock, ResponseTemplate, matchers};
+use zero2prod_axum::startup::get_connection_pool;
 
 use crate::helpers::startup::spawn_app;
 
@@ -141,4 +142,25 @@ async fn subscribe_sends_a_confirmation_email_with_a_link() {
         "html link and text link are different: {:?}",
         confirmation_links
     );
+}
+
+#[tokio::test]
+async fn subscribe_fails_if_there_is_a_fatal_database_error() -> Result<(), sqlx::Error> {
+    let app = spawn_app().await;
+    let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
+
+    sqlx::query!("ALTER TABLE subscription_tokens DROP COLUMN subscription_token;",)
+        .execute(&get_connection_pool(&app.configuration))
+        .await
+        .unwrap();
+
+    let response = app.post_subscriptions(body.into()).await;
+    assert_eq!(
+        response.status(),
+        StatusCode::INTERNAL_SERVER_ERROR,
+        "expected 500 Internal Server Error but got: {:?} instead",
+        response
+    );
+
+    Ok(())
 }

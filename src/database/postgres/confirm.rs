@@ -1,13 +1,11 @@
 use sqlx::PgExecutor;
 use uuid::Uuid;
 
-use crate::database::error::DatabaseError;
-
-#[tracing::instrument(name = "Mark subscriber as confirmed", skip_all)]
+#[tracing::instrument(name = "Mark subscriber as confirmed", skip_all, err(Debug))]
 pub async fn confirm_subscriber(
     pg_executor: impl PgExecutor<'_>,
     subscriber_id: Uuid,
-) -> Result<(), DatabaseError> {
+) -> Result<(), sqlx::Error> {
     sqlx::query!(
         r#"
         UPDATE subscriptions
@@ -22,11 +20,11 @@ pub async fn confirm_subscriber(
     Ok(())
 }
 
-#[tracing::instrument(name = "Get subscriber_id from token", skip_all)]
+#[tracing::instrument(name = "Get subscriber_id from token", skip_all, err(Debug))]
 pub async fn get_subscriber_id_from_token(
     pg_executor: impl PgExecutor<'_>,
     subscription_token: &str,
-) -> Result<Option<Uuid>, DatabaseError> {
+) -> Result<Option<Uuid>, sqlx::Error> {
     let result = sqlx::query!(
         r#"
         SELECT subscriber_id

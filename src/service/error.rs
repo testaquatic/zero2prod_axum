@@ -1,9 +1,9 @@
-use crate::{database::error::DatabaseError, email_client::EmailClientError};
+use crate::email_client::EmailClientError;
 
 #[derive(thiserror::Error, Debug)]
 pub enum ServiceError {
     #[error("서버에서 오류가 발생했습니다")]
-    DatabaseError(#[from] DatabaseError),
+    DatabaseError(#[from] sqlx::Error),
     #[error("서버에서 오류가 발생했습니다")]
     SendEmailError(#[from] EmailClientError),
     // 내부 메시지를 표시한다.
@@ -11,10 +11,4 @@ pub enum ServiceError {
     ValidationError(String),
     #[error("서버에서 오류가 발생했습니다")]
     SubscriptionTokenError,
-}
-
-impl From<sqlx::Error> for ServiceError {
-    fn from(error: sqlx::Error) -> Self {
-        ServiceError::DatabaseError(error.into())
-    }
 }

@@ -14,7 +14,8 @@ use crate::{app_state::AppState, handler::error::AppError};
     fields(
         subscriber_email = %form_data.email,
         subscriber_name = %form_data.name
-    )
+    ),
+    err
 )]
 #[utoipa::path(
   description = "구독 요청을 받는다.",

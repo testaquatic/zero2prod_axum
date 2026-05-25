@@ -5,9 +5,9 @@ use crate::service::error::ServiceError;
 #[derive(thiserror::Error, Debug)]
 pub enum AppError {
     #[error("내부 서버 오류: {0}")]
-    InternalError(ServiceError),
+    InternalError(#[source] ServiceError),
     #[error("입력 오류 : {0}")]
-    BadRequest(ServiceError),
+    BadRequest(#[source] ServiceError),
 }
 
 impl IntoResponse for AppError {
