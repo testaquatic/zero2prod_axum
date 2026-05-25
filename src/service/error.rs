@@ -9,4 +9,12 @@ pub enum ServiceError {
     // 내부 메시지를 표시한다.
     #[error("{0}")]
     ValidationError(String),
+    #[error("서버에서 오류가 발생했습니다")]
+    SubscriptionTokenError,
+}
+
+impl From<sqlx::Error> for ServiceError {
+    fn from(error: sqlx::Error) -> Self {
+        ServiceError::DatabaseError(error.into())
+    }
 }

@@ -5,7 +5,7 @@ use axum::{
     http,
 };
 
-use crate::app_state::AppState;
+use crate::{app_state::AppState, handler::error::AppError};
 
 #[derive(serde::Deserialize, utoipa::IntoParams)]
 pub struct Parameters {
@@ -30,8 +30,12 @@ pub struct Parameters {
 pub async fn confirm(
     State(app_state): State<Arc<AppState>>,
     Query(params): Query<Parameters>,
-) -> http::StatusCode {
-    http::StatusCode::OK
+) -> Result<http::StatusCode, AppError> {
+    app_state
+        .subscribe_service
+        .confirm(&params.subscription_token)
+        .await?;
+    Ok(http::StatusCode::OK)
 }
 
 #[derive(utoipa::OpenApi)]

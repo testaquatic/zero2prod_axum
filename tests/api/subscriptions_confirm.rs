@@ -1,5 +1,6 @@
 use reqwest::{Method, StatusCode};
 use wiremock::{Mock, ResponseTemplate, matchers};
+use zero2prod_axum::startup::get_connection_pool;
 
 use crate::helpers::startup::spawn_app;
 
@@ -41,6 +42,47 @@ async fn the_link_returned_by_subscribe_returns_a_200_if_called() -> Result<(), 
         StatusCode::OK,
         "expected 200 OK: {:?}",
         response
+    );
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn clicking_on_the_confirmation_link_confirms_a_subscriber() -> Result<(), anyhow::Error> {
+    let app = spawn_app().await;
+    let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
+
+    Mock::given(matchers::path("/email"))
+        .and(matchers::method(Method::POST))
+        .respond_with(ResponseTemplate::new(StatusCode::OK))
+        .mount(&app.email_server)
+        .await;
+
+    app.post_subscriptions(body.into()).await;
+    let email_requst = &app.email_server.received_requests().await.unwrap()[0];
+    let confirmation_links = app.get_confirmation_links(email_requst);
+    reqwest::get(confirmation_links.html)
+        .await
+        .expect("failed to execute request");
+
+    let saved = sqlx::query!("SELECT email, name, status FROM subscriptions")
+        .fetch_one(&get_connection_pool(&app.configuration))
+        .await?;
+
+    assert_eq!(
+        saved.email, "ursula_le_guin@gmail.com",
+        "did not store email correctly in database: {:?}",
+        saved
+    );
+    assert_eq!(
+        saved.name, "le guin",
+        "did not store name correctly in database: {:?}",
+        saved
+    );
+    assert_eq!(
+        saved.status, "confirmed",
+        "did not store status correctly in database: {:?}",
+        saved
     );
 
     Ok(())
