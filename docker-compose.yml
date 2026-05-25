@@ -15,6 +15,7 @@ services:
             - APP_DATABASE__REQUIRE_SSL=false
             - APP_APPLICATION__PORT=8000
             - APP_APPLICATION__HOST=0.0.0.0
+            - APP_APPLICATION__BASE_URL=http://127.0.0.1 # 바꿔야 함
     postgres:
         image: postgres:18
         ports:

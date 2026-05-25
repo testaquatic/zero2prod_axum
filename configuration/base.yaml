@@ -6,6 +6,7 @@ database:
   host: localhost
   port: 5432
 application:
+  base_url: "http://127.0.0.1"
   port: 8000
 email_client:
   base_url: "localhost"

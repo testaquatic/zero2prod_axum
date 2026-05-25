@@ -1,0 +1,47 @@
+use reqwest::{Method, StatusCode};
+use wiremock::{Mock, ResponseTemplate, matchers};
+
+use crate::helpers::startup::spawn_app;
+
+#[tokio::test]
+async fn confirmation_without_token_are_rejected_with_a_400() -> Result<(), anyhow::Error> {
+    let app = spawn_app().await;
+    let response = reqwest::get(&format!("{}/subscriptions/confirm", app.app_address())).await?;
+
+    assert_eq!(
+        response.status(),
+        StatusCode::BAD_REQUEST,
+        "expected 400 Bad Request: {:?}",
+        response
+    );
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn the_link_returned_by_subscribe_returns_a_200_if_called() -> Result<(), anyhow::Error> {
+    let app = spawn_app().await;
+    let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
+
+    Mock::given(matchers::path("/email"))
+        .and(matchers::method(Method::POST))
+        .respond_with(ResponseTemplate::new(StatusCode::OK))
+        .mount(&app.email_server)
+        .await;
+
+    app.post_subscriptions(body.into()).await;
+
+    let email_requst = &app.email_server.received_requests().await.unwrap()[0];
+
+    let confirmation_links = app.get_confirmation_links(email_requst);
+
+    let response = reqwest::get(confirmation_links.html).await?;
+    assert_eq!(
+        response.status(),
+        StatusCode::OK,
+        "expected 200 OK: {:?}",
+        response
+    );
+
+    Ok(())
+}

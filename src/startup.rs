@@ -14,6 +14,7 @@ use crate::{
     handler::{
         health_check::{self, health_check},
         subscriptions::{self, subscribe},
+        subscriptions_confirm::{self, confirm},
     },
     middleware::request_id::RequestIdLayer,
 };
@@ -26,6 +27,7 @@ pub fn get_app_router(app_state: Arc<app_state::AppState>) -> axum::Router {
     axum::Router::new()
         .route("/health_check", routing::get(health_check))
         .route("/subscriptions", routing::post(subscribe))
+        .route("/subscriptions/confirm", routing::get(confirm))
         .with_state(app_state)
         .merge(openapi_router)
         .layer(tower_http::trace::TraceLayer::new_for_http())
@@ -37,6 +39,7 @@ fn get_swagger_router() -> axum::Router {
     let (router, mut api) = OpenApiRouter::new().split_for_parts();
     api.merge(health_check::HealthCheckApiDoc::openapi());
     api.merge(subscriptions::SubscriptionsApiDoc::openapi());
+    api.merge(subscriptions_confirm::SubscriptionsConfirm::openapi());
 
     router.merge(SwaggerUi::new("/swagger-ui").url("/apidoc/openapi.json", api))
 }
@@ -111,7 +114,11 @@ impl Application {
         let listener = tokio::net::TcpListener::bind(address).await?;
 
         // `AppState`` 생성
-        let app_state = app_state::AppState::new(connection_pool, email_client);
+        let app_state = app_state::AppState::new(
+            connection_pool,
+            email_client,
+            configuration.application.base_url,
+        );
 
         // `Router` 생성
         let app_router = get_app_router(app_state);

@@ -38,25 +38,41 @@ mod tests {
     #[test]
     fn empty_string_is_rejected() {
         let email = "".to_string();
-        assert!(SubscriberEmail::parse(email).is_err());
+        assert!(
+            SubscriberEmail::parse(email.clone()).is_err(),
+            "empty email should be rejected: {}",
+            email
+        );
     }
 
     #[test]
     fn email_missing_at_symbol_is_rejected() {
         let email = "ursulaguin.com".to_string();
-        assert!(SubscriberEmail::parse(email).is_err());
+        assert!(
+            SubscriberEmail::parse(email.clone()).is_err(),
+            "email missing @: {}",
+            email
+        );
     }
 
     #[test]
     fn email_missing_subject_is_rejected() {
         let email = "@gmail.com".to_string();
-        assert!(SubscriberEmail::parse(email).is_err());
+        assert!(
+            SubscriberEmail::parse(email.clone()).is_err(),
+            "email missing subject: {}",
+            email
+        );
     }
 
     #[test]
     fn valid_email_is_parsed_successfully() {
         let email = SafeEmail().fake::<String>();
-        assert!(SubscriberEmail::parse(email).is_ok());
+        assert!(
+            SubscriberEmail::parse(email.clone()).is_ok(),
+            "valid email should be parsed successfully: {}",
+            email
+        );
     }
 
     #[quickcheck_macros::quickcheck]

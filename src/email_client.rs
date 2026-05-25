@@ -4,12 +4,18 @@ use secrecy::{ExposeSecret, SecretString};
 
 use crate::domain::subscriber_email::SubscriberEmail;
 
+#[derive(Debug, thiserror::Error)]
+pub enum EmailClientError {
+    #[error("UnexpectedError")]
+    UnexpectedError(#[source] reqwest::Error),
+}
+
 /// 이메일을 전송한다.
 pub struct EmailClient {
     /// HTTP Client
     http_client: reqwest::Client,
     /// 요청을 만들 API의 URL
-    base_url: String,
+    pub base_url: String,
     /// 발신자의 이메일 주소
     sender: SubscriberEmail,
     // 인증 토큰
@@ -50,7 +56,7 @@ impl EmailClient {
         subject: &str,
         html_body: &str,
         text_body: &str,
-    ) -> Result<(), reqwest::Error> {
+    ) -> Result<(), EmailClientError> {
         let url = format!("{}/email", self.base_url);
         let request_body = SendEmailRequest {
             from: self.sender.as_ref(),
@@ -68,8 +74,10 @@ impl EmailClient {
             )
             .json(&request_body)
             .send()
-            .await?
-            .error_for_status()?;
+            .await
+            .map_err(EmailClientError::UnexpectedError)?
+            .error_for_status()
+            .map_err(EmailClientError::UnexpectedError)?;
 
         Ok(())
     }

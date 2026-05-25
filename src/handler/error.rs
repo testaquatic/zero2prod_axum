@@ -33,7 +33,9 @@ impl IntoResponse for AppError {
 impl From<ServiceError> for AppError {
     fn from(service_error: ServiceError) -> Self {
         match service_error {
-            ServiceError::DatabaseError(_) => AppError::InternalError(service_error),
+            ServiceError::DatabaseError(_) | ServiceError::SendEmailError(_) => {
+                AppError::InternalError(service_error)
+            }
             ServiceError::ValidationError(_) => AppError::BadRequest(service_error),
         }
     }

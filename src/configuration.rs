@@ -27,10 +27,13 @@ pub struct DatabaseSettings {
 pub struct ApplicationSettings {
     pub port: u16,
     pub host: String,
+    /// API 서버의 url
+    pub base_url: String,
 }
 
 #[derive(serde::Deserialize, Clone)]
 pub struct EmailClientSettings {
+    /// 이메일 서버(Postmark)의 url
     pub base_url: String,
     pub sender_email: String,
     pub authorization_token: SecretString,
