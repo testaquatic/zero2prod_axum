@@ -1,15 +1,17 @@
 use std::sync::Arc;
 
 use crate::{
-    email_client,
-    service::{self, subscribers::SubscribersService},
+    email_client::{self, EmailClient},
+    service::{newsletter::NewsletterService, subscriptions::SubscriptionsService},
 };
 
 pub struct ApplicationBaseUrl(pub String);
 
 pub struct AppState {
-    pub subscribe_service: service::subscribers::SubscribersService,
-    pub email_client: email_client::EmailClient,
+    pub subscribe_service: SubscriptionsService,
+    pub newsletter_service: NewsletterService,
+    pub pg_pool: sqlx::PgPool,
+    pub email_client: EmailClient,
     pub base_url: ApplicationBaseUrl,
 }
 
@@ -20,7 +22,9 @@ impl AppState {
         base_url: String,
     ) -> Arc<Self> {
         let app_state = Self {
-            subscribe_service: SubscribersService::new(pool),
+            subscribe_service: SubscriptionsService,
+            newsletter_service: NewsletterService,
+            pg_pool: pool,
             email_client,
             base_url: ApplicationBaseUrl(base_url),
         };

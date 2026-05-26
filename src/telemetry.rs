@@ -13,7 +13,6 @@ where
     let env_filter =
         EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(env_filter));
     let formatting_layer = tracing_subscriber::fmt::layer()
-        .with_target(true)
         .with_span_events(FmtSpan::NEW | FmtSpan::CLOSE)
         .with_writer(sink)
         .json()

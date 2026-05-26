@@ -38,12 +38,11 @@ where
     }
 
     fn call(&mut self, req: Request) -> Self::Future {
-        let future = self.inner.call(req);
+        let path = req.uri().path().to_string();
+        let span =
+            tracing::info_span!("zero2prod_axum", request_id = %uuid::Uuid::new_v4(), path = %path);
+        let future = self.inner.call(req).instrument(span);
 
-        Box::pin(async move {
-            let span = tracing::info_span!("zero2prod_axum", request_id = %uuid::Uuid::new_v4());
-
-            future.instrument(span).await
-        })
+        Box::pin(future)
     }
 }

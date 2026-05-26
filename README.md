@@ -14,7 +14,16 @@
 ./scripts/init_db.sh
 ```
 
+## Docker Compose
+
+클라우드 대신에 빌드 테스트를 해보려고 만들었다.  
+환경변수를 수정해야 한다.
+
 # 환경변수
 
 - TEST_LOG=true: 테스트에 로그를 표시한다.
 - SKIP_DOCKER=true : `./scripts/init_db.sh`를 실행할 때 도커 컨테이너 생성을 건너뛴다.
+
+# 이번 코드의 컨셉
+
+이전에 읽었던 [러스트 백 엔드 (Axum)](https://text.ibetter.kr/rust-axum)의 코드를 반영했다.

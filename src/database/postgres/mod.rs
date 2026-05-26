@@ -1,2 +1,3 @@
 pub mod confirm;
-pub mod subscription;
+pub mod newsletters;
+pub mod subscriptions;

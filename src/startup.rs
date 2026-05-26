@@ -13,6 +13,7 @@ use crate::{
     email_client,
     handler::{
         health_check::{self, health_check},
+        newsletter::publish_newsletter,
         subscriptions::{self, subscribe},
         subscriptions_confirm::{self, confirm},
     },
@@ -28,6 +29,7 @@ pub fn get_app_router(app_state: Arc<app_state::AppState>) -> axum::Router {
         .route("/health_check", routing::get(health_check))
         .route("/subscriptions", routing::post(subscribe))
         .route("/subscriptions/confirm", routing::get(confirm))
+        .route("/newsletter", routing::post(publish_newsletter))
         .with_state(app_state)
         .merge(openapi_router)
         .layer(tower_http::trace::TraceLayer::new_for_http())

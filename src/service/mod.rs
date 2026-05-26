@@ -1,2 +1,3 @@
 pub mod error;
-pub mod subscribers;
+pub mod newsletter;
+pub mod subscriptions;

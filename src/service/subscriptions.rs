@@ -5,40 +5,36 @@ use crate::{
     database::postgres::{
         self,
         confirm::{confirm_subscriber, get_subscriber_id_from_token},
-        subscription,
+        subscriptions,
     },
     domain::new_subscriber::NewSubscriber,
-    email_client,
+    email_client::{self, EmailClient},
     handler::subscriptions::SubscribeFormData,
     service::error::ServiceError,
 };
 
-pub struct SubscribersService {
-    pg_pool: PgPool,
-}
+pub struct SubscriptionsService;
 
-impl SubscribersService {
-    pub fn new(pg_pool: PgPool) -> Self {
-        Self { pg_pool }
-    }
-
+impl SubscriptionsService {
     /// 구독 요청을 처리한다.
     pub async fn subscribe(
         &self,
-        email_client: &email_client::EmailClient,
+        pg_pool: &PgPool,
+        email_client: &EmailClient,
         subscriber_form: SubscribeFormData,
         base_url: &str,
     ) -> Result<(), ServiceError> {
         let new_subscriber =
             NewSubscriber::try_from(subscriber_form).map_err(ServiceError::ValidationError)?;
 
-        let mut transaction = self.pg_pool.begin().await?;
+        let mut transaction = pg_pool.begin().await?;
         let subscriber_id =
-            postgres::subscription::insert_subscriber(transaction.as_mut(), &new_subscriber)
+            postgres::subscriptions::insert_subscriber(transaction.as_mut(), &new_subscriber)
                 .await?;
         let subscription_token = generate_subscription_token();
 
-        subscription::store_token(transaction.as_mut(), subscriber_id, &subscription_token).await?;
+        subscriptions::store_token(transaction.as_mut(), subscriber_id, &subscription_token)
+            .await?;
 
         transaction.commit().await?;
 
@@ -49,12 +45,16 @@ impl SubscribersService {
     }
 
     /// 구독을 확인한다.
-    pub async fn confirm(&self, subscription_token: &str) -> Result<(), ServiceError> {
-        let id = get_subscriber_id_from_token(&self.pg_pool, subscription_token)
+    pub async fn confirm(
+        &self,
+        pg_pool: &PgPool,
+        subscription_token: &str,
+    ) -> Result<(), ServiceError> {
+        let id = get_subscriber_id_from_token(pg_pool, subscription_token)
             .await?
             .ok_or_else(|| ServiceError::SubscriptionTokenError)?;
 
-        confirm_subscriber(&self.pg_pool, id).await?;
+        confirm_subscriber(pg_pool, id).await?;
 
         Ok(())
     }

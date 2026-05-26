@@ -36,7 +36,12 @@ pub async fn subscribe(
 ) -> Result<http::StatusCode, AppError> {
     app_state
         .subscribe_service
-        .subscribe(&app_state.email_client, form_data, &app_state.base_url.0)
+        .subscribe(
+            &app_state.pg_pool,
+            &app_state.email_client,
+            form_data,
+            &app_state.base_url.0,
+        )
         .await?;
 
     Ok(http::StatusCode::OK)

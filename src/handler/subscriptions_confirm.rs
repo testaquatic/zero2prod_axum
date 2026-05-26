@@ -25,6 +25,7 @@ pub struct Parameters {
   responses(
     (status = http::StatusCode::OK, description = "OK"),
     (status = http::StatusCode::BAD_REQUEST, description = "요청 데이터 유효성 검증 실패"),
+    (status = http::StatusCode::INTERNAL_SERVER_ERROR, description = "서버 내부 오류"),
   )
 )]
 pub async fn confirm(
@@ -33,7 +34,7 @@ pub async fn confirm(
 ) -> Result<http::StatusCode, AppError> {
     app_state
         .subscribe_service
-        .confirm(&params.subscription_token)
+        .confirm(&app_state.pg_pool, &params.subscription_token)
         .await?;
     Ok(http::StatusCode::OK)
 }
