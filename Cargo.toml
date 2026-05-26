@@ -10,6 +10,7 @@ path = "src/lib.rs"
 anyhow = "1"
 # 웹 프레임워크
 axum = { version = "0.8", features = ["form"] }
+base64 = "0.22"
 # 시간
 chrono = "0.4"
 # 설정

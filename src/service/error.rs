@@ -11,4 +11,6 @@ pub enum ServiceError {
     ValidationError(String),
     #[error("서버에서 오류가 발생했습니다")]
     SubscriptionTokenError,
+    #[error("사용자 정보를 찾을 수 없습니다")]
+    AuthError,
 }

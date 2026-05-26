@@ -1,4 +1,5 @@
-use reqwest::{Method, StatusCode};
+use axum::http::HeaderValue;
+use reqwest::{Method, StatusCode, header};
 use wiremock::{Mock, ResponseTemplate, matchers};
 
 use crate::helpers::{
@@ -135,6 +136,38 @@ async fn create_confirmed_subscriber(app: &TestApp) -> Result<(), anyhow::Error>
     reqwest::get(confirmation_link.html)
         .await?
         .error_for_status()?;
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn request_missing_authorization_are_rejected() -> Result<(), anyhow::Error> {
+    let app = spawn_app().await;
+
+    let response = reqwest::Client::new()
+        .post(&format!("{}/newsletter", app.app_address()))
+        .json(&serde_json::json!({
+            "title": "Newsletter title",
+            "content": {
+                "text": "Newsletter body as plain text",
+                "html": "<p>Newsletter body as HTML</p>"
+            }
+        }))
+        .send()
+        .await?;
+
+    assert_eq!(
+        response.status(),
+        StatusCode::UNAUTHORIZED,
+        "expected 401 Unauthorized but got: {:?}",
+        response
+    );
+    assert_eq!(
+        response.headers().get(header::WWW_AUTHENTICATE),
+        Some(&HeaderValue::from_str(r#"Basic realm="publish""#)?),
+        "expected 'WWW-Authenticate' header with value 'Basic realm=\"publish\"' but got: {:?}",
+        response
+    );
 
     Ok(())
 }

@@ -1,6 +1,6 @@
 use std::sync::LazyLock;
 
-use sqlx::{Connection, QueryBuilder, postgres};
+use sqlx::{Connection, PgPool, QueryBuilder, postgres};
 use uuid::Uuid;
 use wiremock::MockServer;
 use zero2prod_axum::{
@@ -87,4 +87,24 @@ async fn migrate_test_database(config: &Settings) {
         .run(&pg_pool)
         .await
         .expect("failed to migrate the database");
+
+    // 테스트 유저를 추가한다.
+    add_test_user(&pg_pool).await;
+}
+
+/// 사용자를 DB에 추가한다.
+async fn add_test_user(pool: &PgPool) {
+    sqlx::query!(
+        r#"
+        INSERT INTO users (user_id, username, password, role)
+        VALUES ($1, $2, $3, $4)
+        "#,
+        Uuid::new_v4(),
+        Uuid::new_v4().to_string(),
+        Uuid::new_v4().to_string(),
+        "admin"
+    )
+    .execute(pool)
+    .await
+    .expect("failed to add users");
 }

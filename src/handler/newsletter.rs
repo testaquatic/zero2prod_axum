@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use axum::{Json, extract::State, http};
 
-use crate::{app_state::AppState, handler::error::AppError};
+use crate::{app_state::AppState, handler::error::AppError, middleware::credentials};
 
 /// 뉴스레터를 발행한다.
 #[utoipa::path(
@@ -10,6 +10,9 @@ use crate::{app_state::AppState, handler::error::AppError};
     summary = "뉴스레터 발행",
     post,
     path = "/newsletter",
+    params(
+        ("Authorization" = String, Header, description = "Basic authentication")
+    ),
     request_body = BodyData,
     responses(
         (status = http::StatusCode::OK, description = "OK")
@@ -17,6 +20,7 @@ use crate::{app_state::AppState, handler::error::AppError};
 )]
 pub async fn publish_newsletter(
     State(app_state): State<Arc<AppState>>,
+    credentials: credentials::Credentials,
     Json(body): Json<BodyData>,
 ) -> Result<http::StatusCode, AppError> {
     app_state
@@ -41,3 +45,7 @@ pub struct Content {
     /// 일반 텍스트
     pub text: String,
 }
+
+#[derive(utoipa::OpenApi)]
+#[openapi(paths(publish_newsletter))]
+pub struct NewsletterOpenApiDoc;

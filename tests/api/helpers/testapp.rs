@@ -64,13 +64,30 @@ impl TestApp {
     }
 
     pub async fn post_newsletters(&self, body: serde_json::Value) -> reqwest::Response {
+        let (username, password) = self.test_user().await;
         reqwest::Client::new()
             .post(&format!("{}/newsletter", self.app_address()))
-            .header(header::CONTENT_TYPE, "application/json")
+            .basic_auth(username, Some(password))
             .json(&body)
             .send()
             .await
             .expect("Failed to execute request.")
+    }
+
+    pub async fn test_user(&self) -> (String, String) {
+        let pool = zero2prod_axum::startup::get_connection_pool(&self.configuration);
+        let row = sqlx::query!(
+            r#"
+            SELECT username, password
+            FROM users
+            LIMIT 1
+            "#,
+        )
+        .fetch_one(&pool)
+        .await
+        .expect("Failed to get test user");
+
+        (row.username, row.password)
     }
 }
 

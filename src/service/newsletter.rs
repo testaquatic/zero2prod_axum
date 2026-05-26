@@ -1,9 +1,12 @@
-use sqlx::PgPool;
+use secrecy::SecretString;
+use sqlx::{PgExecutor, PgPool};
 
 use crate::{
-    database::postgres::newsletters::get_confirmed_subscribers,
-    domain::subscriber_email::SubscriberEmail, email_client::EmailClient,
-    handler::newsletter::BodyData, service::error::ServiceError,
+    database::postgres::newsletters::{get_confirmed_subscribers, get_user_id_from_credentials},
+    domain::subscriber_email::SubscriberEmail,
+    email_client::EmailClient,
+    handler::newsletter::BodyData,
+    service::error::ServiceError,
 };
 
 pub struct NewsletterService;
@@ -42,5 +45,16 @@ impl NewsletterService {
         }
 
         Ok(())
+    }
+
+    pub async fn validate_credentials(
+        &self,
+        pg_executor: impl PgExecutor<'_>,
+        username: &str,
+        password: &SecretString,
+    ) -> Result<uuid::Uuid, ServiceError> {
+        let uuid = get_user_id_from_credentials(pg_executor, username, password).await?;
+
+        uuid.ok_or(ServiceError::AuthError)
     }
 }

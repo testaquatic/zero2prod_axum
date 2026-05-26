@@ -13,7 +13,7 @@ use crate::{
     email_client,
     handler::{
         health_check::{self, health_check},
-        newsletter::publish_newsletter,
+        newsletter::{self, publish_newsletter},
         subscriptions::{self, subscribe},
         subscriptions_confirm::{self, confirm},
     },
@@ -42,7 +42,7 @@ fn get_swagger_router() -> axum::Router {
     api.merge(health_check::HealthCheckApiDoc::openapi());
     api.merge(subscriptions::SubscriptionsApiDoc::openapi());
     api.merge(subscriptions_confirm::SubscriptionsConfirm::openapi());
-
+    api.merge(newsletter::NewsletterOpenApiDoc::openapi());
     router.merge(SwaggerUi::new("/swagger-ui").url("/apidoc/openapi.json", api))
 }
 
