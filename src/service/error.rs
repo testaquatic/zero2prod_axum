@@ -12,7 +12,7 @@ pub enum ServiceError {
     #[error("서버에서 오류가 발생했습니다")]
     SubscriptionTokenError,
     #[error("사용자 정보를 찾을 수 없습니다")]
-    AuthError,
+    AuthError(#[source] anyhow::Error),
     #[error("서버에서 오류가 발생했습니다")]
-    UnexpectedError(#[from] anyhow::Error),
+    UnexpectedError(#[source] anyhow::Error),
 }

@@ -8,6 +8,8 @@ path = "src/lib.rs"
 
 [dependencies]
 anyhow = "1"
+# 암호화
+argon2 = { version = "0.5", features = ["std"] }
 # 웹 프레임워크
 axum = { version = "0.8", features = ["form"] }
 base64 = "0.22"
@@ -15,8 +17,8 @@ base64 = "0.22"
 chrono = "0.4"
 # 설정
 config = "0.15"
-hex = "0.4"
 log = "0.4"
+# 무작위 소스
 rand = "0.10"
 # HTTP Client
 reqwest = { version = "0.13", features = ["json", "brotli", "gzip", "zstd", "deflate"] }
@@ -24,9 +26,9 @@ reqwest = { version = "0.13", features = ["json", "brotli", "gzip", "zstd", "def
 secrecy = { version = "0.10", features = ["serde"] }
 # 직렬화
 serde = { version = "1", features = ["derive"] }
-sha3 = "0.12.0"
 # Postgres
 sqlx = { version = "0.9", features = ["chrono", "postgres", "runtime-tokio", "tls-rustls", "uuid"] }
+# 오류 구현 
 thiserror = "2"
 # 비동기 처리
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }

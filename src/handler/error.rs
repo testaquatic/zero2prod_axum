@@ -22,13 +22,13 @@ impl IntoResponse for AppError {
         // 로깅
         match &self {
             AppError::InternalError(_) | AppError::UnexpectedError(_) => {
-                tracing::error!("internal server error: {}", self);
+                tracing::error!("internal server error: {:?}", self);
             }
             AppError::BadRequest(_) => {
-                tracing::error!("validation error: {}", self);
+                tracing::error!("validation error: {:?}", self);
             }
             AppError::AuthError(_) => {
-                tracing::warn!("unauthorized: {}", self);
+                tracing::warn!("unauthorized: {:?}", self);
             }
         }
 
@@ -60,7 +60,7 @@ impl From<ServiceError> for AppError {
             | ServiceError::SubscriptionTokenError
             | ServiceError::UnexpectedError(_) => AppError::InternalError(service_error),
             ServiceError::ValidationError(_) => AppError::BadRequest(service_error),
-            ServiceError::AuthError => AppError::AuthError(anyhow::anyhow!(service_error)),
+            ServiceError::AuthError(_) => AppError::AuthError(anyhow::anyhow!(service_error)),
         }
     }
 }

@@ -1,4 +1,7 @@
-use sha3::Digest;
+use argon2::{
+    Argon2, PasswordHasher,
+    password_hash::{SaltString, rand_core},
+};
 use uuid::Uuid;
 
 pub struct TestUser {
@@ -17,8 +20,11 @@ impl TestUser {
     }
 
     pub async fn store(&self, pool: &sqlx::PgPool) {
-        let password_hash = sha3::Sha3_256::digest(self.password.as_bytes());
-        let password_hash = hex::encode(password_hash);
+        let salt = SaltString::generate(&mut rand_core::OsRng);
+        let password_hash = Argon2::default()
+            .hash_password(self.password.as_bytes(), &salt)
+            .expect("failed to hash password")
+            .to_string();
 
         sqlx::query!(
             r#"

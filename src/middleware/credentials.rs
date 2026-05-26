@@ -5,22 +5,30 @@ use axum::extract::FromRequestParts;
 use base64::{Engine, engine::general_purpose::STANDARD};
 use secrecy::SecretString;
 
-use crate::{app_state::AppState, handler::error::AppError};
+use crate::{
+    app_state::AppState,
+    domain::credential::{Credentials, UsernamePassword},
+    handler::error::AppError,
+};
 
 /// Basic 인증 관련 추출자
-pub struct Credentials {
+pub struct ExtractCredentials {
     pub username: String,
     pub password: SecretString,
     pub user_id: uuid::Uuid,
 }
 
-#[derive(serde::Deserialize)]
-struct UsernamePassword {
-    pub username: String,
-    pub password: SecretString,
+impl From<ExtractCredentials> for Credentials {
+    fn from(value: ExtractCredentials) -> Self {
+        Self {
+            username: value.username,
+            password: value.password,
+            user_id: value.user_id,
+        }
+    }
 }
 
-impl FromRequestParts<Arc<AppState>> for Credentials {
+impl FromRequestParts<Arc<AppState>> for ExtractCredentials {
     type Rejection = AppError;
 
     async fn from_request_parts(
@@ -31,7 +39,7 @@ impl FromRequestParts<Arc<AppState>> for Credentials {
         let username_password = extract_credentials(parts).await?;
         // 사용자의 ID를 찾는다.
         let user_id = app_state
-            .newsletter_service
+            .credential_service
             .validate_credentials(
                 &app_state.pg_pool,
                 &username_password.username,
@@ -40,7 +48,7 @@ impl FromRequestParts<Arc<AppState>> for Credentials {
             .await?;
         tracing::Span::current().record("user_id", tracing::field::display(user_id));
 
-        Ok(Credentials {
+        Ok(ExtractCredentials {
             username: username_password.username,
             password: username_password.password,
             user_id,
