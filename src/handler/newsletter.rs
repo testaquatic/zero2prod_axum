@@ -20,7 +20,7 @@ use crate::{app_state::AppState, handler::error::AppError, middleware::credentia
 )]
 pub async fn publish_newsletter(
     State(app_state): State<Arc<AppState>>,
-    credentials: credentials::Credentials,
+    _credentials: credentials::Credentials,
     Json(body): Json<BodyData>,
 ) -> Result<http::StatusCode, AppError> {
     app_state

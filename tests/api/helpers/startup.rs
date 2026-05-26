@@ -1,6 +1,6 @@
 use std::sync::LazyLock;
 
-use sqlx::{Connection, PgPool, QueryBuilder, postgres};
+use sqlx::{Connection, QueryBuilder, postgres};
 use uuid::Uuid;
 use wiremock::MockServer;
 use zero2prod_axum::{
@@ -9,7 +9,7 @@ use zero2prod_axum::{
     telemetry,
 };
 
-use crate::helpers::testapp::TestApp;
+use crate::helpers::{test_app::TestApp, test_user::TestUser};
 
 /// tracing
 static TRACING: LazyLock<()> = LazyLock::new(|| {
@@ -45,6 +45,14 @@ pub async fn spawn_app() -> TestApp {
     // `EmailClient`의 타입아웃을 200ms로 설정한다.
     configuration.email_client.timeout_milliseconds = 200;
 
+    // 테스트 유저를 넣는다
+    let test_user = TestUser::generate();
+    test_user
+        .store(&zero2prod_axum::startup::get_connection_pool(
+            &configuration,
+        ))
+        .await;
+
     // `TcpListener` 생성
     // port를 0으로 설정
     configuration.application.port = 0;
@@ -62,6 +70,7 @@ pub async fn spawn_app() -> TestApp {
     TestApp {
         configuration,
         email_server,
+        test_user,
         _api_server_handle: api_server_handle,
     }
 }
@@ -87,24 +96,4 @@ async fn migrate_test_database(config: &Settings) {
         .run(&pg_pool)
         .await
         .expect("failed to migrate the database");
-
-    // 테스트 유저를 추가한다.
-    add_test_user(&pg_pool).await;
-}
-
-/// 사용자를 DB에 추가한다.
-async fn add_test_user(pool: &PgPool) {
-    sqlx::query!(
-        r#"
-        INSERT INTO users (user_id, username, password, role)
-        VALUES ($1, $2, $3, $4)
-        "#,
-        Uuid::new_v4(),
-        Uuid::new_v4().to_string(),
-        Uuid::new_v4().to_string(),
-        "admin"
-    )
-    .execute(pool)
-    .await
-    .expect("failed to add users");
 }

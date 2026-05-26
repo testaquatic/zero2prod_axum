@@ -1,4 +1,5 @@
-use secrecy::SecretString;
+use secrecy::{ExposeSecret, SecretString};
+use sha3::Digest;
 use sqlx::{PgExecutor, PgPool};
 
 use crate::{
@@ -53,7 +54,9 @@ impl NewsletterService {
         username: &str,
         password: &SecretString,
     ) -> Result<uuid::Uuid, ServiceError> {
-        let uuid = get_user_id_from_credentials(pg_executor, username, password).await?;
+        let password_hash = sha3::Sha3_256::digest(password.expose_secret().as_bytes());
+        let password_hash = hex::encode(password_hash);
+        let uuid = get_user_id_from_credentials(pg_executor, username, &password_hash).await?;
 
         uuid.ok_or(ServiceError::AuthError)
     }

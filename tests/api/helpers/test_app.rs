@@ -2,10 +2,13 @@ use reqwest::header;
 use wiremock::MockServer;
 use zero2prod_axum::configuration::Settings;
 
+use crate::helpers::test_user::TestUser;
+
 pub struct TestApp {
     pub configuration: Settings,
     /// 이메일 서버를 모사한다.
     pub email_server: MockServer,
+    pub test_user: TestUser,
     pub _api_server_handle: tokio::task::JoinHandle<Result<(), std::io::Error>>,
 }
 
@@ -64,30 +67,13 @@ impl TestApp {
     }
 
     pub async fn post_newsletters(&self, body: serde_json::Value) -> reqwest::Response {
-        let (username, password) = self.test_user().await;
         reqwest::Client::new()
             .post(&format!("{}/newsletter", self.app_address()))
-            .basic_auth(username, Some(password))
+            .basic_auth(&self.test_user.username, Some(&self.test_user.password))
             .json(&body)
             .send()
             .await
             .expect("Failed to execute request.")
-    }
-
-    pub async fn test_user(&self) -> (String, String) {
-        let pool = zero2prod_axum::startup::get_connection_pool(&self.configuration);
-        let row = sqlx::query!(
-            r#"
-            SELECT username, password
-            FROM users
-            LIMIT 1
-            "#,
-        )
-        .fetch_one(&pool)
-        .await
-        .expect("Failed to get test user");
-
-        (row.username, row.password)
     }
 }
 

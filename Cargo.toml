@@ -15,6 +15,7 @@ base64 = "0.22"
 chrono = "0.4"
 # 설정
 config = "0.15"
+hex = "0.4"
 log = "0.4"
 rand = "0.10"
 # HTTP Client
@@ -23,6 +24,7 @@ reqwest = { version = "0.13", features = ["json", "brotli", "gzip", "zstd", "def
 secrecy = { version = "0.10", features = ["serde"] }
 # 직렬화
 serde = { version = "1", features = ["derive"] }
+sha3 = "0.12.0"
 # Postgres
 sqlx = { version = "0.9", features = ["chrono", "postgres", "runtime-tokio", "tls-rustls", "uuid"] }
 thiserror = "2"

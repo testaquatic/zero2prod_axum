@@ -1,4 +1,3 @@
-use secrecy::{ExposeSecret, SecretString};
 use sqlx::PgExecutor;
 
 pub struct ConfirmedSubscriber {
@@ -24,16 +23,16 @@ pub async fn get_confirmed_subscribers(
 pub async fn get_user_id_from_credentials(
     pg_executor: impl PgExecutor<'_>,
     username: &str,
-    password: &SecretString,
+    password_hash: &str,
 ) -> Result<Option<uuid::Uuid>, sqlx::Error> {
     sqlx::query!(
         r#"
         SELECT user_id
         FROM users
-        WHERE username = $1 and password = $2
+        WHERE username = $1 and password_hash = $2
         "#,
         username,
-        password.expose_secret(),
+        password_hash,
     )
     .fetch_optional(pg_executor)
     .await

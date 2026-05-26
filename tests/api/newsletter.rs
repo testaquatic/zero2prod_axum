@@ -4,7 +4,7 @@ use wiremock::{Mock, ResponseTemplate, matchers};
 
 use crate::helpers::{
     startup::spawn_app,
-    testapp::{ConfirmationLinks, TestApp},
+    test_app::{ConfirmationLinks, TestApp},
 };
 
 #[tokio::test]

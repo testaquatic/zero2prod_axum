@@ -57,7 +57,8 @@ impl From<ServiceError> for AppError {
         match service_error {
             ServiceError::DatabaseError(_)
             | ServiceError::SendEmailError(_)
-            | ServiceError::SubscriptionTokenError => AppError::InternalError(service_error),
+            | ServiceError::SubscriptionTokenError
+            | ServiceError::UnexpectedError(_) => AppError::InternalError(service_error),
             ServiceError::ValidationError(_) => AppError::BadRequest(service_error),
             ServiceError::AuthError => AppError::AuthError(anyhow::anyhow!(service_error)),
         }
