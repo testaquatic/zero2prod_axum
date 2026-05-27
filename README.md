@@ -19,6 +19,15 @@
 클라우드 대신에 빌드 테스트를 해보려고 만들었다.  
 환경변수를 수정해야 한다.
 
+## 키 생성 방법
+
+JWT를 활성화하는데 필요하다.
+
+```bash
+openssl genpkey -algorithm ed25519 -out private.pem
+openssl pkey -in private.pem -pubout -out public.pem
+```
+
 # 환경변수
 
 - TEST_LOG=true: 테스트에 로그를 표시한다.

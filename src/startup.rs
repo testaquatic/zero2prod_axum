@@ -1,8 +1,11 @@
 use std::time::Duration;
 
 use axum::Router;
+use moka::future::Cache;
+use secrecy::ExposeSecret;
 use sqlx::{PgPool, postgres::PgPoolOptions};
 use tokio::net::TcpListener;
+use uuid::Uuid;
 
 use crate::{
     app_state,
@@ -80,11 +83,36 @@ impl Application {
         tracing::info!("listening on {}", address);
         let listener = tokio::net::TcpListener::bind(address).await?;
 
+        // Moka 초기화
+        let moka_cache: Cache<Uuid, Uuid> = moka::future::CacheBuilder::new(10_000)
+            .time_to_live(Duration::from_hours(12))
+            .time_to_idle(Duration::from_hours(1))
+            .build();
+
+        // pem 파일 읽기
+        let private_key = std::fs::read(
+            configuration
+                .application
+                .token_secret_private_pem
+                .expose_secret(),
+        )?
+        .into();
+        let public_key = std::fs::read(
+            configuration
+                .application
+                .token_secret_public_pem
+                .expose_secret(),
+        )?
+        .into();
+
         // `AppState`` 생성
         let app_state = app_state::AppState::new(
             connection_pool,
             email_client,
             configuration.application.base_url,
+            private_key,
+            public_key,
+            moka_cache,
         );
 
         // `Router` 생성

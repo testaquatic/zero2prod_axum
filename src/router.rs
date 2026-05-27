@@ -1,8 +1,10 @@
 use std::sync::Arc;
 
 use axum::{middleware, routing};
-use utoipa::OpenApi;
-use utoipa_axum::router::OpenApiRouter;
+use utoipa::{
+    OpenApi,
+    openapi::{Info, OpenApiBuilder},
+};
 use utoipa_swagger_ui::SwaggerUi;
 
 use crate::{
@@ -14,7 +16,7 @@ use crate::{
         subscriptions::{self, subscribe},
         subscriptions_confirm::{self, confirm},
     },
-    middleware::{credentials::ExtractCredentials, request_id::RequestIdLayer},
+    middleware::{auth_token::TokenData, request_id::RequestIdLayer},
 };
 
 /// 앱 라우터를 생성한다.
@@ -39,18 +41,28 @@ pub fn get_protected_router(app_state: Arc<app_state::AppState>) -> axum::Router
     axum::Router::new()
         .route("/newsletter", routing::post(publish_newsletter))
         .route_layer(middleware::from_extractor_with_state::<
-            ExtractCredentials,
+            TokenData,
             Arc<AppState>,
         >(app_state))
 }
 
 /// 스웨거 라우터를 생성한다.
 fn get_swagger_router() -> axum::Router {
-    let (router, mut api) = OpenApiRouter::new().split_for_parts();
+    let mut api = OpenApiBuilder::new()
+        .info(
+            Info::builder()
+                .title("zero2prod_axum")
+                .description(Some("zero2prod을 axum으로 작성했다.")),
+        )
+        .build();
+
     api.merge(health_check::HealthCheckApiDoc::openapi());
     api.merge(subscriptions::SubscriptionsApiDoc::openapi());
     api.merge(subscriptions_confirm::SubscriptionsConfirm::openapi());
     api.merge(newsletter::NewsletterOpenApiDoc::openapi());
     api.merge(login::post::PostLoginOpenApiDoc::openapi());
-    router.merge(SwaggerUi::new("/swagger-ui").url("/apidoc/openapi.json", api))
+
+    SwaggerUi::new("/swagger-ui")
+        .url("/apidoc/openapi.json", api)
+        .into()
 }

@@ -1,5 +1,4 @@
-use axum::http::HeaderValue;
-use reqwest::{Method, StatusCode, header};
+use reqwest::{Method, StatusCode};
 use uuid::Uuid;
 use wiremock::{Mock, ResponseTemplate, matchers};
 
@@ -27,7 +26,9 @@ async fn newletters_are_not_delivered_to_unconfirmed_subscribers() -> Result<(),
         "html": "<p>Newsletter body as HTML</p>"
       }
     });
-    let response = app.post_newsletters(newsletter_request_body).await;
+    let response = app
+        .post_newsletters(newsletter_request_body, &app.auth_token)
+        .await;
 
     assert_eq!(
         response.status(),
@@ -58,7 +59,9 @@ async fn newsletters_are_delivered_to_confirmed_subscribers() -> Result<(), anyh
         "html": "<p>Newsletter body as HTML</p>"
       }
     });
-    let response = app.post_newsletters(newsletter_request_body).await;
+    let response = app
+        .post_newsletters(newsletter_request_body, &app.auth_token)
+        .await;
 
     assert_eq!(
         response.status(),
@@ -91,7 +94,7 @@ async fn newsletters_returns_400_for_invalid_data() -> Result<(), anyhow::Error>
     ];
 
     for (invalid_body, error_message) in test_cases {
-        let response = app.post_newsletters(invalid_body).await;
+        let response = app.post_newsletters(invalid_body, &app.auth_token).await;
 
         assert_eq!(
             response.status(),
@@ -145,7 +148,8 @@ async fn create_confirmed_subscriber(app: &TestApp) -> Result<(), anyhow::Error>
 async fn request_missing_authorization_are_rejected() -> Result<(), anyhow::Error> {
     let app = spawn_app().await;
 
-    let response = reqwest::Client::new()
+    let response = app
+        .api_client
         .post(&format!("{}/newsletter", app.app_address()))
         .json(&serde_json::json!({
             "title": "Newsletter title",
@@ -161,31 +165,21 @@ async fn request_missing_authorization_are_rejected() -> Result<(), anyhow::Erro
         response.status(),
         StatusCode::UNAUTHORIZED,
         "expected 401 Unauthorized but got: {:?}",
-        response
-    );
-    assert_eq!(
-        response.headers().get(header::WWW_AUTHENTICATE),
-        Some(&HeaderValue::from_str(r#"Basic realm="publish""#)?),
-        "expected 'WWW-Authenticate' header with value 'Basic realm=\"publish\"' but got: {:?}",
         response
     );
 
     Ok(())
 }
 
-/// cargo nextest run non_existing_user_is_rejected --release -- --nocapture
-/// 아래 테스트와 소요 시간을 비교해보자
 #[tokio::test]
-async fn non_existing_user_is_rejected() -> Result<(), anyhow::Error> {
+async fn invalid_token_is_rejected() -> Result<(), anyhow::Error> {
     let app = spawn_app().await;
-    let username = Uuid::new_v4().to_string();
-    let password = Uuid::new_v4().to_string();
+    let token = Uuid::new_v4().to_string();
 
-    let start_time = tokio::time::Instant::now();
-
-    let response = reqwest::Client::new()
+    let response = app
+        .api_client
         .post(&format!("{}/newsletter", app.app_address()))
-        .basic_auth(username, Some(password))
+        .bearer_auth(token)
         .json(&serde_json::json!({
             "title": "Newsletter title",
             "content": {
@@ -196,68 +190,10 @@ async fn non_existing_user_is_rejected() -> Result<(), anyhow::Error> {
         .send()
         .await?;
 
-    let duration = tokio::time::Instant::now() - start_time;
-    println!("Request took {}ms", duration.as_millis());
-
     assert_eq!(
         response.status(),
         StatusCode::UNAUTHORIZED,
         "expected 401 Unauthorized but got: {:?}",
-        response
-    );
-    assert_eq!(
-        response.headers().get(header::WWW_AUTHENTICATE),
-        Some(&HeaderValue::from_str(r#"Basic realm="publish""#)?),
-        "expected 'WWW-Authenticate' header with value 'Basic realm=\"publish\"' but got: {:?}",
-        response
-    );
-
-    Ok(())
-}
-
-/// cargo nextest run invalid_password_is_rejected --release -- --nocapture
-/// 위 테스트와 소요 시간을 비교해보자
-/// 소요 시간이 크게 차이난다면 소요시간 분석 부채널 공격의 우려가 있다
-/// 사용자가 존재하는지 확인할 수 있다
-#[tokio::test]
-async fn invalid_password_is_rejected() -> Result<(), anyhow::Error> {
-    let app = spawn_app().await;
-    let username = &app.test_user.username;
-    let password = Uuid::new_v4().to_string();
-
-    assert_ne!(
-        app.test_user.password, password,
-        "password must be invalid to test"
-    );
-
-    let start_time = tokio::time::Instant::now();
-
-    let response = reqwest::Client::new()
-        .post(&format!("{}/newsletter", app.app_address()))
-        .basic_auth(username, Some(password))
-        .json(&serde_json::json!({
-            "title": "Newsletter title",
-            "content": {
-                "text": "Newsletter body as plain text",
-                "html": "<p>Newsletter body as HTML</p>"
-            }
-        }))
-        .send()
-        .await?;
-
-    let duration = tokio::time::Instant::now() - start_time;
-    println!("Request took {}ms", duration.as_millis());
-
-    assert_eq!(
-        response.status(),
-        StatusCode::UNAUTHORIZED,
-        "expected 401 Unauthorized but got: {:?}",
-        response
-    );
-    assert_eq!(
-        response.headers().get(header::WWW_AUTHENTICATE),
-        Some(&HeaderValue::from_str(r#"Basic realm="publish""#)?),
-        "expected 'WWW-Authenticate' header with value 'Basic realm=\"publish\"' but got: {:?}",
         response
     );
 

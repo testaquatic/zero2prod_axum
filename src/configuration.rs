@@ -29,7 +29,8 @@ pub struct ApplicationSettings {
     pub host: String,
     /// API 서버의 url
     pub base_url: String,
-    pub token_secret: SecretString,
+    pub token_secret_private_pem: SecretString,
+    pub token_secret_public_pem: SecretString,
 }
 
 #[derive(serde::Deserialize, Clone)]

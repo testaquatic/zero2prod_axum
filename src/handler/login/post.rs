@@ -1,6 +1,10 @@
 use std::sync::Arc;
 
 use axum::{Json, extract::State};
+use utoipa::{
+    Modify,
+    openapi::security::{Http, HttpAuthScheme, SecurityScheme},
+};
 
 use crate::{
     app_state::AppState,
@@ -32,12 +36,27 @@ pub async fn login(
         .await?;
     tracing::Span::current().record("user_id", tracing::field::display(&user_id));
 
+    let token = app_state
+        .auth_token_service
+        .generate_token(&app_state, &user_id)
+        .await?;
+
     Ok(Json(TokenResponse {
-        token: "123".to_string(),
+        token: token.into(),
         token_type: "Bearer".to_string(),
     }))
 }
 
 #[derive(utoipa::OpenApi)]
-#[openapi(paths(login))]
+#[openapi(paths(login), modifiers(&PostLoginOpenApiDoc))]
 pub struct PostLoginOpenApiDoc;
+
+impl Modify for PostLoginOpenApiDoc {
+    fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
+        let components: &mut utoipa::openapi::Components = openapi.components.as_mut().unwrap(); // we can unwrap safely since there already is components registered.
+        components.add_security_scheme(
+            "bearerAuth",
+            SecurityScheme::Http(Http::new(HttpAuthScheme::Bearer)),
+        )
+    }
+}

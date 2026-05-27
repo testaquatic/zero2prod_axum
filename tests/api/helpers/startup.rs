@@ -1,10 +1,13 @@
 use std::sync::LazyLock;
 
+use reqwest::StatusCode;
+use secrecy::ExposeSecret;
 use sqlx::{Connection, QueryBuilder, postgres};
 use uuid::Uuid;
 use wiremock::MockServer;
 use zero2prod_axum::{
     configuration::{self, Settings},
+    domain::credential::TokenResponse,
     startup::Application,
     telemetry,
 };
@@ -67,11 +70,32 @@ pub async fn spawn_app() -> TestApp {
     // 테스트 서버 실행
     let api_server_handle = tokio::spawn(application.run_until_stopped());
 
+    // 로그인 토큰을 얻는다
+    let token_response = post_login(
+        &configuration,
+        &serde_json::json!({ "username": &test_user.username, "password": &test_user.password }),
+    )
+    .await;
+    assert_eq!(
+        token_response.status(),
+        StatusCode::OK,
+        "failed to get token: {:?}",
+        token_response
+    );
+    let token = get_token_from_response(token_response).await;
+
+    let api_client = reqwest::Client::builder()
+        .cookie_store(true)
+        .build()
+        .expect("failed to build client");
+
     TestApp {
         configuration,
         email_server,
         test_user,
+        auth_token: token.token.expose_secret().to_string(),
         _api_server_handle: api_server_handle,
+        api_client,
     }
 }
 
@@ -96,4 +120,26 @@ async fn migrate_test_database(config: &Settings) {
         .run(&pg_pool)
         .await
         .expect("failed to migrate the database");
+}
+
+async fn get_token_from_response(response: reqwest::Response) -> TokenResponse {
+    response
+        .json::<TokenResponse>()
+        .await
+        .expect("failed to get token")
+}
+
+pub async fn post_login<Body: serde::Serialize>(
+    configuration: &Settings,
+    body: &Body,
+) -> reqwest::Response {
+    reqwest::Client::new()
+        .post(&format!(
+            "http://localhost:{}/login",
+            configuration.application.port
+        ))
+        .json(body)
+        .send()
+        .await
+        .expect("Failed to execute request.")
 }

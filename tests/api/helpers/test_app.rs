@@ -2,13 +2,15 @@ use reqwest::header;
 use wiremock::MockServer;
 use zero2prod_axum::configuration::Settings;
 
-use crate::helpers::test_user::TestUser;
+use crate::helpers::{startup::post_login, test_user::TestUser};
 
 pub struct TestApp {
     pub configuration: Settings,
     /// 이메일 서버를 모사한다.
     pub email_server: MockServer,
     pub test_user: TestUser,
+    pub auth_token: String,
+    pub api_client: reqwest::Client,
     pub _api_server_handle: tokio::task::JoinHandle<Result<(), std::io::Error>>,
 }
 
@@ -21,7 +23,7 @@ impl TestApp {
     }
 
     pub async fn post_subscriptions(&self, body: String) -> reqwest::Response {
-        reqwest::Client::new()
+        self.api_client
             .post(&format!("{}/subscriptions", self.app_address()))
             .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
             .body(body)
@@ -66,14 +68,22 @@ impl TestApp {
         ConfirmationLinks { html, plain_text }
     }
 
-    pub async fn post_newsletters(&self, body: serde_json::Value) -> reqwest::Response {
-        reqwest::Client::new()
+    pub async fn post_newsletters(
+        &self,
+        body: serde_json::Value,
+        token: &str,
+    ) -> reqwest::Response {
+        self.api_client
             .post(&format!("{}/newsletter", self.app_address()))
-            .basic_auth(&self.test_user.username, Some(&self.test_user.password))
+            .bearer_auth(token)
             .json(&body)
             .send()
             .await
             .expect("Failed to execute request.")
+    }
+
+    pub async fn post_login<Body: serde::Serialize>(&self, body: &Body) -> reqwest::Response {
+        post_login(&self.configuration, body).await
     }
 }
 

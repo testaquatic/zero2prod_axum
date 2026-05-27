@@ -11,7 +11,10 @@ use crate::{app_state::AppState, error::AppError};
     post,
     path = "/newsletter",
     params(
-        ("Authorization" = String, Header, description = "Basic authentication")
+        ("Authorization" = String, Header, description = "Bearer authentication", example = "Bearer <token>"),
+    ),
+    security(
+        ("bearerAuth" = []),
     ),
     request_body = BodyData,
     responses(
