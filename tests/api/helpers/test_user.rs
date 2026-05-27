@@ -1,5 +1,5 @@
 use argon2::{
-    Argon2, PasswordHasher,
+    Argon2, Params, PasswordHasher,
     password_hash::{SaltString, rand_core},
 };
 use uuid::Uuid;
@@ -21,10 +21,14 @@ impl TestUser {
 
     pub async fn store(&self, pool: &sqlx::PgPool) {
         let salt = SaltString::generate(&mut rand_core::OsRng);
-        let password_hash = Argon2::default()
-            .hash_password(self.password.as_bytes(), &salt)
-            .expect("failed to hash password")
-            .to_string();
+        let password_hash = Argon2::new(
+            argon2::Algorithm::Argon2id,
+            argon2::Version::V0x13,
+            Params::new(19456, 2, 1, None).expect("failed to build parameters"),
+        )
+        .hash_password(self.password.as_bytes(), &salt)
+        .expect("failed to hash password")
+        .to_string();
 
         sqlx::query!(
             r#"

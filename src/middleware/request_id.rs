@@ -39,8 +39,8 @@ where
 
     fn call(&mut self, req: Request) -> Self::Future {
         let path = req.uri().path().to_string();
-        let span =
-            tracing::info_span!("zero2prod_axum", request_id = %uuid::Uuid::new_v4(), path = %path);
+        let method = req.method();
+        let span = tracing::info_span!("zero2prod_axum", request_id = %uuid::Uuid::new_v4(), path = %path, method = %method);
         let future = self.inner.call(req).instrument(span);
 
         Box::pin(future)

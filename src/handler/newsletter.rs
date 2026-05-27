@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use axum::{Json, extract::State, http};
 
-use crate::{app_state::AppState, handler::error::AppError, middleware::credentials};
+use crate::{app_state::AppState, handler::error::AppError};
 
 /// 뉴스레터를 발행한다.
 #[utoipa::path(
@@ -20,7 +20,6 @@ use crate::{app_state::AppState, handler::error::AppError, middleware::credentia
 )]
 pub async fn publish_newsletter(
     State(app_state): State<Arc<AppState>>,
-    _credentials: credentials::ExtractCredentials,
     Json(body): Json<BodyData>,
 ) -> Result<http::StatusCode, AppError> {
     app_state

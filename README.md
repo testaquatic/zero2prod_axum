@@ -27,3 +27,28 @@
 # 이번 코드의 컨셉
 
 이전에 읽었던 [러스트 백 엔드 (Axum)](https://text.ibetter.kr/rust-axum)의 코드를 반영했다.
+
+# phc_string_gen
+
+PHC 문자열과 UUID를 생성한다.
+편의를 위해서 GO로 작성한 작은 프로그램이다.  
+이전에 작성한 코드가 있어서 가져왔다.
+
+```bash
+go run ./phc_string_gen.go --help
+Usage of phc_string_gen:
+  -l uint
+        [l]ength (default 32)
+  -m uint
+        [m]emory (default 19456)
+  -p string
+        [p]assword
+        Automatically generated if not entered
+  -s string
+        [s]alt
+        Automatically generated if not entered
+  -t uint
+        [t]ime (default 2)
+  -th uint
+        [th]reads (default 1)
+```

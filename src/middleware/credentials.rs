@@ -3,7 +3,7 @@ use std::sync::Arc;
 use anyhow::Context;
 use axum::extract::FromRequestParts;
 use base64::{Engine, engine::general_purpose::STANDARD};
-use secrecy::SecretString;
+use secrecy::{ExposeSecret, SecretString};
 
 use crate::{
     app_state::AppState,
@@ -37,13 +37,21 @@ impl FromRequestParts<Arc<AppState>> for ExtractCredentials {
     ) -> Result<Self, Self::Rejection> {
         // 일단 사용자명과 비밀번호를 추출한다
         let username_password = extract_credentials(parts).await?;
+
+        // Clone 이전의 비밀번호 길이 검사
+        // 256바이트라면 감당할만 하다
+        // 설마 256자를 넘기는 비밀번호는 사용 안하겠지
+        if username_password.password.expose_secret().len() > 256 {
+            return Err(AppError::AuthError(anyhow::anyhow!("Password too long")));
+        }
+
         // 사용자의 ID를 찾는다.
         let user_id = app_state
             .credential_service
             .validate_credentials(
                 &app_state.pg_pool,
                 &username_password.username,
-                &username_password.password,
+                username_password.password.clone(),
             )
             .await?;
         tracing::Span::current().record("user_id", tracing::field::display(user_id));

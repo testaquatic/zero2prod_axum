@@ -5,6 +5,7 @@ pub mod domain;
 pub mod email_client;
 pub mod handler;
 pub mod middleware;
+pub mod router;
 pub mod service;
 pub mod startup;
 pub mod telemetry;

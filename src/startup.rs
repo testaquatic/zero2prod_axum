@@ -1,50 +1,15 @@
-use std::{sync::Arc, time::Duration};
+use std::time::Duration;
 
-use axum::{Router, routing};
+use axum::Router;
 use sqlx::{PgPool, postgres::PgPoolOptions};
 use tokio::net::TcpListener;
-use utoipa::OpenApi;
-use utoipa_axum::router::OpenApiRouter;
-use utoipa_swagger_ui::SwaggerUi;
 
 use crate::{
     app_state,
     configuration::{self},
     email_client,
-    handler::{
-        health_check::{self, health_check},
-        newsletter::{self, publish_newsletter},
-        subscriptions::{self, subscribe},
-        subscriptions_confirm::{self, confirm},
-    },
-    middleware::request_id::RequestIdLayer,
+    router::get_app_router,
 };
-
-/// 앱 라우터를 생성한다.
-/// todo: 권한을 가지고 있는 사용자만 접근 가능하게 만들기
-pub fn get_app_router(app_state: Arc<app_state::AppState>) -> axum::Router {
-    let openapi_router = get_swagger_router();
-
-    axum::Router::new()
-        .route("/health_check", routing::get(health_check))
-        .route("/subscriptions", routing::post(subscribe))
-        .route("/subscriptions/confirm", routing::get(confirm))
-        .route("/newsletter", routing::post(publish_newsletter))
-        .with_state(app_state)
-        .merge(openapi_router)
-        .layer(tower_http::trace::TraceLayer::new_for_http())
-        .layer(RequestIdLayer)
-}
-
-/// 스웨거 라우터를 생성한다.
-fn get_swagger_router() -> axum::Router {
-    let (router, mut api) = OpenApiRouter::new().split_for_parts();
-    api.merge(health_check::HealthCheckApiDoc::openapi());
-    api.merge(subscriptions::SubscriptionsApiDoc::openapi());
-    api.merge(subscriptions_confirm::SubscriptionsConfirm::openapi());
-    api.merge(newsletter::NewsletterOpenApiDoc::openapi());
-    router.merge(SwaggerUi::new("/swagger-ui").url("/apidoc/openapi.json", api))
-}
 
 pub fn get_connection_pool(configuration: &configuration::Settings) -> PgPool {
     PgPoolOptions::new()

@@ -14,6 +14,8 @@ where
         EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(env_filter));
     let formatting_layer = tracing_subscriber::fmt::layer()
         .with_span_events(FmtSpan::NEW | FmtSpan::CLOSE)
+        .with_line_number(true)
+        .with_file(true)
         .with_writer(sink)
         .json()
         .with_current_span(true)
