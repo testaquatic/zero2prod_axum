@@ -5,7 +5,7 @@ use axum::{
     http,
 };
 
-use crate::{app_state::AppState, handler::error::AppError};
+use crate::{app_state::AppState, error::AppError};
 
 #[derive(serde::Deserialize, utoipa::IntoParams)]
 pub struct Parameters {

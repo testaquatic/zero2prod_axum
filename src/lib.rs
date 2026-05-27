@@ -3,6 +3,7 @@ pub mod configuration;
 pub mod database;
 pub mod domain;
 pub mod email_client;
+pub mod error;
 pub mod handler;
 pub mod middleware;
 pub mod router;

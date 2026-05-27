@@ -4,8 +4,8 @@ use secrecy::{ExposeSecret, SecretString};
 use sqlx::PgExecutor;
 
 use crate::{
-    database::postgres::credentials::get_user_id_password_hash_from_username,
-    service::error::ServiceError,
+    database::postgres::users::get_user_id_password_hash_from_username,
+    domain::credential::UsernamePassword, service::error::ServiceError,
 };
 
 pub struct CredentialService;
@@ -15,12 +15,11 @@ impl CredentialService {
     pub async fn validate_credentials(
         &self,
         pg_executor: impl PgExecutor<'_>,
-        username: &str,
-        password: SecretString,
+        username_password: &UsernamePassword,
     ) -> Result<uuid::Uuid, ServiceError> {
-        let user_password_hash = get_user_id_password_hash_from_username(pg_executor, username)
-            .await
-            .map_err(ServiceError::DatabaseError)?;
+        let user_password_hash =
+            get_user_id_password_hash_from_username(pg_executor, &username_password.username)
+                .await?;
         let user_id = user_password_hash.as_ref().map(|user| user.user_id);
         let user_password_hash = user_password_hash
             .map(|user| user.password_hash)
@@ -29,13 +28,14 @@ impl CredentialService {
                 SecretString::new("$argon2id$v=19$m=19456,t=2,p=1$Ty9NdHNhNzQ$dBqxxXkpnU8ob6RgDsVlPw7BsC76W0/v0z7JpdEkJds".to_string().into())
             );
 
-        let password = password.clone();
+        let password = username_password.password.clone();
         spawn_blocking_with_tracing(move || verify_password_hash(password, user_password_hash))
             .await
-            .map_err(|e| ServiceError::UnexpectedError(e.into()))??;
+            .context("Failed to spawn blocking task")
+            .map_err(ServiceError::UnexpectedError)??;
 
         user_id
-            .with_context(|| format!("Unknown username: {}", username))
+            .with_context(|| format!("Unknown username: {}", username_password.username))
             .map_err(ServiceError::AuthError)
     }
 }
@@ -46,10 +46,12 @@ fn verify_password_hash(
     password_hash: SecretString,
 ) -> Result<(), ServiceError> {
     let password_hash = PasswordHash::new(password_hash.expose_secret())
-        .map_err(|e| ServiceError::UnexpectedError(anyhow::anyhow!(e)))?;
+        .context("Failed to parse hash in PHC string format")
+        .map_err(ServiceError::UnexpectedError)?;
     Argon2::default()
         .verify_password(password.expose_secret().as_bytes(), &password_hash)
-        .map_err(|e| ServiceError::AuthError(anyhow::anyhow!(e)))
+        .context("Invalid password")
+        .map_err(ServiceError::AuthError)
 }
 
 fn spawn_blocking_with_tracing<F, R>(f: F) -> tokio::task::JoinHandle<R>

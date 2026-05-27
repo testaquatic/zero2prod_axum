@@ -11,7 +11,7 @@ anyhow = "1"
 # 암호화
 argon2 = { version = "0.5", features = ["std"] }
 # 웹 프레임워크
-axum = { version = "0.8", features = ["form"] }
+axum = { version = "0.8", features = ["form", "macros"] }
 base64 = "0.22"
 # 시간
 chrono = "0.4"
@@ -26,6 +26,8 @@ reqwest = { version = "0.13", features = ["json", "brotli", "gzip", "zstd", "def
 secrecy = { version = "0.10", features = ["serde"] }
 # 직렬화
 serde = { version = "1", features = ["derive"] }
+# json 직렬화, 역직렬화
+serde_json = "1"
 # Postgres
 sqlx = { version = "0.9", features = ["chrono", "postgres", "runtime-tokio", "tls-rustls", "uuid"] }
 # 오류 구현 
@@ -57,8 +59,7 @@ linkify = "0.11"
 # 속성 테스트
 quickcheck = "1"
 quickcheck_macros = "1"
-# json 직렬화, 역직렬화
-serde_json = "1"
+
 # axum에 각종 편의 기능 추가
 tower = { version = "0.5", features = ["util"] }
 # 테스트 웹 서버

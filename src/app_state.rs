@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::{
     email_client::{self, EmailClient},
     service::{
-        credential::CredentialService, newsletter::NewsletterService,
+        authentication::CredentialService, newsletter::NewsletterService,
         subscriptions::SubscriptionsService,
     },
 };

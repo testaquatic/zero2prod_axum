@@ -1,4 +1,3 @@
-pub mod confirm;
-pub mod credentials;
-pub mod newsletters;
+pub mod subscription_tokens;
 pub mod subscriptions;
+pub mod users;

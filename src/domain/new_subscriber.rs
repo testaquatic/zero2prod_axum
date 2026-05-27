@@ -4,6 +4,7 @@ use crate::{
 };
 
 /// 유효성을 검사한 가입을 요청한 사용자의 정보
+#[derive(Debug)]
 pub struct NewSubscriber {
     pub email: SubscriberEmail,
     pub name: SubscriberName,

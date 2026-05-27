@@ -4,8 +4,8 @@ use sqlx::PgPool;
 use crate::{
     database::postgres::{
         self,
-        confirm::{confirm_subscriber, get_subscriber_id_from_token},
-        subscriptions,
+        subscription_tokens::{get_subscriber_id_from_token, insert_subscription_token},
+        subscriptions::update_subscriber_confirmed,
     },
     domain::new_subscriber::NewSubscriber,
     email_client::{self, EmailClient},
@@ -33,8 +33,7 @@ impl SubscriptionsService {
                 .await?;
         let subscription_token = generate_subscription_token();
 
-        subscriptions::store_token(transaction.as_mut(), subscriber_id, &subscription_token)
-            .await?;
+        insert_subscription_token(transaction.as_mut(), subscriber_id, &subscription_token).await?;
 
         transaction.commit().await?;
 
@@ -54,7 +53,7 @@ impl SubscriptionsService {
             .await?
             .ok_or_else(|| ServiceError::SubscriptionTokenError)?;
 
-        confirm_subscriber(pg_pool, id).await?;
+        update_subscriber_confirmed(pg_pool, id).await?;
 
         Ok(())
     }

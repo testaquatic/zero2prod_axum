@@ -6,7 +6,7 @@ use axum::{
     http::{self},
 };
 
-use crate::{app_state::AppState, handler::error::AppError};
+use crate::{app_state::AppState, error::AppError};
 
 #[tracing::instrument(
     name = "Adding a new subscriber",

@@ -4,6 +4,26 @@ use uuid::Uuid;
 
 use crate::domain::new_subscriber::NewSubscriber;
 
+pub struct ConfirmedSubscriber {
+    pub email: String,
+}
+
+#[tracing::instrument(name = "Get confirmed subscribers", skip_all, err(Debug))]
+pub async fn get_confirmed_subscribers(
+    pg_executor: impl PgExecutor<'_>,
+) -> Result<Vec<ConfirmedSubscriber>, sqlx::Error> {
+    sqlx::query_as!(
+        ConfirmedSubscriber,
+        r#"
+        SELECT email
+        FROM subscriptions
+        WHERE status = 'confirmed'
+        "#,
+    )
+    .fetch_all(pg_executor)
+    .await
+}
+
 /// 구독자 데이터를 데이터베이스에 저장한다.
 /// 구독자의 `Uuid`를 반환한다.
 #[tracing::instrument(
@@ -32,22 +52,17 @@ pub async fn insert_subscriber(
     Ok(subscriber_id)
 }
 
-#[tracing::instrument(
-    name = "Store subscription token in the database",
-    skip_all,
-    err(Debug)
-)]
-pub async fn store_token(
+#[tracing::instrument(name = "Mark subscriber as confirmed", skip_all, err(Debug))]
+pub async fn update_subscriber_confirmed(
     pg_executor: impl PgExecutor<'_>,
     subscriber_id: Uuid,
-    subscription_token: &str,
 ) -> Result<(), sqlx::Error> {
     sqlx::query!(
         r#"
-        INSERT INTO subscription_tokens (subscription_token, subscriber_id) 
-        VALUES ($1, $2);
+        UPDATE subscriptions
+        SET status = 'confirmed'
+        WHERE id = $1
         "#,
-        subscription_token,
         subscriber_id,
     )
     .execute(pg_executor)

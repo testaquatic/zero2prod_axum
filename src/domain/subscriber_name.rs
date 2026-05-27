@@ -4,6 +4,7 @@ use unicode_segmentation::UnicodeSegmentation;
 /// 1. 빈 문자열은 거부
 /// 2. 최대 256자
 /// 3. 특수 문자는 거부
+#[derive(Debug)]
 pub struct SubscriberName(String);
 
 impl SubscriberName {

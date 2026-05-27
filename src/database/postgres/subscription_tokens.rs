@@ -1,17 +1,22 @@
 use sqlx::PgExecutor;
 use uuid::Uuid;
 
-#[tracing::instrument(name = "Mark subscriber as confirmed", skip_all, err(Debug))]
-pub async fn confirm_subscriber(
+#[tracing::instrument(
+    name = "Store subscription token in the database",
+    skip_all,
+    err(Debug)
+)]
+pub async fn insert_subscription_token(
     pg_executor: impl PgExecutor<'_>,
     subscriber_id: Uuid,
+    subscription_token: &str,
 ) -> Result<(), sqlx::Error> {
     sqlx::query!(
         r#"
-        UPDATE subscriptions
-        SET status = 'confirmed'
-        WHERE id = $1
-        "#,
+      INSERT INTO subscription_tokens (subscription_token, subscriber_id) 
+      VALUES ($1, $2);
+      "#,
+        subscription_token,
         subscriber_id,
     )
     .execute(pg_executor)

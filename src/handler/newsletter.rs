@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use axum::{Json, extract::State, http};
 
-use crate::{app_state::AppState, handler::error::AppError};
+use crate::{app_state::AppState, error::AppError};
 
 /// 뉴스레터를 발행한다.
 #[utoipa::path(

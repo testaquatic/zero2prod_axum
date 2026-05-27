@@ -1,7 +1,7 @@
 use sqlx::PgPool;
 
 use crate::{
-    database::postgres::newsletters::get_confirmed_subscribers,
+    database::postgres::subscriptions::get_confirmed_subscribers,
     domain::subscriber_email::SubscriberEmail, email_client::EmailClient,
     handler::newsletter::BodyData, service::error::ServiceError,
 };

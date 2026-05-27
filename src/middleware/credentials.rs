@@ -8,7 +8,7 @@ use secrecy::{ExposeSecret, SecretString};
 use crate::{
     app_state::AppState,
     domain::credential::{Credentials, UsernamePassword},
-    handler::error::AppError,
+    error::AppError,
 };
 
 /// Basic 인증 관련 추출자
@@ -48,11 +48,7 @@ impl FromRequestParts<Arc<AppState>> for ExtractCredentials {
         // 사용자의 ID를 찾는다.
         let user_id = app_state
             .credential_service
-            .validate_credentials(
-                &app_state.pg_pool,
-                &username_password.username,
-                username_password.password.clone(),
-            )
+            .validate_credentials(&app_state.pg_pool, &username_password)
             .await?;
         tracing::Span::current().record("user_id", tracing::field::display(user_id));
 

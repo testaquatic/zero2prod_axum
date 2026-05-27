@@ -5,6 +5,7 @@ database:
   database_name: newsletter
   host: localhost
   port: 5432
+  token_secret: "long-and-very-secret-random-key-needed-for-authentication"
 application:
   base_url: "http://127.0.0.1"
   port: 8000

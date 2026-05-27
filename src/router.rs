@@ -9,6 +9,7 @@ use crate::{
     app_state::{self, AppState},
     handler::{
         health_check::{self, health_check},
+        login::{self, post::login},
         newsletter::{self, publish_newsletter},
         subscriptions::{self, subscribe},
         subscriptions_confirm::{self, confirm},
@@ -26,6 +27,7 @@ pub fn get_app_router(app_state: Arc<app_state::AppState>) -> axum::Router {
         .route("/health_check", routing::get(health_check))
         .route("/subscriptions", routing::post(subscribe))
         .route("/subscriptions/confirm", routing::get(confirm))
+        .route("/login", routing::post(login))
         .merge(protected_router)
         .with_state(app_state)
         .merge(openapi_router)
@@ -49,5 +51,6 @@ fn get_swagger_router() -> axum::Router {
     api.merge(subscriptions::SubscriptionsApiDoc::openapi());
     api.merge(subscriptions_confirm::SubscriptionsConfirm::openapi());
     api.merge(newsletter::NewsletterOpenApiDoc::openapi());
+    api.merge(login::post::PostLoginOpenApiDoc::openapi());
     router.merge(SwaggerUi::new("/swagger-ui").url("/apidoc/openapi.json", api))
 }
