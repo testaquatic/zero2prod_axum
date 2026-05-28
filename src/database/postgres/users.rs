@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use secrecy::SecretString;
+use secrecy::{ExposeSecret, SecretString};
 use sqlx::PgExecutor;
 
 use crate::domain::response::UserInfo;
@@ -51,4 +51,24 @@ pub async fn get_user_info_by_user_id(
     )
     .fetch_optional(pg_executor)
     .await
+}
+
+#[tracing::instrument(name = "Change password hash", skip_all, err(Debug))]
+pub async fn update_password_hash(
+    pg_executor: impl PgExecutor<'_>,
+    user_id: &uuid::Uuid,
+    password_hash: &SecretString,
+) -> Result<(), sqlx::Error> {
+    sqlx::query!(
+        r#"
+        UPDATE users
+        SET password_hash = $1
+        WHERE user_id = $2
+        "#,
+        password_hash.expose_secret(),
+        user_id,
+    )
+    .execute(pg_executor)
+    .await
+    .map(|_| ())
 }

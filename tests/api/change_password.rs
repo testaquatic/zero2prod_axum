@@ -2,6 +2,7 @@ use fake::Fake;
 use reqwest::StatusCode;
 use secrecy::ExposeSecret;
 use uuid::Uuid;
+use zero2prod_axum::domain::response::TokenResponse;
 
 use crate::helpers::startup::spawn_app;
 
@@ -129,5 +130,69 @@ async fn too_long_password_is_rejected() -> Result<(), anyhow::Error> {
         );
     }
 
+    Ok(())
+}
+
+#[tokio::test]
+async fn changing_password_works() -> Result<(), anyhow::Error> {
+    let app = spawn_app().await;
+    let new_password = Uuid::new_v4().to_string();
+
+    // 비밀번호를 변경한다.
+    let response = app
+        .post_change_password(
+            &serde_json::json!({
+              "current_password": &app.test_user.password,
+              "new_password": new_password,
+              "new_password_check": new_password
+            }),
+            &app.auth_token,
+        )
+        .await;
+    assert_eq!(
+        response.status(),
+        StatusCode::OK,
+        "expected 200 OK but got: {:?}",
+        response
+    );
+
+    // 로그아웃 한다
+    let response = app.post_logout(&app.auth_token).await;
+    assert_eq!(
+        response.status(),
+        StatusCode::ACCEPTED,
+        "expected 202 OK but got: {:?}",
+        response
+    );
+
+    // 새로운 토큰을 생성한다.
+    let response = app
+        .post_login(
+            &serde_json::json!({"username": &app.test_user.username, "password": new_password}),
+        )
+        .await;
+    assert_eq!(
+        response.status(),
+        StatusCode::OK,
+        "expected 200 OK but got: {:?}",
+        response
+    );
+
+    let new_token = response
+        .json::<TokenResponse>()
+        .await
+        .expect("failed to get new token")
+        .token
+        .expose_secret()
+        .to_string();
+
+    // 새로운 토큰으로 관리자 대쉬보드를 불러온다
+    let response = app.get_admin_dashboard(&new_token).await;
+    assert_eq!(
+        response.status(),
+        StatusCode::OK,
+        "expected 200 OK but got: {:?}",
+        response
+    );
     Ok(())
 }

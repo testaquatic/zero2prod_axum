@@ -1,11 +1,14 @@
 use anyhow::Context;
-use argon2::{Argon2, PasswordHash, PasswordVerifier};
+use argon2::{
+    Argon2, PasswordHash, PasswordHasher, PasswordVerifier,
+    password_hash::{SaltString, rand_core},
+};
 use secrecy::{ExposeSecret, SecretString};
 
 use crate::{
     app_state::AppState,
     database::postgres::users::{
-        get_user_id_password_hash_from_username, get_user_info_by_user_id,
+        get_user_id_password_hash_from_username, get_user_info_by_user_id, update_password_hash,
     },
     domain::{
         extractor::TokenData,
@@ -66,6 +69,7 @@ impl CredentialService {
             ));
         }
 
+        // 비밀번호 두개는 같아야 한다.
         if change_password_form_data.new_password.expose_secret()
             != change_password_form_data.new_password_check.expose_secret()
         {
@@ -74,21 +78,31 @@ impl CredentialService {
             ));
         }
 
+        // user_id를 불러오고 기존의 비밀번호가 맞는지 확인한다.
         let user_info = get_user_info_by_user_id(&app_state.pg_pool, &token_data.user_id)
             .await?
             .context("No user data!")
             .map_err(ServiceError::UnexpectedError)?;
 
-        self.validate_credentials(
-            app_state,
-            &LoginFormData {
-                username: user_info.username,
-                password: change_password_form_data.current_password.clone(),
-            },
-        )
-        .await?;
+        let login_form_data = LoginFormData {
+            username: user_info.username,
+            password: change_password_form_data.current_password.clone(),
+        };
 
-        unimplemented!()
+        self.validate_credentials(app_state, &login_form_data)
+            .await?;
+
+        let new_password = change_password_form_data.new_password.clone();
+        // 해시를 생성한다.
+        let password_hash =
+            spawn_blocking_with_tracing(move || compute_password_hash(new_password))
+                .await
+                .context("tokio join error")
+                .map_err(ServiceError::UnexpectedError)??;
+
+        update_password_hash(&app_state.pg_pool, &token_data.user_id, &password_hash).await?;
+
+        Ok(())
     }
 }
 
@@ -106,7 +120,16 @@ fn verify_password_hash(
         .map_err(ServiceError::AuthError)
 }
 
-fn spawn_blocking_with_tracing<F, R>(f: F) -> tokio::task::JoinHandle<R>
+fn compute_password_hash(password: SecretString) -> Result<SecretString, ServiceError> {
+    let salt = SaltString::generate(&mut rand_core::OsRng);
+    Argon2::default()
+        .hash_password(password.expose_secret().as_bytes(), &salt)
+        .context("Failed to hash password")
+        .map(|hash| hash.to_string().into())
+        .map_err(ServiceError::UnexpectedError)
+}
+
+pub fn spawn_blocking_with_tracing<F, R>(f: F) -> tokio::task::JoinHandle<R>
 where
     F: FnOnce() -> R + Send + 'static,
     R: Send + 'static,
