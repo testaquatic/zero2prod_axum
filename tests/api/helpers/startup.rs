@@ -7,7 +7,7 @@ use uuid::Uuid;
 use wiremock::MockServer;
 use zero2prod_axum::{
     configuration::{self, Settings},
-    domain::credential::TokenResponse,
+    domain::response::TokenResponse,
     startup::Application,
     telemetry,
 };

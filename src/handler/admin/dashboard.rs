@@ -5,15 +5,10 @@ use reqwest::StatusCode;
 
 use crate::{
     app_state::AppState,
-    domain::user::UserInfo,
+    domain::response::UserInfo,
     error::{AppError, AppErrorMessage},
     middleware::auth_token::TokenData,
 };
-
-#[derive(serde::Serialize)]
-pub struct DashboardJson {
-    pub username: String,
-}
 
 #[tracing::instrument(name = "Get admin dashboard", skip_all, err(Debug))]
 #[utoipa::path(
@@ -28,9 +23,9 @@ pub struct DashboardJson {
     responses(
         (status = StatusCode::OK, description = "Dashboard info", body = UserInfo),
         (
-            status = StatusCode::UNAUTHORIZED, 
-            description = "접근 권한이 없음", 
-            body = AppErrorMessage, 
+            status = StatusCode::UNAUTHORIZED,
+            description = "접근 권한이 없음",
+            body = AppErrorMessage,
             example = json!({
                 "type": StatusCode::UNAUTHORIZED.to_string(),
                 "message": "인증 오류: 사용자 정보를 찾을 수 없습니다",
@@ -47,7 +42,6 @@ pub async fn get_admin_dashboard(
         .dashboard_service
         .get_admin_dashboard(&app_state, &token_data)
         .await?;
-
 
     Ok(Json(user_info))
 }

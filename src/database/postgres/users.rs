@@ -3,7 +3,7 @@ use std::borrow::Cow;
 use secrecy::SecretString;
 use sqlx::PgExecutor;
 
-use crate::domain::user::UserInfo;
+use crate::domain::response::UserInfo;
 
 pub struct UserPasswordHash<'a> {
     pub user_id: uuid::Uuid,
@@ -43,7 +43,7 @@ pub async fn get_user_info_by_user_id(
     sqlx::query_as!(
         UserInfo,
         r#"
-        SELECT user_id, username, role
+        SELECT username, role
         FROM users
         WHERE user_id = $1
         "#,

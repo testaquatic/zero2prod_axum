@@ -1,6 +1,6 @@
-use crate::{
-    domain::{subscriber_email::SubscriberEmail, subscriber_name::SubscriberName},
-    handler::subscriptions::SubscribeFormData,
+use crate::domain::{
+    form_data::SubscribeFormData, subscriber_email::SubscriberEmail,
+    subscriber_name::SubscriberName,
 };
 
 /// 유효성을 검사한 가입을 요청한 사용자의 정보

@@ -44,7 +44,6 @@ async fn admin_dashboard_response_with_expected_json() -> Result<(), anyhow::Err
     assert_eq!(response.status(), StatusCode::OK);
 
     let response_json = response.json::<serde_json::Value>().await.unwrap();
-    assert_eq!(response_json["user_id"], app.test_user.user_id.to_string());
     assert_eq!(response_json["username"], app.test_user.username);
     assert_eq!(response_json["role"], "admin");
 

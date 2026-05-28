@@ -1,11 +1,10 @@
 use anyhow::Context;
 use argon2::{Argon2, PasswordHash, PasswordVerifier};
 use secrecy::{ExposeSecret, SecretString};
-use sqlx::PgExecutor;
 
 use crate::{
-    database::postgres::users::get_user_id_password_hash_from_username,
-    domain::credential::UsernamePassword, service::error::ServiceError,
+    app_state::AppState, database::postgres::users::get_user_id_password_hash_from_username,
+    domain::form_data::UsernamePasswordFormData, service::error::ServiceError,
 };
 
 pub struct CredentialService;
@@ -14,12 +13,14 @@ impl CredentialService {
     #[tracing::instrument(name = "Validate credentials", skip_all, err(Debug))]
     pub async fn validate_credentials(
         &self,
-        pg_executor: impl PgExecutor<'_>,
-        username_password: &UsernamePassword,
+        app_state: &AppState,
+        username_password: &UsernamePasswordFormData,
     ) -> Result<uuid::Uuid, ServiceError> {
-        let user_password_hash =
-            get_user_id_password_hash_from_username(pg_executor, &username_password.username)
-                .await?;
+        let user_password_hash = get_user_id_password_hash_from_username(
+            &app_state.pg_pool,
+            &username_password.username,
+        )
+        .await?;
         let user_id = user_password_hash.as_ref().map(|user| user.user_id);
         let user_password_hash = user_password_hash
             .map(|user| user.password_hash)

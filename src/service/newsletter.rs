@@ -1,9 +1,8 @@
-use sqlx::PgPool;
-
 use crate::{
+    app_state::AppState,
     database::postgres::subscriptions::get_confirmed_subscribers,
-    domain::subscriber_email::SubscriberEmail, email_client::EmailClient,
-    handler::newsletter::BodyData, service::error::ServiceError,
+    domain::{form_data::PostNewsletterFormData, subscriber_email::SubscriberEmail},
+    service::error::ServiceError,
 };
 
 pub struct NewsletterService;
@@ -11,11 +10,10 @@ pub struct NewsletterService;
 impl NewsletterService {
     pub async fn publish_newsletter(
         &self,
-        pg_pool: &PgPool,
-        email: &BodyData,
-        email_client: &EmailClient,
+        app_stat: &AppState,
+        email: &PostNewsletterFormData,
     ) -> Result<(), ServiceError> {
-        let confirmed_subscribers = get_confirmed_subscribers(pg_pool).await?;
+        let confirmed_subscribers = get_confirmed_subscribers(&app_stat.pg_pool).await?;
         let subscribers = confirmed_subscribers.into_iter().filter_map(|r| {
             SubscriberEmail::parse(r.email)
                 .map_err(|e| {
@@ -28,7 +26,8 @@ impl NewsletterService {
         });
 
         for subscriber in subscribers {
-            email_client
+            app_stat
+                .email_client
                 .send_email(
                     &subscriber,
                     &email.title,

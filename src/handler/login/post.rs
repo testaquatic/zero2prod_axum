@@ -8,7 +8,7 @@ use utoipa::{
 
 use crate::{
     app_state::AppState,
-    domain::credential::{TokenResponse, UsernamePassword},
+    domain::{form_data::UsernamePasswordFormData, response::TokenResponse},
     error::{AppError, AppErrorMessage},
 };
 
@@ -18,7 +18,7 @@ use crate::{
   summary = "로그인",
   post,
   path = "/login",
-  request_body(content = inline(UsernamePassword), content_type = "application/json"),
+  request_body(content = inline(UsernamePasswordFormData), content_type = "application/json"),
   responses(
     (status = http::StatusCode::OK, description = "OK", body = TokenResponse),
     (status = http::StatusCode::UNPROCESSABLE_ENTITY, body = AppErrorMessage, description = "누락되거나 유효하지 않은 필드가 있음"),
@@ -28,11 +28,11 @@ use crate::{
 )]
 pub async fn login(
     State(app_state): State<Arc<AppState>>,
-    Json(login_input): Json<UsernamePassword>,
+    Json(login_input): Json<UsernamePasswordFormData>,
 ) -> Result<Json<TokenResponse>, AppError> {
     let user_id = app_state
         .credential_service
-        .validate_credentials(&app_state.pg_pool, &login_input)
+        .validate_credentials(&app_state, &login_input)
         .await?;
     tracing::Span::current().record("user_id", tracing::field::display(&user_id));
 
@@ -53,7 +53,7 @@ pub struct PostLoginOpenApiDoc;
 
 impl Modify for PostLoginOpenApiDoc {
     fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
-        let components: &mut utoipa::openapi::Components = openapi.components.as_mut().unwrap(); // we can unwrap safely since there already is components registered.
+        let components: &mut utoipa::openapi::Components = openapi.components.as_mut().unwrap();
         components.add_security_scheme(
             "bearerAuth",
             SecurityScheme::Http(Http::new(HttpAuthScheme::Bearer)),

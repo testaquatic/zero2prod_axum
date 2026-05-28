@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use axum::{Json, extract::State, http};
 
-use crate::{app_state::AppState, error::AppError};
+use crate::{app_state::AppState, domain::form_data::PostNewsletterFormData, error::AppError};
 
 /// 뉴스레터를 발행한다.
 #[tracing::instrument(name = "Publish a newsletter issue", skip_all, err(Debug))]
@@ -17,36 +17,20 @@ use crate::{app_state::AppState, error::AppError};
     security(
         ("bearerAuth" = []),
     ),
-    request_body = BodyData,
+    request_body = PostNewsletterFormData,
     responses(
         (status = http::StatusCode::OK, description = "OK")
     )
 )]
 pub async fn publish_newsletter(
     State(app_state): State<Arc<AppState>>,
-    Json(body): Json<BodyData>,
+    Json(body): Json<PostNewsletterFormData>,
 ) -> Result<http::StatusCode, AppError> {
     app_state
         .newsletter_service
-        .publish_newsletter(&app_state.pg_pool, &body, &app_state.email_client)
+        .publish_newsletter(&app_state, &body)
         .await?;
     Ok(http::StatusCode::OK)
-}
-
-#[derive(serde::Deserialize, utoipa::ToSchema)]
-pub struct BodyData {
-    /// 제목
-    pub title: String,
-    /// 내용
-    pub content: Content,
-}
-
-#[derive(serde::Deserialize, utoipa::ToSchema)]
-pub struct Content {
-    /// HTML 문서
-    pub html: String,
-    /// 일반 텍스트
-    pub text: String,
 }
 
 #[derive(utoipa::OpenApi)]

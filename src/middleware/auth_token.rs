@@ -24,7 +24,7 @@ impl FromRequestParts<Arc<AppState>> for TokenData {
         app_state: &Arc<AppState>,
     ) -> Result<Self, Self::Rejection> {
         let token = extract_credentials(parts).await?;
-        let tokendata = validate_token(&app_state, token).await?;
+        let tokendata = validate_token(app_state, token).await?;
         Ok(tokendata)
     }
 }

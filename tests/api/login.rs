@@ -1,7 +1,7 @@
 use reqwest::StatusCode;
 use secrecy::SecretString;
 use uuid::Uuid;
-use zero2prod_axum::{domain::credential::UsernamePassword, error::AppError};
+use zero2prod_axum::{domain::form_data::UsernamePasswordFormData, error::AppError};
 
 use crate::helpers::startup::spawn_app;
 
@@ -12,7 +12,7 @@ async fn invalid_username_is_rejected() -> Result<(), anyhow::Error> {
     let app = spawn_app().await;
     let username = Uuid::new_v4().to_string();
     let password = Uuid::new_v4().to_string();
-    let username_password = UsernamePassword {
+    let username_password = UsernamePasswordFormData {
         username,
         password: SecretString::new(password.into()),
     };
@@ -55,7 +55,7 @@ async fn invalid_password_is_rejected() -> Result<(), anyhow::Error> {
     let app = spawn_app().await;
     let username = &app.test_user.username;
     let password = Uuid::new_v4().to_string();
-    let username_password = UsernamePassword {
+    let username_password = UsernamePasswordFormData {
         username: username.clone(),
         password: SecretString::new(password.clone().into()),
     };

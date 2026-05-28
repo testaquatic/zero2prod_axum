@@ -34,7 +34,7 @@ pub async fn confirm(
 ) -> Result<http::StatusCode, AppError> {
     app_state
         .subscriptions_service
-        .confirm(&app_state.pg_pool, &params.subscription_token)
+        .confirm(&app_state, &params.subscription_token)
         .await?;
     Ok(http::StatusCode::OK)
 }
