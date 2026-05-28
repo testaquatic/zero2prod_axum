@@ -1,8 +1,10 @@
 use anyhow::Context;
 
 use crate::{
-    app_state::AppState, database::postgres::users::get_user_info_by_user_id,
-    domain::response::UserInfo, middleware::auth_token::TokenData, service::error::ServiceError,
+    app_state::AppState,
+    database::postgres::users::get_user_info_by_user_id,
+    domain::{extractor::TokenData, response::UserInfo},
+    service::error::ServiceError,
 };
 
 pub struct DashboardService;

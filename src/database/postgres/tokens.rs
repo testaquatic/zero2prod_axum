@@ -2,26 +2,27 @@ use moka::future::Cache;
 use sqlx::PgExecutor;
 use uuid::Uuid;
 
-use crate::domain::credential::Claims;
+use crate::domain::extractor::TokenData;
 
 #[tracing::instrument(name = "Save token", skip_all, err(Debug))]
-pub async fn save_token(
+pub async fn save_token_info(
     pg_excutor: impl PgExecutor<'_>,
     moka_cache: &Cache<Uuid, Uuid>,
-    claims: &Claims,
-    user_id: &Uuid,
+    token_data: &TokenData,
 ) -> Result<(), sqlx::Error> {
-    moka_cache.insert(claims.auth_id, *user_id).await;
+    moka_cache
+        .insert(token_data.claims.auth_id, token_data.user_id)
+        .await;
 
     sqlx::query!(
         r#"
         INSERT INTO auth_tokens (auth_id, user_id, exp, iat)
         VALUES ($1, $2, $3, $4);
         "#,
-        claims.auth_id,
-        user_id,
-        claims.exp,
-        claims.iat,
+        token_data.claims.auth_id,
+        token_data.user_id,
+        token_data.claims.exp,
+        token_data.claims.iat,
     )
     .execute(pg_excutor)
     .await?;
@@ -56,6 +57,27 @@ pub async fn get_user_id_by_token_id(
     } else {
         Ok(None)
     }
+}
+
+#[tracing::instrument(name = "Delete token", skip_all, err(Debug))]
+pub async fn delete_token(
+    pg_excutor: impl PgExecutor<'_>,
+    moka_cache: &Cache<Uuid, Uuid>,
+    token_id: &Uuid,
+) -> Result<(), sqlx::Error> {
+    sqlx::query!(
+        r#"
+        DELETE FROM auth_tokens
+        WHERE auth_id = $1;
+        "#,
+        token_id,
+    )
+    .execute(pg_excutor)
+    .await?;
+
+    moka_cache.remove(token_id).await;
+
+    Ok(())
 }
 
 #[tracing::instrument(name = "Delete expired tokens", skip_all, err(Debug))]

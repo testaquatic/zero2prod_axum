@@ -1,15 +1,15 @@
-use std::time::Duration;
+use std::{io, time::Duration};
 
 use axum::Router;
 use moka::future::Cache;
-use secrecy::ExposeSecret;
+use secrecy::{ExposeSecret, SecretSlice};
 use sqlx::{PgPool, postgres::PgPoolOptions};
 use tokio::net::TcpListener;
 use uuid::Uuid;
 
 use crate::{
     app_state,
-    configuration::{self},
+    configuration::{self, Settings},
     email_client,
     router::get_app_router,
 };
@@ -36,6 +36,29 @@ pub fn get_email_client(
     );
 
     Ok(email_client)
+}
+
+///
+pub fn get_private_and_public_key_from_configuration(
+    configuration: &Settings,
+) -> Result<(SecretSlice<u8>, SecretSlice<u8>), io::Error> {
+    // pem 파일 읽기
+    let private_key = std::fs::read(
+        configuration
+            .application
+            .token_secret_private_pem
+            .expose_secret(),
+    )?
+    .into();
+    let public_key = std::fs::read(
+        configuration
+            .application
+            .token_secret_public_pem
+            .expose_secret(),
+    )?
+    .into();
+
+    Ok((private_key, public_key))
 }
 
 pub async fn run() -> Result<(), std::io::Error> {
@@ -68,6 +91,10 @@ impl Application {
             .sender()
             .expect("Invalid sender email address");
         let timeout = configuration.email_client.timeout();
+
+        let (private_key, public_key) =
+            get_private_and_public_key_from_configuration(&configuration)?;
+
         let email_client = email_client::EmailClient::new(
             configuration.email_client.base_url,
             sender_email,
@@ -88,22 +115,6 @@ impl Application {
             .time_to_live(Duration::from_hours(12))
             .time_to_idle(Duration::from_hours(1))
             .build();
-
-        // pem 파일 읽기
-        let private_key = std::fs::read(
-            configuration
-                .application
-                .token_secret_private_pem
-                .expose_secret(),
-        )?
-        .into();
-        let public_key = std::fs::read(
-            configuration
-                .application
-                .token_secret_public_pem
-                .expose_secret(),
-        )?
-        .into();
 
         // `AppState`` 생성
         let app_state = app_state::AppState::new(

@@ -1,5 +1,5 @@
 use crate::domain::{
-    form_data::SubscribeFormData, subscriber_email::SubscriberEmail,
+    form_data::SubscriptionFormData, subscriber_email::SubscriberEmail,
     subscriber_name::SubscriberName,
 };
 
@@ -10,9 +10,9 @@ pub struct NewSubscriber {
     pub name: SubscriberName,
 }
 
-impl TryFrom<SubscribeFormData> for NewSubscriber {
+impl TryFrom<SubscriptionFormData> for NewSubscriber {
     type Error = String;
-    fn try_from(value: SubscribeFormData) -> Result<Self, Self::Error> {
+    fn try_from(value: SubscriptionFormData) -> Result<Self, Self::Error> {
         Ok(NewSubscriber {
             email: SubscriberEmail::parse(value.email)?,
             name: SubscriberName::parse(value.name)?,

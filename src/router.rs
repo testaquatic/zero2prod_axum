@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use axum::{middleware, routing};
+use axum::routing;
 use utoipa::{
     OpenApi,
     openapi::{Info, OpenApiBuilder},
@@ -8,21 +8,25 @@ use utoipa::{
 use utoipa_swagger_ui::SwaggerUi;
 
 use crate::{
-    app_state::{self, AppState},
+    app_state::AppState,
     handler::{
-        admin::dashboard::{self, get_admin_dashboard},
+        admin::{
+            dashboard::{self, get_admin_dashboard},
+            logout::{self, logout},
+            password::{self, post::change_password},
+        },
         health_check::{self, health_check},
         login::{self, post::login},
         newsletter::{self, publish_newsletter},
         subscriptions::{self, subscribe},
         subscriptions_confirm::{self, confirm},
     },
-    middleware::{auth_token::TokenData, request_id::RequestIdLayer},
+    middleware::{auth_token::auth_token_middleware, request_id::RequestIdLayer},
 };
 
 /// 앱 라우터를 생성한다.
 /// todo: 권한을 가지고 있는 사용자만 접근 가능하게 만들기
-pub fn get_app_router(app_state: Arc<app_state::AppState>) -> axum::Router {
+pub fn get_app_router(app_state: Arc<AppState>) -> axum::Router {
     let openapi_router = get_swagger_router();
     let protected_router = get_protected_router(app_state.clone());
 
@@ -38,14 +42,13 @@ pub fn get_app_router(app_state: Arc<app_state::AppState>) -> axum::Router {
         .layer(RequestIdLayer)
 }
 
-pub fn get_protected_router(app_state: Arc<app_state::AppState>) -> axum::Router<Arc<AppState>> {
+pub fn get_protected_router(app_state: Arc<AppState>) -> axum::Router<Arc<AppState>> {
     axum::Router::new()
         .route("/newsletter", routing::post(publish_newsletter))
         .route("/admin/dashboard", routing::get(get_admin_dashboard))
-        .route_layer(middleware::from_extractor_with_state::<
-            TokenData,
-            Arc<AppState>,
-        >(app_state))
+        .route("/admin/password", routing::post(change_password))
+        .route("/admin/logout", routing::post(logout))
+        .route_layer(auth_token_middleware(app_state))
 }
 
 /// 스웨거 라우터를 생성한다.
@@ -64,6 +67,8 @@ fn get_swagger_router() -> axum::Router {
     api.merge(newsletter::NewsletterOpenApiDoc::openapi());
     api.merge(login::post::PostLoginOpenApiDoc::openapi());
     api.merge(dashboard::GetAdminDashboardOpenApiDoc::openapi());
+    api.merge(password::post::ChangePasswordOpenApiDoc::openapi());
+    api.merge(logout::LogoutOpenApiDoc::openapi());
 
     SwaggerUi::new("/swagger-ui")
         .url("/apidoc/openapi.json", api)

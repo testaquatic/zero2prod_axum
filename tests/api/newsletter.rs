@@ -1,5 +1,5 @@
 use reqwest::{Method, StatusCode};
-use uuid::Uuid;
+use secrecy::ExposeSecret;
 use wiremock::{Mock, ResponseTemplate, matchers};
 
 use crate::helpers::{
@@ -175,12 +175,12 @@ async fn request_missing_authorization_are_rejected() -> Result<(), anyhow::Erro
 #[tokio::test]
 async fn invalid_token_is_rejected() -> Result<(), anyhow::Error> {
     let app = spawn_app().await;
-    let token = Uuid::new_v4().to_string();
+    let token = app.invalid_token().await;
 
     let response = app
         .api_client
         .post(&format!("{}/newsletter", app.app_address()))
-        .bearer_auth(token)
+        .bearer_auth(token.expose_secret())
         .json(&serde_json::json!({
             "title": "Newsletter title",
             "content": {

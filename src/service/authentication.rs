@@ -3,8 +3,15 @@ use argon2::{Argon2, PasswordHash, PasswordVerifier};
 use secrecy::{ExposeSecret, SecretString};
 
 use crate::{
-    app_state::AppState, database::postgres::users::get_user_id_password_hash_from_username,
-    domain::form_data::UsernamePasswordFormData, service::error::ServiceError,
+    app_state::AppState,
+    database::postgres::users::{
+        get_user_id_password_hash_from_username, get_user_info_by_user_id,
+    },
+    domain::{
+        extractor::TokenData,
+        form_data::{ChangePasswordFormData, LoginFormData},
+    },
+    service::error::ServiceError,
 };
 
 pub struct CredentialService;
@@ -14,7 +21,7 @@ impl CredentialService {
     pub async fn validate_credentials(
         &self,
         app_state: &AppState,
-        username_password: &UsernamePasswordFormData,
+        username_password: &LoginFormData,
     ) -> Result<uuid::Uuid, ServiceError> {
         let user_password_hash = get_user_id_password_hash_from_username(
             &app_state.pg_pool,
@@ -38,6 +45,50 @@ impl CredentialService {
         user_id
             .with_context(|| format!("Unknown username: {}", username_password.username))
             .map_err(ServiceError::AuthError)
+    }
+
+    pub async fn change_password(
+        &self,
+        app_state: &AppState,
+        token_data: &TokenData,
+        change_password_form_data: &ChangePasswordFormData,
+    ) -> Result<(), ServiceError> {
+        // 일단 길이부터 확인한다.
+        if change_password_form_data.new_password.expose_secret().len() <= 12 {
+            return Err(ServiceError::ValidationError(
+                "Password too short".to_string(),
+            ));
+        }
+
+        if change_password_form_data.new_password.expose_secret().len() >= 128 {
+            return Err(ServiceError::ValidationError(
+                "Password too long".to_string(),
+            ));
+        }
+
+        if change_password_form_data.new_password.expose_secret()
+            != change_password_form_data.new_password_check.expose_secret()
+        {
+            return Err(ServiceError::ValidationError(
+                "You entered two different new passwords".to_string(),
+            ));
+        }
+
+        let user_info = get_user_info_by_user_id(&app_state.pg_pool, &token_data.user_id)
+            .await?
+            .context("No user data!")
+            .map_err(ServiceError::UnexpectedError)?;
+
+        self.validate_credentials(
+            app_state,
+            &LoginFormData {
+                username: user_info.username,
+                password: change_password_form_data.current_password.clone(),
+            },
+        )
+        .await?;
+
+        unimplemented!()
     }
 }
 

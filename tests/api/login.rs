@@ -1,7 +1,7 @@
 use reqwest::StatusCode;
 use secrecy::SecretString;
 use uuid::Uuid;
-use zero2prod_axum::{domain::form_data::UsernamePasswordFormData, error::AppError};
+use zero2prod_axum::{domain::form_data::LoginFormData, error::AppError};
 
 use crate::helpers::startup::spawn_app;
 
@@ -12,7 +12,7 @@ async fn invalid_username_is_rejected() -> Result<(), anyhow::Error> {
     let app = spawn_app().await;
     let username = Uuid::new_v4().to_string();
     let password = Uuid::new_v4().to_string();
-    let username_password = UsernamePasswordFormData {
+    let username_password = LoginFormData {
         username,
         password: SecretString::new(password.into()),
     };
@@ -31,7 +31,7 @@ async fn invalid_username_is_rejected() -> Result<(), anyhow::Error> {
 
     let resonse_json = response.json::<serde_json::Value>().await.unwrap();
     assert_eq!(
-        resonse_json["type"],
+        resonse_json["status"],
         axum::http::StatusCode::UNAUTHORIZED.to_string(),
         "response: {:?}",
         resonse_json
@@ -55,7 +55,7 @@ async fn invalid_password_is_rejected() -> Result<(), anyhow::Error> {
     let app = spawn_app().await;
     let username = &app.test_user.username;
     let password = Uuid::new_v4().to_string();
-    let username_password = UsernamePasswordFormData {
+    let username_password = LoginFormData {
         username: username.clone(),
         password: SecretString::new(password.clone().into()),
     };
@@ -79,7 +79,7 @@ async fn invalid_password_is_rejected() -> Result<(), anyhow::Error> {
 
     let resonse_json = response.json::<serde_json::Value>().await.unwrap();
     assert_eq!(
-        resonse_json["type"],
+        resonse_json["status"],
         axum::http::StatusCode::UNAUTHORIZED.to_string(),
         "response: {:?}",
         resonse_json

@@ -6,7 +6,7 @@ use axum::{
     http::{self},
 };
 
-use crate::{app_state::AppState, domain::form_data::SubscribeFormData, error::AppError};
+use crate::{app_state::AppState, domain::form_data::SubscriptionFormData, error::AppError};
 
 #[tracing::instrument(
     name = "Adding a new subscriber",
@@ -22,7 +22,7 @@ use crate::{app_state::AppState, domain::form_data::SubscribeFormData, error::Ap
   summary = "구독 요청",
   post,
   path = "/subscriptions",
-  request_body(content = inline(SubscribeFormData)),
+  request_body(content = inline(SubscriptionFormData)),
   responses(
     (status = http::StatusCode::OK, description = "OK"),
     (status = http::StatusCode::UNPROCESSABLE_ENTITY, description = "누락되거나 유효하지 않은 필드가 있음"),
@@ -32,7 +32,7 @@ use crate::{app_state::AppState, domain::form_data::SubscribeFormData, error::Ap
 )]
 pub async fn subscribe(
     State(app_state): State<Arc<AppState>>,
-    Json(form_data): Json<SubscribeFormData>,
+    Json(form_data): Json<SubscriptionFormData>,
 ) -> Result<http::StatusCode, AppError> {
     app_state
         .subscriptions_service

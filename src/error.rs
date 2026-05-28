@@ -1,11 +1,6 @@
-use axum::{
-    Json,
-    http::{self},
-    response::IntoResponse,
-};
-use serde::Serializer;
+use axum::{Json, response::IntoResponse};
 
-use crate::service::error::ServiceError;
+use crate::{domain::response::AppErrorMessage, service::error::ServiceError};
 
 #[derive(thiserror::Error, Debug)]
 pub enum AppError {
@@ -17,30 +12,6 @@ pub enum AppError {
     AuthError(#[source] anyhow::Error),
     #[error("서버 오류: 예상하지 못한 오류가 방생했습니다")]
     UnexpectedError(#[source] anyhow::Error),
-}
-
-#[derive(serde::Serialize, Debug, utoipa::ToSchema)]
-pub struct AppErrorMessage {
-    #[serde(rename = "type", serialize_with = "status_code_to_string")]
-    #[schema(value_type = String)]
-    pub status_code: http::StatusCode,
-    pub message: String,
-}
-
-fn status_code_to_string<S>(
-    status_code: &http::StatusCode,
-    s: S,
-) -> Result<<S as Serializer>::Ok, <S as Serializer>::Error>
-where
-    S: Serializer,
-{
-    s.serialize_str(&status_code.to_string())
-}
-
-impl IntoResponse for AppErrorMessage {
-    fn into_response(self) -> axum::response::Response {
-        (self.status_code, Json(self)).into_response()
-    }
 }
 
 impl IntoResponse for AppError {
@@ -59,21 +30,22 @@ impl IntoResponse for AppError {
         }
 
         // 응답
-        match self {
+        let app_error_message = match self {
             AppError::InternalError(_) | AppError::UnexpectedError(_) => AppErrorMessage {
-                status_code: axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                status: axum::http::StatusCode::INTERNAL_SERVER_ERROR,
                 message: self.to_string(),
             },
             AppError::BadRequest(_) => AppErrorMessage {
-                status_code: axum::http::StatusCode::BAD_REQUEST,
+                status: axum::http::StatusCode::BAD_REQUEST,
                 message: self.to_string(),
             },
             AppError::AuthError(_) => AppErrorMessage {
-                status_code: axum::http::StatusCode::UNAUTHORIZED,
+                status: axum::http::StatusCode::UNAUTHORIZED,
                 message: self.to_string(),
             },
-        }
-        .into_response()
+        };
+
+        (app_error_message.status, Json(app_error_message)).into_response()
     }
 }
 

@@ -5,9 +5,11 @@ use reqwest::StatusCode;
 
 use crate::{
     app_state::AppState,
-    domain::response::UserInfo,
-    error::{AppError, AppErrorMessage},
-    middleware::auth_token::TokenData,
+    domain::{
+        extractor::TokenData,
+        response::{AppErrorMessage, UserInfo},
+    },
+    error::AppError,
 };
 
 #[tracing::instrument(name = "Get admin dashboard", skip_all, err(Debug))]
@@ -27,7 +29,7 @@ use crate::{
             description = "접근 권한이 없음",
             body = AppErrorMessage,
             example = json!({
-                "type": StatusCode::UNAUTHORIZED.to_string(),
+                "status": StatusCode::UNAUTHORIZED.to_string(),
                 "message": "인증 오류: 사용자 정보를 찾을 수 없습니다",
             })
         ),

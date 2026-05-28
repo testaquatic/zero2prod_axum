@@ -1,15 +1,24 @@
 use std::sync::Arc;
 
 use axum::{Json, extract::State};
+use chrono::Utc;
+use secrecy::SecretString;
 use utoipa::{
     Modify,
     openapi::security::{Http, HttpAuthScheme, SecurityScheme},
 };
+use uuid::Uuid;
 
 use crate::{
     app_state::AppState,
-    domain::{form_data::UsernamePasswordFormData, response::TokenResponse},
-    error::{AppError, AppErrorMessage},
+    domain::{
+        credential::Claims,
+        extractor::TokenData,
+        form_data::LoginFormData,
+        response::{AppErrorMessage, TokenResponse},
+    },
+    error::AppError,
+    service::error::ServiceError,
 };
 
 #[tracing::instrument(skip_all,fields(username = login_input.username, user_id = tracing::field::Empty), err(Debug))]
@@ -18,7 +27,7 @@ use crate::{
   summary = "로그인",
   post,
   path = "/login",
-  request_body(content = inline(UsernamePasswordFormData), content_type = "application/json"),
+  request_body(content = inline(LoginFormData), content_type = "application/json"),
   responses(
     (status = http::StatusCode::OK, description = "OK", body = TokenResponse),
     (status = http::StatusCode::UNPROCESSABLE_ENTITY, body = AppErrorMessage, description = "누락되거나 유효하지 않은 필드가 있음"),
@@ -28,23 +37,43 @@ use crate::{
 )]
 pub async fn login(
     State(app_state): State<Arc<AppState>>,
-    Json(login_input): Json<UsernamePasswordFormData>,
+    Json(login_input): Json<LoginFormData>,
 ) -> Result<Json<TokenResponse>, AppError> {
-    let user_id = app_state
-        .credential_service
-        .validate_credentials(&app_state, &login_input)
-        .await?;
-    tracing::Span::current().record("user_id", tracing::field::display(&user_id));
-
-    let token = app_state
-        .auth_token_service
-        .generate_token(&app_state, &user_id)
-        .await?;
+    let token = process_token_generation(&app_state, &login_input).await?;
 
     Ok(Json(TokenResponse {
         token: token.into(),
         token_type: "Bearer".to_string(),
     }))
+}
+
+/// 토큰 생성과 관련한 절차를 수행한다.
+async fn process_token_generation(
+    app_state: &AppState,
+    login_input: &LoginFormData,
+) -> Result<SecretString, ServiceError> {
+    let user_id = app_state
+        .credential_service
+        .validate_credentials(app_state, login_input)
+        .await?;
+    tracing::Span::current().record("user_id", tracing::field::display(&user_id));
+
+    let claims = Claims {
+        auth_id: Uuid::new_v4(),
+        exp: (Utc::now() + chrono::Duration::hours(1)).timestamp(),
+        iat: Utc::now().timestamp(),
+    };
+
+    let token = app_state.auth_token_service.generate_token(&claims).await?;
+
+    let token_data = TokenData { claims, user_id };
+
+    app_state
+        .auth_token_service
+        .save_token_info(app_state, &token_data)
+        .await?;
+
+    Ok(token)
 }
 
 #[derive(utoipa::OpenApi)]

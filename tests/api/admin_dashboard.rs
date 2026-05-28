@@ -1,5 +1,5 @@
 use reqwest::StatusCode;
-use uuid::Uuid;
+use secrecy::ExposeSecret;
 
 use crate::helpers::startup::spawn_app;
 
@@ -23,9 +23,9 @@ async fn you_must_be_logged_in_to_access_admin_dashboard() -> Result<(), anyhow:
 #[tokio::test]
 async fn admin_dashboard_with_invalid_token_is_rejected_with_a_401() -> Result<(), anyhow::Error> {
     let app = spawn_app().await;
-    let token = Uuid::new_v4().to_string();
+    let token = app.invalid_token().await;
 
-    let response = app.get_admin_dashboard(&token).await;
+    let response = app.get_admin_dashboard(&token.expose_secret()).await;
 
     assert_eq!(
         response.status(),

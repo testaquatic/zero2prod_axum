@@ -1,5 +1,12 @@
+use chrono::Utc;
+use secrecy::{ExposeSecret, SecretString};
+use uuid::Uuid;
 use wiremock::MockServer;
-use zero2prod_axum::configuration::Settings;
+use zero2prod_axum::{
+    configuration::Settings, domain::credential::Claims,
+    service::auth_token_service::AuthTokenService,
+    startup::get_private_and_public_key_from_configuration,
+};
 
 use crate::helpers::{startup::post_login, test_user::TestUser};
 
@@ -87,6 +94,53 @@ impl TestApp {
     pub async fn get_admin_dashboard(&self, token: &str) -> reqwest::Response {
         self.api_client
             .get(&format!("{}/admin/dashboard", self.app_address()))
+            .bearer_auth(token)
+            .send()
+            .await
+            .expect("Failed to execute request.")
+    }
+
+    pub async fn post_change_password(
+        &self,
+        body: &impl serde::Serialize,
+        token: &str,
+    ) -> reqwest::Response {
+        self.api_client
+            .post(&format!("{}/admin/password", self.app_address()))
+            .bearer_auth(token)
+            .json(body)
+            .send()
+            .await
+            .expect("Failed to execute request.")
+    }
+
+    pub async fn invalid_token(&self) -> SecretString {
+        let claims = Claims {
+            auth_id: Uuid::new_v4(),
+            exp: (Utc::now() + chrono::Duration::hours(1)).timestamp(),
+            iat: Utc::now().timestamp(),
+        };
+
+        let (private_key, public_key) =
+            get_private_and_public_key_from_configuration(&self.configuration)
+                .expect("failed to read key file");
+
+        let invalid_token = AuthTokenService {
+            token_secret_private_key: private_key,
+            token_secret_public_key: public_key,
+        }
+        .generate_token(&claims)
+        .await
+        .expect("Failed to generate token");
+
+        assert_ne!(invalid_token.expose_secret(), self.auth_token);
+
+        invalid_token
+    }
+
+    pub async fn post_logout(&self, token: &str) -> reqwest::Response {
+        self.api_client
+            .post(&format!("{}/admin/logout", self.app_address()))
             .bearer_auth(token)
             .send()
             .await
