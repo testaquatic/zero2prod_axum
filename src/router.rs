@@ -13,11 +13,11 @@ use crate::{
         admin::{
             dashboard::{self, get_admin_dashboard},
             logout::{self, logout},
+            newsletter::{self, publish_newsletter},
             password::{self, change_password},
         },
         health_check::{self, health_check},
         login::{self, login},
-        newsletter::{self, publish_newsletter},
         subscriptions::{self, subscribe},
         subscriptions_confirm::{self, confirm},
     },
@@ -44,7 +44,7 @@ pub fn get_app_router(app_state: Arc<AppState>) -> axum::Router {
 
 pub fn get_protected_router(app_state: Arc<AppState>) -> axum::Router<Arc<AppState>> {
     axum::Router::new()
-        .route("/newsletter", routing::post(publish_newsletter))
+        .route("/admin/newsletters", routing::post(publish_newsletter))
         .route("/admin/dashboard", routing::get(get_admin_dashboard))
         .route("/admin/password", routing::post(change_password))
         .route("/admin/logout", routing::post(logout))

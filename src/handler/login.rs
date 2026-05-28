@@ -34,7 +34,6 @@ use crate::{
     (status = http::StatusCode::INTERNAL_SERVER_ERROR, body = AppErrorMessage, description = "서버 내부 오류"),
     (status = http::StatusCode::UNAUTHORIZED, body = AppErrorMessage, description = "로그인 데이터 유효성 검증 실패"),
   ),
-  security(("basicAuth" = [])),
   tags = ["Account"]
 )]
 pub async fn login(
@@ -93,3 +92,4 @@ impl Modify for PostLoginOpenApiDoc {
         )
     }
 }
+

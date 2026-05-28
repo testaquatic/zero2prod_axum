@@ -20,14 +20,12 @@ async fn newletters_are_not_delivered_to_unconfirmed_subscribers() -> Result<(),
         .await;
 
     let newsletter_request_body = serde_json::json!({
-      "title": "Newsletter title",
-      "content": {
-        "text": "Newsletter body as plain text",
-        "html": "<p>Newsletter body as HTML</p>"
-      }
+        "title": "Newsletter title",
+        "text_content": "Newsletter body as plain text",
+        "html_content": "<p>Newsletter body as HTML</p>"
     });
     let response = app
-        .post_newsletters(newsletter_request_body, &app.auth_token)
+        .post_newsletters(&newsletter_request_body, Some(&app.auth_token))
         .await;
 
     assert_eq!(
@@ -53,14 +51,12 @@ async fn newsletters_are_delivered_to_confirmed_subscribers() -> Result<(), anyh
         .await;
 
     let newsletter_request_body = serde_json::json!({
-      "title": "Newsletter title",
-      "content": {
-        "text": "Newsletter body as plain text",
-        "html": "<p>Newsletter body as HTML</p>"
-      }
+        "title": "Newsletter title",
+        "text_content": "Newsletter body as plain text",
+        "html_content": "<p>Newsletter body as HTML</p>"
     });
     let response = app
-        .post_newsletters(newsletter_request_body, &app.auth_token)
+        .post_newsletters(&newsletter_request_body, Some(&app.auth_token))
         .await;
 
     assert_eq!(
@@ -80,10 +76,8 @@ async fn newsletters_returns_400_for_invalid_data() -> Result<(), anyhow::Error>
     let test_cases = vec![
         (
             serde_json::json!({
-              "content": {
-                "text": "Newsletter body as plain text",
-                "html": "<p>Newsletter body as HTML</p>"
-              }
+                "text_content": "Newsletter body as plain text",
+                "html_content": "<p>Newsletter body as HTML</p>"
             }),
             "missing title",
         ),
@@ -94,7 +88,9 @@ async fn newsletters_returns_400_for_invalid_data() -> Result<(), anyhow::Error>
     ];
 
     for (invalid_body, error_message) in test_cases {
-        let response = app.post_newsletters(invalid_body, &app.auth_token).await;
+        let response = app
+            .post_newsletters(&invalid_body, Some(&app.auth_token))
+            .await;
 
         assert_eq!(
             response.status(),
@@ -146,21 +142,20 @@ async fn create_confirmed_subscriber(app: &TestApp) -> Result<(), anyhow::Error>
 }
 
 #[tokio::test]
-async fn request_missing_authorization_are_rejected() -> Result<(), anyhow::Error> {
+async fn request_missing_auth_token_are_rejected() -> Result<(), anyhow::Error> {
     let app = spawn_app().await;
 
     let response = app
-        .api_client
-        .post(&format!("{}/newsletter", app.app_address()))
-        .json(&serde_json::json!({
-            "title": "Newsletter title",
-            "content": {
-                "text": "Newsletter body as plain text",
-                "html": "<p>Newsletter body as HTML</p>"
-            }
-        }))
-        .send()
-        .await?;
+        .post_newsletters(
+            &serde_json::json!({
+                "title": "Newsletter title",
+                "text_content": "Newsletter body as plain text",
+                "html_content": "<p>Newsletter body as HTML</p>"
+
+            }),
+            None,
+        )
+        .await;
 
     assert_eq!(
         response.status(),
@@ -179,14 +174,12 @@ async fn invalid_token_is_rejected() -> Result<(), anyhow::Error> {
 
     let response = app
         .api_client
-        .post(&format!("{}/newsletter", app.app_address()))
+        .post(&format!("{}/admin/newsletters", app.app_address()))
         .bearer_auth(token.expose_secret())
         .json(&serde_json::json!({
             "title": "Newsletter title",
-            "content": {
-                "text": "Newsletter body as plain text",
-                "html": "<p>Newsletter body as HTML</p>"
-            }
+            "text_content": "Newsletter body as plain text",
+            "html_content": "<p>Newsletter body as HTML</p>"
         }))
         .send()
         .await?;
@@ -195,6 +188,38 @@ async fn invalid_token_is_rejected() -> Result<(), anyhow::Error> {
         response.status(),
         StatusCode::UNAUTHORIZED,
         "expected 401 Unauthorized but got: {:?}",
+        response
+    );
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn newsletter_creation_is_idempotent() -> Result<(), anyhow::Error> {
+    let app = spawn_app().await;
+    create_confirmed_subscriber(&app).await?;
+
+    Mock::given(matchers::path("/email"))
+        .and(matchers::method(Method::POST))
+        .respond_with(ResponseTemplate::new(StatusCode::OK))
+        .expect(1)
+        .mount(&app.email_server)
+        .await;
+
+    let newsletter_request_body = serde_json::json!({
+        "title": "Newsletter title",
+        "text_content": "Newsletter body as plain text",
+        "html_content": "<p>Newsletter body as HTML</p>"
+    });
+
+    let response = app
+        .post_newsletters(&newsletter_request_body, Some(&app.auth_token))
+        .await;
+
+    assert_eq!(
+        response.status(),
+        StatusCode::OK,
+        "expected 200 OK but got: {:?}",
         response
     );
 

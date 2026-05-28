@@ -35,7 +35,9 @@ openssl pkey -in private.pem -pubout -out public.pem
 
 # 이번 코드의 컨셉
 
-이전에 읽었던 [러스트 백 엔드 (Axum)](https://text.ibetter.kr/rust-axum)의 코드를 반영했다.
+1. 이전에 읽었던 [러스트 백 엔드 (Axum)](https://text.ibetter.kr/rust-axum)의 코드를 반영했다.  
+1. HTML을 직접 다루지 않고 JSON을 통해서 통신한다.
+1. JWT 인증을 사용한다. 
 
 # phc_string_gen
 

@@ -16,18 +16,12 @@ pub struct PostNewsletterFormData {
     /// 제목
     #[schema(example = "제목")]
     pub title: String,
-    /// 내용
-    pub content: Content,
-}
-
-#[derive(serde::Deserialize, utoipa::ToSchema, Debug)]
-pub struct Content {
     /// HTML 문서
-    #[schema(example = "<h1>HTML 문서</h1>")]
-    pub html: String,
+    #[schema(example = "<p>Newsletter body as HTML</p>")]
+    pub html_content: String,
     /// 일반 텍스트
-    #[schema(example = "일반 텍스트")]
-    pub text: String,
+    #[schema(example = "Newsletter body as plain text")]
+    pub text_content: String,
 }
 
 /// 핸들러에 들어오는 가입 요청 데이터

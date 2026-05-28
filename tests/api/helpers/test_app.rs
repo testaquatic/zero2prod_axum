@@ -75,13 +75,19 @@ impl TestApp {
 
     pub async fn post_newsletters(
         &self,
-        body: serde_json::Value,
-        token: &str,
+        body: &serde_json::Value,
+        token: Option<&str>,
     ) -> reqwest::Response {
-        self.api_client
-            .post(&format!("{}/newsletter", self.app_address()))
-            .bearer_auth(token)
-            .json(&body)
+        let mut request_builder = self
+            .api_client
+            .post(&format!("{}/admin/newsletters", self.app_address()))
+            .json(&body);
+
+        if let Some(token) = token {
+            request_builder = request_builder.bearer_auth(token);
+        }
+
+        request_builder
             .send()
             .await
             .expect("Failed to execute request.")

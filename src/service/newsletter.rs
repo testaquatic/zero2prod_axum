@@ -31,8 +31,8 @@ impl NewsletterService {
                 .send_email(
                     &subscriber,
                     &email.title,
-                    &email.content.html,
-                    &email.content.text,
+                    &email.html_content,
+                    &email.text_content,
                 )
                 .await
                 .inspect_err(|e| {

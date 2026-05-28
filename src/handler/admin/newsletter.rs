@@ -10,7 +10,7 @@ use crate::{app_state::AppState, domain::form_data::PostNewsletterFormData, erro
     description = "뉴스레터를 발행한다.",
     summary = "뉴스레터 발행",
     post,
-    path = "/newsletter",
+    path = "/admin/newsletters",
     params(
         ("Authorization" = String, Header, description = "Bearer authentication", example = "Bearer <token>"),
     ),
