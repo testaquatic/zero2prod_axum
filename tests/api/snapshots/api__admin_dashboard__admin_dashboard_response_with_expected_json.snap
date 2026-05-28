@@ -1,0 +1,9 @@
+---
+source: tests/api/admin_dashboard.rs
+expression: "response.json::<serde_json::Value>().await.unwrap()"
+---
+{
+  "role": "admin",
+  "user_id": "565c1d7c-3849-4b5f-8983-cc507979887f",
+  "username": "7094f293-c91b-404d-8f26-739432606c9e"
+}

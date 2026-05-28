@@ -22,7 +22,10 @@ async fn confirmation_without_token_are_rejected_with_a_400() -> Result<(), anyh
 #[tokio::test]
 async fn the_link_returned_by_subscribe_returns_a_200_if_called() -> Result<(), anyhow::Error> {
     let app = spawn_app().await;
-    let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
+    let body = serde_json::json!({
+        "name": "le guin",
+        "email": "ursula_le_guin@gmail.com"
+    });
 
     Mock::given(matchers::path("/email"))
         .and(matchers::method(Method::POST))
@@ -30,7 +33,7 @@ async fn the_link_returned_by_subscribe_returns_a_200_if_called() -> Result<(), 
         .mount(&app.email_server)
         .await;
 
-    app.post_subscriptions(body.into()).await;
+    app.post_subscriptions(&body).await;
 
     let email_requst = &app.email_server.received_requests().await.unwrap()[0];
 
@@ -50,15 +53,17 @@ async fn the_link_returned_by_subscribe_returns_a_200_if_called() -> Result<(), 
 #[tokio::test]
 async fn clicking_on_the_confirmation_link_confirms_a_subscriber() -> Result<(), anyhow::Error> {
     let app = spawn_app().await;
-    let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
-
+    let body = serde_json::json!({
+        "name": "le guin",
+        "email": "ursula_le_guin@gmail.com"
+    });
     Mock::given(matchers::path("/email"))
         .and(matchers::method(Method::POST))
         .respond_with(ResponseTemplate::new(StatusCode::OK))
         .mount(&app.email_server)
         .await;
 
-    app.post_subscriptions(body.into()).await;
+    app.post_subscriptions(&body).await;
     let email_requst = &app.email_server.received_requests().await.unwrap()[0];
     let confirmation_links = app.get_confirmation_links(email_requst);
     reqwest::get(confirmation_links.html)

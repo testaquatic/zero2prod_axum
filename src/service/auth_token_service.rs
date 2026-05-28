@@ -6,7 +6,7 @@ use uuid::Uuid;
 
 use crate::{
     app_state::AppState,
-    database::postgres::tokens::{get_user_id_from_by_id, save_token},
+    database::postgres::tokens::{get_user_id_by_token_id, save_token},
     domain::credential::Claims,
     service::error::ServiceError,
 };
@@ -28,21 +28,28 @@ impl AuthTokenService {
             exp: (now + chrono::Duration::hours(12)).timestamp(),
             iat: now.timestamp(),
         };
-
-        let token = jsonwebtoken::encode(
-            &Header::new(jsonwebtoken::Algorithm::EdDSA),
-            &claims,
-            &EncodingKey::from_ed_pem(
-                app_state
-                    .auth_token_service
-                    .token_secret_private_key
-                    .expose_secret(),
-            )
-            .context("Failed to generate encoding key")
-            .map_err(ServiceError::UnexpectedError)?,
+        let encoding_key = EncodingKey::from_ed_pem(
+            app_state
+                .auth_token_service
+                .token_secret_private_key
+                .expose_secret(),
         )
-        .context("unexpected error")
+        .context("Failed to generate encoding key")
         .map_err(ServiceError::UnexpectedError)?;
+
+        let token_claims = claims.clone();
+        let token = tokio::task::spawn_blocking(move || {
+            jsonwebtoken::encode(
+                &Header::new(jsonwebtoken::Algorithm::EdDSA),
+                &token_claims,
+                &encoding_key,
+            )
+            .context("unexpected error")
+            .map_err(ServiceError::UnexpectedError)
+        })
+        .await
+        .context("tokio join error")
+        .map_err(ServiceError::UnexpectedError)??;
 
         save_token(&app_state.pg_pool, &app_state.moka_cache, &claims, user_id).await?;
 
@@ -55,7 +62,7 @@ impl AuthTokenService {
         claims: &Claims,
     ) -> Result<Option<Uuid>, ServiceError> {
         let user_id =
-            get_user_id_from_by_id(&app_state.pg_pool, &app_state.moka_cache, &claims.auth_id)
+            get_user_id_by_token_id(&app_state.pg_pool, &app_state.moka_cache, &claims.auth_id)
                 .await?;
 
         Ok(user_id)

@@ -8,17 +8,19 @@ use crate::{
     email_client::{self, EmailClient},
     service::{
         auth_token_service::AuthTokenService, authentication::CredentialService,
-        newsletter::NewsletterService, subscriptions::SubscriptionsService,
+        dashboard_service::DashboardService, newsletter::NewsletterService,
+        subscriptions::SubscriptionsService,
     },
 };
 
 pub struct ApplicationBaseUrl(pub String);
 
 pub struct AppState {
-    pub subscribe_service: SubscriptionsService,
+    pub subscriptions_service: SubscriptionsService,
     pub newsletter_service: NewsletterService,
     pub credential_service: CredentialService,
     pub auth_token_service: AuthTokenService,
+    pub dashboard_service: DashboardService,
     pub pg_pool: sqlx::PgPool,
     pub email_client: EmailClient,
     pub base_url: ApplicationBaseUrl,
@@ -35,9 +37,10 @@ impl AppState {
         moka_cache: Cache<Uuid, Uuid>,
     ) -> Arc<Self> {
         let app_state = Self {
-            subscribe_service: SubscriptionsService,
+            subscriptions_service: SubscriptionsService,
             newsletter_service: NewsletterService,
             credential_service: CredentialService,
+            dashboard_service: DashboardService,
             auth_token_service: AuthTokenService {
                 token_secret_private_key,
                 token_secret_public_key,

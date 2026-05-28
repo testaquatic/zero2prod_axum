@@ -19,9 +19,10 @@ pub enum AppError {
     UnexpectedError(#[source] anyhow::Error),
 }
 
-#[derive(serde::Serialize, Debug)]
+#[derive(serde::Serialize, Debug, utoipa::ToSchema)]
 pub struct AppErrorMessage {
     #[serde(rename = "type", serialize_with = "status_code_to_string")]
+    #[schema(value_type = String)]
     pub status_code: http::StatusCode,
     pub message: String,
 }

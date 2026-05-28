@@ -5,6 +5,7 @@ use axum::{Json, extract::State, http};
 use crate::{app_state::AppState, error::AppError};
 
 /// 뉴스레터를 발행한다.
+#[tracing::instrument(name = "Publish a newsletter issue", skip_all, err(Debug))]
 #[utoipa::path(
     description = "뉴스레터를 발행한다.",
     summary = "뉴스레터 발행",

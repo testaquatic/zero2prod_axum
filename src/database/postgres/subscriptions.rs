@@ -31,7 +31,7 @@ pub async fn get_confirmed_subscribers(
     skip_all,
     err(Debug)
 )]
-pub async fn insert_subscriber(
+pub async fn save_subscriber(
     pg_executor: impl PgExecutor<'_>,
     new_subscriber: &NewSubscriber,
 ) -> Result<Uuid, sqlx::Error> {

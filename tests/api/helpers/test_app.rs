@@ -1,4 +1,3 @@
-use reqwest::header;
 use wiremock::MockServer;
 use zero2prod_axum::configuration::Settings;
 
@@ -22,11 +21,10 @@ impl TestApp {
         )
     }
 
-    pub async fn post_subscriptions(&self, body: String) -> reqwest::Response {
+    pub async fn post_subscriptions(&self, body: &impl serde::Serialize) -> reqwest::Response {
         self.api_client
             .post(&format!("{}/subscriptions", self.app_address()))
-            .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
-            .body(body)
+            .json(body)
             .send()
             .await
             .expect("Failed to execute request.")
@@ -84,6 +82,15 @@ impl TestApp {
 
     pub async fn post_login<Body: serde::Serialize>(&self, body: &Body) -> reqwest::Response {
         post_login(&self.configuration, body).await
+    }
+
+    pub async fn get_admin_dashboard(&self, token: &str) -> reqwest::Response {
+        self.api_client
+            .get(&format!("{}/admin/dashboard", self.app_address()))
+            .bearer_auth(token)
+            .send()
+            .await
+            .expect("Failed to execute request.")
     }
 }
 

@@ -4,7 +4,7 @@ use sqlx::PgPool;
 use crate::{
     database::postgres::{
         self,
-        subscription_tokens::{get_subscriber_id_from_token, insert_subscription_token},
+        subscription_tokens::{get_subscriber_id_from_token, save_subscription_token},
         subscriptions::update_subscriber_confirmed,
     },
     domain::new_subscriber::NewSubscriber,
@@ -29,11 +29,10 @@ impl SubscriptionsService {
 
         let mut transaction = pg_pool.begin().await?;
         let subscriber_id =
-            postgres::subscriptions::insert_subscriber(transaction.as_mut(), &new_subscriber)
-                .await?;
+            postgres::subscriptions::save_subscriber(transaction.as_mut(), &new_subscriber).await?;
         let subscription_token = generate_subscription_token();
 
-        insert_subscription_token(transaction.as_mut(), subscriber_id, &subscription_token).await?;
+        save_subscription_token(transaction.as_mut(), subscriber_id, &subscription_token).await?;
 
         transaction.commit().await?;
 

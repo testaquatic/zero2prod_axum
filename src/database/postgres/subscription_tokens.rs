@@ -1,12 +1,8 @@
 use sqlx::PgExecutor;
 use uuid::Uuid;
 
-#[tracing::instrument(
-    name = "Store subscription token in the database",
-    skip_all,
-    err(Debug)
-)]
-pub async fn insert_subscription_token(
+#[tracing::instrument(name = "Save subscription token in the database", skip_all, err(Debug))]
+pub async fn save_subscription_token(
     pg_executor: impl PgExecutor<'_>,
     subscriber_id: Uuid,
     subscription_token: &str,

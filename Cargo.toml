@@ -56,6 +56,7 @@ validator = "0.20"
 [dev-dependencies]
 # 무작위 데이터 생성
 fake = "5"
+insta = { version = "1", features = ["json", "redactions"] }
 # 텍스트에 링크가 있는지 확인
 linkify = "0.11"
 # 속성 테스트

@@ -109,7 +109,10 @@ async fn newsletters_returns_400_for_invalid_data() -> Result<(), anyhow::Error>
 
 /// 테스트 대상 애플리케이션의 퍼블릭 API를 사용해서 확인되지 않은 구독자를 생성한다.
 async fn create_unconfirmed_subscriber(app: &TestApp) -> Result<ConfirmationLinks, anyhow::Error> {
-    let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
+    let body = serde_json::json!({
+        "name": "le guin",
+        "email": "ursula_le_guin@gmail.com"
+    });
 
     let _mock_guard = Mock::given(matchers::path("/email"))
         .and(matchers::method(Method::POST))
@@ -119,9 +122,7 @@ async fn create_unconfirmed_subscriber(app: &TestApp) -> Result<ConfirmationLink
         .mount_as_scoped(&app.email_server)
         .await;
 
-    app.post_subscriptions(body.into())
-        .await
-        .error_for_status()?;
+    app.post_subscriptions(&body).await.error_for_status()?;
 
     let email_request = &app
         .email_server

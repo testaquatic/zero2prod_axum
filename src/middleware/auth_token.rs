@@ -4,11 +4,15 @@ use anyhow::Context;
 use axum::extract::FromRequestParts;
 use jsonwebtoken::{DecodingKey, Validation};
 use secrecy::{ExposeSecret, SecretString};
+use uuid::Uuid;
 
-use crate::{app_state::AppState, domain::credential::Claims, error::AppError};
+use crate::{
+    app_state::AppState, domain::credential::Claims, error::AppError, service::error::ServiceError,
+};
 
-/// Basic 인증 관련 추출자
+/// Bearer 인증 관련 추출자
 pub struct TokenData {
+    pub user_id: Uuid,
     pub claims: Claims,
 }
 
@@ -20,36 +24,8 @@ impl FromRequestParts<Arc<AppState>> for TokenData {
         app_state: &Arc<AppState>,
     ) -> Result<Self, Self::Rejection> {
         let token = extract_credentials(parts).await?;
-
-        let token_data = jsonwebtoken::decode::<Claims>(
-            token.expose_secret().as_bytes(),
-            &DecodingKey::from_ed_pem(
-                app_state
-                    .auth_token_service
-                    .token_secret_public_key
-                    .expose_secret(),
-            )
-            .context("Failed to make decoding key")
-            .map_err(AppError::UnexpectedError)?,
-            &Validation::new(jsonwebtoken::Algorithm::EdDSA),
-        )
-        .map(|claims| TokenData {
-            claims: claims.claims,
-        })
-        .context("Invalid Token")
-        .map_err(AppError::AuthError)?;
-
-        app_state
-            .auth_token_service
-            .get_user_id_by_claims(app_state, &token_data.claims)
-            .await?;
-
-        let now = chrono::Utc::now().timestamp();
-        if token_data.claims.exp < now {
-            return Err(AppError::AuthError(anyhow::anyhow!("Expired Token")));
-        }
-
-        Ok(token_data)
+        let tokendata = validate_token(&app_state, token).await?;
+        Ok(tokendata)
     }
 }
 
@@ -71,4 +47,47 @@ async fn extract_credentials(
         .map_err(AppError::AuthError)?;
 
     Ok(SecretString::new(token.to_string().into()))
+}
+
+/// 토큰이 유효한지 확인하고 `TokenData`를 반환하던다
+pub async fn validate_token(
+    app_state: &AppState,
+    token: SecretString,
+) -> Result<TokenData, ServiceError> {
+    let decoding_key = DecodingKey::from_ed_pem(
+        app_state
+            .auth_token_service
+            .token_secret_public_key
+            .expose_secret(),
+    )
+    .context("Failed to make decoding key")
+    .map_err(ServiceError::UnexpectedError)?;
+
+    let claims = tokio::task::spawn_blocking(move || {
+        jsonwebtoken::decode::<Claims>(
+            token.expose_secret().as_bytes(),
+            &decoding_key,
+            &Validation::new(jsonwebtoken::Algorithm::EdDSA),
+        )
+        .map(|claims| claims.claims)
+        .context("Invalid Token")
+        .map_err(ServiceError::AuthError)
+    })
+    .await
+    .context("tokio join error")
+    .map_err(ServiceError::UnexpectedError)??;
+
+    let user_id = app_state
+        .auth_token_service
+        .get_user_id_by_claims(app_state, &claims)
+        .await?
+        .context("No user id")
+        .map_err(ServiceError::AuthError)?;
+
+    let now = chrono::Utc::now().timestamp();
+    if claims.exp < now {
+        return Err(ServiceError::AuthError(anyhow::anyhow!("Expired Token")));
+    }
+
+    Ok(TokenData { user_id, claims })
 }

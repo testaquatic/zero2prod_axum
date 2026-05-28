@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use axum::{
-    Form,
+    Json,
     extract::State,
     http::{self},
 };
@@ -15,14 +15,14 @@ use crate::{app_state::AppState, error::AppError};
         subscriber_email = %form_data.email,
         subscriber_name = %form_data.name
     ),
-    err
+    err(Debug)
 )]
 #[utoipa::path(
   description = "구독 요청을 받는다.",
   summary = "구독 요청",
   post,
   path = "/subscriptions",
-  request_body(content = inline(SubscribeFormData), content_type = "application/x-www-form-urlencoded"),
+  request_body(content = inline(SubscribeFormData)),
   responses(
     (status = http::StatusCode::OK, description = "OK"),
     (status = http::StatusCode::UNPROCESSABLE_ENTITY, description = "누락되거나 유효하지 않은 필드가 있음"),
@@ -32,10 +32,10 @@ use crate::{app_state::AppState, error::AppError};
 )]
 pub async fn subscribe(
     State(app_state): State<Arc<AppState>>,
-    Form(form_data): Form<SubscribeFormData>,
+    Json(form_data): Json<SubscribeFormData>,
 ) -> Result<http::StatusCode, AppError> {
     app_state
-        .subscribe_service
+        .subscriptions_service
         .subscribe(
             &app_state.pg_pool,
             &app_state.email_client,

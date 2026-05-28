@@ -10,6 +10,7 @@ use utoipa_swagger_ui::SwaggerUi;
 use crate::{
     app_state::{self, AppState},
     handler::{
+        admin::dashboard::{self, get_admin_dashboard},
         health_check::{self, health_check},
         login::{self, post::login},
         newsletter::{self, publish_newsletter},
@@ -40,6 +41,7 @@ pub fn get_app_router(app_state: Arc<app_state::AppState>) -> axum::Router {
 pub fn get_protected_router(app_state: Arc<app_state::AppState>) -> axum::Router<Arc<AppState>> {
     axum::Router::new()
         .route("/newsletter", routing::post(publish_newsletter))
+        .route("/admin/dashboard", routing::get(get_admin_dashboard))
         .route_layer(middleware::from_extractor_with_state::<
             TokenData,
             Arc<AppState>,
@@ -61,6 +63,7 @@ fn get_swagger_router() -> axum::Router {
     api.merge(subscriptions_confirm::SubscriptionsConfirm::openapi());
     api.merge(newsletter::NewsletterOpenApiDoc::openapi());
     api.merge(login::post::PostLoginOpenApiDoc::openapi());
+    api.merge(dashboard::GetAdminDashboardOpenApiDoc::openapi());
 
     SwaggerUi::new("/swagger-ui")
         .url("/apidoc/openapi.json", api)

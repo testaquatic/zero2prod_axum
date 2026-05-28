@@ -4,6 +4,7 @@ use uuid::Uuid;
 
 use crate::domain::credential::Claims;
 
+#[tracing::instrument(name = "Save token", skip_all, err(Debug))]
 pub async fn save_token(
     pg_excutor: impl PgExecutor<'_>,
     moka_cache: &Cache<Uuid, Uuid>,
@@ -28,7 +29,8 @@ pub async fn save_token(
     Ok(())
 }
 
-pub async fn get_user_id_from_by_id(
+#[tracing::instrument(name = "Get user_id by token_id", skip_all, err(Debug))]
+pub async fn get_user_id_by_token_id(
     pg_excutor: impl PgExecutor<'_>,
     moka_cache: &Cache<Uuid, Uuid>,
     token_id: &Uuid,
@@ -56,6 +58,7 @@ pub async fn get_user_id_from_by_id(
     }
 }
 
+#[tracing::instrument(name = "Delete expired tokens", skip_all, err(Debug))]
 pub async fn delete_expired_token(
     pg_excutor: impl PgExecutor<'_>,
     date: &chrono::DateTime<chrono::Utc>,

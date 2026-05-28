@@ -1,0 +1,10 @@
+---
+source: tests/api/admin_dashboard.rs
+assertion_line: 33
+expression: response_json
+---
+{
+  "role": "admin",
+  "user_id": "[redacted]",
+  "username": "218bada0-3fdf-4cff-86c6-5b9ed366d02e"
+}

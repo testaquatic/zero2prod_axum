@@ -9,7 +9,7 @@ use utoipa::{
 use crate::{
     app_state::AppState,
     domain::credential::{TokenResponse, UsernamePassword},
-    error::AppError,
+    error::{AppError, AppErrorMessage},
 };
 
 #[tracing::instrument(skip_all,fields(username = login_input.username, user_id = tracing::field::Empty), err(Debug))]
@@ -21,9 +21,9 @@ use crate::{
   request_body(content = inline(UsernamePassword), content_type = "application/json"),
   responses(
     (status = http::StatusCode::OK, description = "OK", body = TokenResponse),
-    (status = http::StatusCode::UNPROCESSABLE_ENTITY, description = "누락되거나 유효하지 않은 필드가 있음"),
-    (status = http::StatusCode::INTERNAL_SERVER_ERROR, description = "서버 내부 오류"),
-    (status = http::StatusCode::UNAUTHORIZED, description = "로그인 데이터 유효성 검증 실패"),
+    (status = http::StatusCode::UNPROCESSABLE_ENTITY, body = AppErrorMessage, description = "누락되거나 유효하지 않은 필드가 있음"),
+    (status = http::StatusCode::INTERNAL_SERVER_ERROR, body = AppErrorMessage, description = "서버 내부 오류"),
+    (status = http::StatusCode::UNAUTHORIZED, body = AppErrorMessage, description = "로그인 데이터 유효성 검증 실패"),
   )
 )]
 pub async fn login(
