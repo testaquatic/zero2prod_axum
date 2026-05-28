@@ -34,7 +34,8 @@ use crate::{
             })
         ),
     ),
-    security(("bearerAuth" = []))
+    security(("bearerAuth" = [])),
+    tags = ["Admin"]
 )]
 pub async fn get_admin_dashboard(
     State(app_state): State<Arc<AppState>>,

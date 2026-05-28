@@ -20,7 +20,8 @@ use crate::{app_state::AppState, domain::form_data::PostNewsletterFormData, erro
     request_body = PostNewsletterFormData,
     responses(
         (status = http::StatusCode::OK, description = "OK")
-    )
+    ),
+    tags = ["Newsletter"]
 )]
 pub async fn publish_newsletter(
     State(app_state): State<Arc<AppState>>,

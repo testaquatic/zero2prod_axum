@@ -28,7 +28,8 @@ use crate::{app_state::AppState, domain::form_data::SubscriptionFormData, error:
     (status = http::StatusCode::UNPROCESSABLE_ENTITY, description = "누락되거나 유효하지 않은 필드가 있음"),
     (status = http::StatusCode::INTERNAL_SERVER_ERROR, description = "서버 내부 오류"),
     (status = http::StatusCode::BAD_REQUEST, description ="요청 데이터 유효성 검증 실패"),
-  )
+  ),
+  tags = ["Newsletter"]
 )]
 pub async fn subscribe(
     State(app_state): State<Arc<AppState>>,

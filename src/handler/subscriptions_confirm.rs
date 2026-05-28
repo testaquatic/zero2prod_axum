@@ -26,7 +26,8 @@ pub struct Parameters {
     (status = http::StatusCode::OK, description = "OK"),
     (status = http::StatusCode::BAD_REQUEST, description = "요청 데이터 유효성 검증 실패"),
     (status = http::StatusCode::INTERNAL_SERVER_ERROR, description = "서버 내부 오류"),
-  )
+  ),
+  tags = ["Newsletter"]
 )]
 pub async fn confirm(
     State(app_state): State<Arc<AppState>>,

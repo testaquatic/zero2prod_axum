@@ -20,7 +20,9 @@ use crate::{
     (status = http::StatusCode::UNAUTHORIZED, body = AppErrorMessage, description = "인증 오류: 접근 권한이 없음"),
     (status = http::StatusCode::UNPROCESSABLE_ENTITY, body = AppErrorMessage, description = "누락되거나 유효하지 않은 필드가 있음"),
     (status = http::StatusCode::INTERNAL_SERVER_ERROR, body = AppErrorMessage, description = "서버 내부 오류"),
-  )
+  ),
+  security(("bearerAuth" = [])),
+  tags = ["Account"]
 )]
 pub async fn change_password(
     State(app_state): State<Arc<AppState>>,

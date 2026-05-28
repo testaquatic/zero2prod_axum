@@ -23,17 +23,19 @@ use crate::{
 
 #[tracing::instrument(skip_all,fields(username = login_input.username, user_id = tracing::field::Empty), err(Debug))]
 #[utoipa::path(
-  description = "로그인을 위한 인증을 받는다.",
+  description = "로그인을 한다.",
   summary = "로그인",
   post,
   path = "/login",
   request_body(content = inline(LoginFormData), content_type = "application/json"),
   responses(
-    (status = http::StatusCode::OK, description = "OK", body = TokenResponse),
+    (status = http::StatusCode::OK, description = "로그인에 성공하면 인증 토큰을 반환한다", body = TokenResponse),
     (status = http::StatusCode::UNPROCESSABLE_ENTITY, body = AppErrorMessage, description = "누락되거나 유효하지 않은 필드가 있음"),
     (status = http::StatusCode::INTERNAL_SERVER_ERROR, body = AppErrorMessage, description = "서버 내부 오류"),
     (status = http::StatusCode::UNAUTHORIZED, body = AppErrorMessage, description = "로그인 데이터 유효성 검증 실패"),
-  )
+  ),
+  security(("basicAuth" = [])),
+  tags = ["Account"]
 )]
 pub async fn login(
     State(app_state): State<Arc<AppState>>,

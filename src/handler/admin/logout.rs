@@ -13,7 +13,9 @@ use crate::{app_state::AppState, domain::extractor::TokenData, error::AppError};
     path = "/admin/logout",
     responses((
         status = http::StatusCode::CREATED, description = "로그아웃 성공"
-    ))
+    )),
+    security(("bearerAuth" = [])),
+    tags = ["Account"]
 )]
 pub async fn logout(
     State(app_state): State<Arc<AppState>>,
