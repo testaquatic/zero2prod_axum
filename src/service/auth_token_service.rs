@@ -11,6 +11,7 @@ use crate::{
 };
 
 pub struct AuthTokenService {
+    pub token_expiration_seconds: i64,
     pub token_secret_private_key: SecretSlice<u8>,
     pub token_secret_public_key: SecretSlice<u8>,
 }
@@ -18,7 +19,7 @@ pub struct AuthTokenService {
 impl AuthTokenService {
     /// JWT 토큰을 생성한다.
     pub async fn generate_token(&self, claims: &Claims) -> Result<SecretString, ServiceError> {
-        let encoding_key = EncodingKey::from_ed_pem(&self.token_secret_private_key.expose_secret())
+        let encoding_key = EncodingKey::from_ed_pem(self.token_secret_private_key.expose_secret())
             .context("Failed to generate encoding key")
             .map_err(ServiceError::UnexpectedError)?;
 
@@ -46,7 +47,7 @@ impl AuthTokenService {
         app_state: &AppState,
         token_data: &TokenData,
     ) -> Result<(), ServiceError> {
-        save_token_info(&app_state.pg_pool, &app_state.moka_cache, &token_data).await?;
+        save_token_info(&app_state.pg_pool, &app_state.moka_cache, token_data).await?;
         Ok(())
     }
 

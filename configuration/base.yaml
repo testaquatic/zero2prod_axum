@@ -8,6 +8,7 @@ database:
 application:
   base_url: "http://127.0.0.1"
   port: 8000
+  token_expiration_seconds: 3600
   token_secret_private_pem: "private.pem"
   token_secret_public_pem: "public.pem"
 email_client:

@@ -38,7 +38,7 @@ pub fn get_email_client(
     Ok(email_client)
 }
 
-///
+/// 사적이면서 공적인 나만의 시크릿
 pub fn get_private_and_public_key_from_configuration(
     configuration: &Settings,
 ) -> Result<(SecretSlice<u8>, SecretSlice<u8>), io::Error> {
@@ -61,6 +61,7 @@ pub fn get_private_and_public_key_from_configuration(
     Ok((private_key, public_key))
 }
 
+/// 서버를 실행한다
 pub async fn run() -> Result<(), std::io::Error> {
     // 설정을 읽는다
     let configuration = configuration::get_configuration().expect("failed to read configuration");
@@ -112,7 +113,9 @@ impl Application {
 
         // Moka 초기화
         let moka_cache: Cache<Uuid, Uuid> = moka::future::CacheBuilder::new(10_000)
-            .time_to_live(Duration::from_hours(12))
+            .time_to_live(Duration::from_secs(
+                configuration.application.token_expiration_seconds as u64,
+            ))
             .time_to_idle(Duration::from_hours(1))
             .build();
 
@@ -121,6 +124,7 @@ impl Application {
             connection_pool,
             email_client,
             configuration.application.base_url,
+            configuration.application.token_expiration_seconds,
             private_key,
             public_key,
             moka_cache,

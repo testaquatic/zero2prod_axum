@@ -42,7 +42,7 @@ pub async fn login(
     let token = process_token_generation(&app_state, &login_input).await?;
 
     Ok(Json(TokenResponse {
-        token: token.into(),
+        token,
         token_type: "Bearer".to_string(),
     }))
 }
@@ -60,7 +60,9 @@ async fn process_token_generation(
 
     let claims = Claims {
         auth_id: Uuid::new_v4(),
-        exp: (Utc::now() + chrono::Duration::hours(1)).timestamp(),
+        exp: (Utc::now()
+            + chrono::Duration::seconds(app_state.auth_token_service.token_expiration_seconds))
+        .timestamp(),
         iat: Utc::now().timestamp(),
     };
 

@@ -117,7 +117,11 @@ impl TestApp {
     pub async fn invalid_token(&self) -> SecretString {
         let claims = Claims {
             auth_id: Uuid::new_v4(),
-            exp: (Utc::now() + chrono::Duration::hours(1)).timestamp(),
+            exp: (Utc::now()
+                + chrono::Duration::seconds(
+                    self.configuration.application.token_expiration_seconds,
+                ))
+            .timestamp(),
             iat: Utc::now().timestamp(),
         };
 
@@ -126,6 +130,7 @@ impl TestApp {
                 .expect("failed to read key file");
 
         let invalid_token = AuthTokenService {
+            token_expiration_seconds: self.configuration.application.token_expiration_seconds,
             token_secret_private_key: private_key,
             token_secret_public_key: public_key,
         }

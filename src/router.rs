@@ -13,10 +13,10 @@ use crate::{
         admin::{
             dashboard::{self, get_admin_dashboard},
             logout::{self, logout},
-            password::{self, post::change_password},
+            password::{self, change_password},
         },
         health_check::{self, health_check},
-        login::{self, post::login},
+        login::{self, login},
         newsletter::{self, publish_newsletter},
         subscriptions::{self, subscribe},
         subscriptions_confirm::{self, confirm},
@@ -65,9 +65,9 @@ fn get_swagger_router() -> axum::Router {
     api.merge(subscriptions::SubscriptionsApiDoc::openapi());
     api.merge(subscriptions_confirm::SubscriptionsConfirm::openapi());
     api.merge(newsletter::NewsletterOpenApiDoc::openapi());
-    api.merge(login::post::PostLoginOpenApiDoc::openapi());
+    api.merge(login::PostLoginOpenApiDoc::openapi());
     api.merge(dashboard::GetAdminDashboardOpenApiDoc::openapi());
-    api.merge(password::post::ChangePasswordOpenApiDoc::openapi());
+    api.merge(password::ChangePasswordOpenApiDoc::openapi());
     api.merge(logout::LogoutOpenApiDoc::openapi());
 
     SwaggerUi::new("/swagger-ui")

@@ -1,21 +1,10 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT user_id, username, role\n        FROM users\n        WHERE user_id = $1\n        ",
+  "query": "\n        SELECT username, role\n        FROM users\n        WHERE user_id = $1\n        ",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
-        "name": "user_id",
-        "type_info": "Uuid",
-        "origin": {
-          "Table": {
-            "table": "users",
-            "name": "user_id"
-          }
-        }
-      },
-      {
-        "ordinal": 1,
         "name": "username",
         "type_info": "Text",
         "origin": {
@@ -26,7 +15,7 @@
         }
       },
       {
-        "ordinal": 2,
+        "ordinal": 1,
         "name": "role",
         "type_info": "Text",
         "origin": {
@@ -44,9 +33,8 @@
     },
     "nullable": [
       false,
-      false,
       false
     ]
   },
-  "hash": "795d4d124b9e7d5f07733ee35e738af39ace001a69a99fb9fa0d8a83a9f3b1ef"
+  "hash": "a64e56a7104b272e451df94fd9fa60ab34c4aa8bf2ef6cca2253bd52b9eb50ad"
 }

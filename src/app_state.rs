@@ -22,9 +22,9 @@ pub struct AppState {
     pub auth_token_service: AuthTokenService,
     pub dashboard_service: DashboardService,
     pub pg_pool: sqlx::PgPool,
+    pub moka_cache: Cache<Uuid, Uuid>,
     pub email_client: EmailClient,
     pub base_url: ApplicationBaseUrl,
-    pub moka_cache: Cache<Uuid, Uuid>,
 }
 
 impl AppState {
@@ -32,6 +32,7 @@ impl AppState {
         pool: sqlx::PgPool,
         email_client: email_client::EmailClient,
         base_url: String,
+        token_expiration_seconds: i64,
         token_secret_private_key: SecretSlice<u8>,
         token_secret_public_key: SecretSlice<u8>,
         moka_cache: Cache<Uuid, Uuid>,
@@ -42,6 +43,7 @@ impl AppState {
             credential_service: CredentialService,
             dashboard_service: DashboardService,
             auth_token_service: AuthTokenService {
+                token_expiration_seconds,
                 token_secret_private_key,
                 token_secret_public_key,
             },
