@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use reqwest::{Method, StatusCode};
 use secrecy::ExposeSecret;
 use wiremock::{Mock, ResponseTemplate, matchers};
@@ -246,6 +248,46 @@ async fn newsletter_creation_is_idempotent() -> Result<(), anyhow::Error> {
     );
 
     // 이메일이 두번 전송되었으므로 실패
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn concurrent_form_submission_is_handled_gracefully() -> Result<(), anyhow::Error> {
+    let app = spawn_app().await;
+    create_confirmed_subscriber(&app).await?;
+
+    Mock::given(matchers::path("/email"))
+        .and(matchers::method(Method::POST))
+        .respond_with(ResponseTemplate::new(StatusCode::OK).set_delay(Duration::from_secs(2)))
+        .expect(1)
+        .mount(&app.email_server)
+        .await;
+
+    let newsletter_request_body = serde_json::json!({
+        "title": "Newsletter title",
+        "text_content": "Newsletter body as plain text",
+        "html_content": "<p>Newsletter body as HTML</p>",
+        "idempotency_key": app.get_idempotency_key(Some(&app.auth_token)).await,
+    });
+
+    let response1 = app.post_newsletters(&newsletter_request_body, Some(&app.auth_token));
+    let response2 = app.post_newsletters(&newsletter_request_body, Some(&app.auth_token));
+
+    let (response1, response2) = tokio::join!(response1, response2);
+
+    assert_eq!(
+        response1.status(),
+        StatusCode::OK,
+        "expected 200 OK but got: {:?}",
+        response1
+    );
+    assert_eq!(
+        response2.status(),
+        StatusCode::OK,
+        "expected 200 OK but got: {:?}",
+        response2
+    );
 
     Ok(())
 }

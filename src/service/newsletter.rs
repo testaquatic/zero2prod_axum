@@ -1,11 +1,14 @@
 use anyhow::Context;
-use axum::response::Response;
+use axum::{
+    http,
+    response::{IntoResponse, Response},
+};
 use uuid::Uuid;
 
 use crate::{
     app_state::AppState,
     database::postgres::{
-        idempotency::{get_idempotency_response, save_idempotency_response},
+        idempotency::{get_idempotency_response, save_idempotency_key, save_idempotency_response},
         subscriptions::get_confirmed_subscribers,
     },
     domain::{
@@ -92,5 +95,57 @@ impl NewsletterService {
         .await?;
 
         Ok(saved_response)
+    }
+
+    pub async fn try_processing(
+        &self,
+        app_state: &AppState,
+        token_data: &TokenData,
+        post_newsletter_form_data: &PostNewsletterFormData,
+    ) -> Result<SavedIdempotencyResponse, ServiceError> {
+        let idempotency_key = IdempotencyKey(post_newsletter_form_data.idempotency_key);
+        let mut transaction = app_state.pg_pool.begin().await?;
+
+        let response =
+            match save_idempotency_key(transaction.as_mut(), &idempotency_key, &token_data.user_id)
+                .await?
+            {
+                Some(_) => {
+                    app_state
+                        .newsletter_service
+                        .publish_newsletter(app_state, post_newsletter_form_data)
+                        .await?;
+                    let response = http::StatusCode::OK.into_response();
+                    let response = SavedIdempotencyResponse::extract_response(response)
+                        .await
+                        .context("cannot convert Response to SavedIdempotencyResponse")
+                        .map_err(ServiceError::UnexpectedError)?;
+                    save_idempotency_response(
+                        transaction.as_mut(),
+                        &idempotency_key,
+                        &token_data.user_id,
+                        &response,
+                    )
+                    .await?;
+
+                    Ok(response)
+                }
+                None => {
+                    let saved_response = get_idempotency_response(
+                        transaction.as_mut(),
+                        &idempotency_key,
+                        &token_data.user_id,
+                    )
+                    .await?
+                    .context("We expected a saved response, we didn't find it")
+                    .map_err(ServiceError::UnexpectedError)?;
+
+                    Ok(saved_response)
+                }
+            };
+
+        transaction.commit().await?;
+
+        response
     }
 }

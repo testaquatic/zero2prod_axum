@@ -16,7 +16,7 @@ use crate::{
 
 pub fn get_connection_pool(configuration: &configuration::Settings) -> PgPool {
     PgPoolOptions::new()
-        .acquire_timeout(Duration::from_secs(2))
+        .acquire_timeout(Duration::from_secs(3))
         .connect_lazy_with(configuration.database.with_db())
 }
 

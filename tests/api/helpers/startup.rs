@@ -46,7 +46,7 @@ pub async fn spawn_app() -> TestApp {
     migrate_test_database(&configuration).await;
 
     // `EmailClient`의 타입아웃을 200ms로 설정한다.
-    configuration.email_client.timeout_milliseconds = 200;
+    configuration.email_client.timeout_milliseconds = 3000;
 
     // 테스트 유저를 넣는다
     let test_user = TestUser::generate();

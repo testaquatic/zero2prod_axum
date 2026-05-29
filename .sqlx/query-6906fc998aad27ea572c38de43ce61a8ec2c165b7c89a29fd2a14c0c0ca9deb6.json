@@ -1,12 +1,10 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        INSERT INTO idempotency (\n          user_id, \n          idempotency_key, \n          response_status_code, \n          response_headers, \n          response_body, \n          created_at)\n        VALUES ($1, $2, $3, $4, $5, $6)\n        ",
+  "query": "\n        UPDATE idempotency\n        SET response_status_code = $1, response_headers = $2, response_body = $3\n        WHERE user_id = $4 AND idempotency_key = $5\n        ",
   "describe": {
     "columns": [],
     "parameters": {
       "Left": [
-        "Uuid",
-        "Uuid",
         "Int2",
         {
           "Custom": {
@@ -33,10 +31,11 @@
           }
         },
         "Bytea",
-        "Timestamptz"
+        "Uuid",
+        "Uuid"
       ]
     },
     "nullable": []
   },
-  "hash": "f2a4ca194280409590cca57ff5d92c4c7454d510c82f28a8d8238c806e8c9ed2"
+  "hash": "6906fc998aad27ea572c38de43ce61a8ec2c165b7c89a29fd2a14c0c0ca9deb6"
 }

@@ -1,16 +1,12 @@
 use std::sync::Arc;
 
-use axum::{
-    Json,
-    extract::State,
-    http,
-    response::{IntoResponse, Response},
-};
+use axum::{Json, extract::State};
 
 use crate::{
     app_state::AppState,
     domain::{
-        extractor::TokenData, form_data::PostNewsletterFormData, idempotency::IdempotencyKey,
+        extractor::TokenData, form_data::PostNewsletterFormData,
+        idempotency::SavedIdempotencyResponse,
     },
     error::AppError,
 };
@@ -39,35 +35,13 @@ pub async fn publish_newsletter(
     State(app_state): State<Arc<AppState>>,
     token_data: TokenData,
     Json(body): Json<PostNewsletterFormData>,
-) -> Result<Response, AppError> {
-    // 저장한 응답이 있다면 일찍 반환한다.
-    if let Some(saved_response) = app_state
-        .newsletter_service
-        .get_idempotency_response(&app_state, &body, &token_data)
-        .await?
-    {
-        return Ok(saved_response.into_response());
-    }
-
-    // 뉴스레터를 전송한다.
-    app_state
-        .newsletter_service
-        .publish_newsletter(&app_state, &body)
-        .await?;
-
-    // 응답을 저장한다.
-    let response = http::StatusCode::OK.into_response();
+) -> Result<SavedIdempotencyResponse, AppError> {
     let response = app_state
         .newsletter_service
-        .save_idempotency_response(
-            &app_state,
-            &IdempotencyKey(body.idempotency_key),
-            &token_data.user_id,
-            response,
-        )
+        .try_processing(&app_state, &token_data, &body)
         .await?;
 
-    Ok(response.into_response())
+    Ok(response)
 }
 
 #[derive(utoipa::OpenApi)]
