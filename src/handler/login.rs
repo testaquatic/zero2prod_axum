@@ -15,7 +15,7 @@ use crate::{
         credential::Claims,
         extractor::TokenData,
         form_data::LoginFormData,
-        response::{AppErrorMessage, TokenResponse},
+        response::{AppErrorMessageResponse, TokenResponse},
     },
     error::AppError,
     service::error::ServiceError,
@@ -30,9 +30,9 @@ use crate::{
   request_body(content = inline(LoginFormData), content_type = "application/json"),
   responses(
     (status = http::StatusCode::OK, description = "로그인에 성공하면 인증 토큰을 반환한다", body = TokenResponse),
-    (status = http::StatusCode::UNPROCESSABLE_ENTITY, body = AppErrorMessage, description = "누락되거나 유효하지 않은 필드가 있음"),
-    (status = http::StatusCode::INTERNAL_SERVER_ERROR, body = AppErrorMessage, description = "서버 내부 오류"),
-    (status = http::StatusCode::UNAUTHORIZED, body = AppErrorMessage, description = "로그인 데이터 유효성 검증 실패"),
+    (status = http::StatusCode::UNPROCESSABLE_ENTITY, body = AppErrorMessageResponse, description = "누락되거나 유효하지 않은 필드가 있음"),
+    (status = http::StatusCode::INTERNAL_SERVER_ERROR, body = AppErrorMessageResponse, description = "서버 내부 오류"),
+    (status = http::StatusCode::UNAUTHORIZED, body = AppErrorMessageResponse, description = "로그인 데이터 유효성 검증 실패"),
   ),
   tags = ["Account"]
 )]
@@ -92,4 +92,3 @@ impl Modify for PostLoginOpenApiDoc {
         )
     }
 }
-

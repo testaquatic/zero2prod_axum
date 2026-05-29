@@ -22,8 +22,10 @@ async fn newletters_are_not_delivered_to_unconfirmed_subscribers() -> Result<(),
     let newsletter_request_body = serde_json::json!({
         "title": "Newsletter title",
         "text_content": "Newsletter body as plain text",
-        "html_content": "<p>Newsletter body as HTML</p>"
+        "html_content": "<p>Newsletter body as HTML</p>",
+        "idempotency_key": app.get_idempotency_key(Some(&app.auth_token)).await
     });
+
     let response = app
         .post_newsletters(&newsletter_request_body, Some(&app.auth_token))
         .await;
@@ -53,7 +55,8 @@ async fn newsletters_are_delivered_to_confirmed_subscribers() -> Result<(), anyh
     let newsletter_request_body = serde_json::json!({
         "title": "Newsletter title",
         "text_content": "Newsletter body as plain text",
-        "html_content": "<p>Newsletter body as HTML</p>"
+        "html_content": "<p>Newsletter body as HTML</p>",
+        "idempotency_key": app.get_idempotency_key(Some(&app.auth_token)).await
     });
     let response = app
         .post_newsletters(&newsletter_request_body, Some(&app.auth_token))
@@ -77,12 +80,16 @@ async fn newsletters_returns_400_for_invalid_data() -> Result<(), anyhow::Error>
         (
             serde_json::json!({
                 "text_content": "Newsletter body as plain text",
-                "html_content": "<p>Newsletter body as HTML</p>"
+                "html_content": "<p>Newsletter body as HTML</p>",
+                "idempotency_key": app.get_idempotency_key(Some(&app.auth_token)).await,
             }),
             "missing title",
         ),
         (
-            serde_json::json!({"title": "Newsletter!"}),
+            serde_json::json!({
+                "title": "Newsletter!",
+                "idempotency_key": app.get_idempotency_key(Some(&app.auth_token)).await,
+            }),
             "missing content",
         ),
     ];
@@ -107,7 +114,7 @@ async fn newsletters_returns_400_for_invalid_data() -> Result<(), anyhow::Error>
 async fn create_unconfirmed_subscriber(app: &TestApp) -> Result<ConfirmationLinks, anyhow::Error> {
     let body = serde_json::json!({
         "name": "le guin",
-        "email": "ursula_le_guin@gmail.com"
+        "email": "ursula_le_guin@gmail.com",
     });
 
     let _mock_guard = Mock::given(matchers::path("/email"))
@@ -150,8 +157,8 @@ async fn request_missing_auth_token_are_rejected() -> Result<(), anyhow::Error> 
             &serde_json::json!({
                 "title": "Newsletter title",
                 "text_content": "Newsletter body as plain text",
-                "html_content": "<p>Newsletter body as HTML</p>"
-
+                "html_content": "<p>Newsletter body as HTML</p>",
+                "idempotency_key": app.get_idempotency_key(Some(&app.auth_token)).await,
             }),
             None,
         )
@@ -179,7 +186,8 @@ async fn invalid_token_is_rejected() -> Result<(), anyhow::Error> {
         .json(&serde_json::json!({
             "title": "Newsletter title",
             "text_content": "Newsletter body as plain text",
-            "html_content": "<p>Newsletter body as HTML</p>"
+            "html_content": "<p>Newsletter body as HTML</p>",
+            "idempotency_key": app.get_idempotency_key(Some(&app.auth_token)).await,
         }))
         .send()
         .await?;
@@ -209,19 +217,35 @@ async fn newsletter_creation_is_idempotent() -> Result<(), anyhow::Error> {
     let newsletter_request_body = serde_json::json!({
         "title": "Newsletter title",
         "text_content": "Newsletter body as plain text",
-        "html_content": "<p>Newsletter body as HTML</p>"
+        "html_content": "<p>Newsletter body as HTML</p>",
+        "idempotency_key": app.get_idempotency_key(Some(&app.auth_token)).await,
     });
 
+    // 첫번째 발행 요청
     let response = app
         .post_newsletters(&newsletter_request_body, Some(&app.auth_token))
         .await;
-
+    // 요청이 성공했으므로 이메일이 전송되었다.
     assert_eq!(
         response.status(),
         StatusCode::OK,
         "expected 200 OK but got: {:?}",
         response
     );
+
+    // 두번째 발행 요청
+    let response = app
+        .post_newsletters(&newsletter_request_body, Some(&app.auth_token))
+        .await;
+    // 요청이 성공했으므로 이메일이 전송되었다.
+    assert_eq!(
+        response.status(),
+        StatusCode::OK,
+        "expected 200 OK but got: {:?}",
+        response
+    );
+
+    // 이메일이 두번 전송되었으므로 실패
 
     Ok(())
 }

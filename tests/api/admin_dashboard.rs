@@ -25,7 +25,7 @@ async fn admin_dashboard_with_invalid_token_is_rejected_with_a_401() -> Result<(
     let app = spawn_app().await;
     let token = app.invalid_token().await;
 
-    let response = app.get_admin_dashboard(&token.expose_secret()).await;
+    let response = app.get_admin_dashboard(Some(&token.expose_secret())).await;
 
     assert_eq!(
         response.status(),
@@ -40,7 +40,7 @@ async fn admin_dashboard_with_invalid_token_is_rejected_with_a_401() -> Result<(
 async fn admin_dashboard_response_with_expected_json() -> Result<(), anyhow::Error> {
     let app = spawn_app().await;
 
-    let response = app.get_admin_dashboard(&app.auth_token).await;
+    let response = app.get_admin_dashboard(Some(&app.auth_token)).await;
     assert_eq!(response.status(), StatusCode::OK);
 
     let response_json = response.json::<serde_json::Value>().await.unwrap();

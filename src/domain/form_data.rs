@@ -1,4 +1,5 @@
 use secrecy::SecretString;
+use uuid::Uuid;
 
 use crate::domain::serializer::secret_string_to_string;
 
@@ -22,6 +23,11 @@ pub struct PostNewsletterFormData {
     /// 일반 텍스트
     #[schema(example = "Newsletter body as plain text")]
     pub text_content: String,
+    /// 멱등성 키
+    /// /admin/idempotency_key 에서 획득해야 하거나 무작위로 생성한 Uuid를 사용한다.
+    /// 일회용이다.
+    #[schema(value_type = String, example = "123e4567-e89b-12d3-a456-426655440000")]
+    pub idempotency_key: Uuid,
 }
 
 /// 핸들러에 들어오는 가입 요청 데이터

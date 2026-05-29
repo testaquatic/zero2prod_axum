@@ -1,6 +1,6 @@
 use axum::{Json, response::IntoResponse};
 
-use crate::{domain::response::AppErrorMessage, service::error::ServiceError};
+use crate::{domain::response::AppErrorMessageResponse, service::error::ServiceError};
 
 #[derive(thiserror::Error, Debug)]
 pub enum AppError {
@@ -31,15 +31,15 @@ impl IntoResponse for AppError {
 
         // 응답
         let app_error_message = match self {
-            AppError::InternalError(_) | AppError::UnexpectedError(_) => AppErrorMessage {
+            AppError::InternalError(_) | AppError::UnexpectedError(_) => AppErrorMessageResponse {
                 status: axum::http::StatusCode::INTERNAL_SERVER_ERROR,
                 message: self.to_string(),
             },
-            AppError::BadRequest(_) => AppErrorMessage {
+            AppError::BadRequest(_) => AppErrorMessageResponse {
                 status: axum::http::StatusCode::BAD_REQUEST,
                 message: self.to_string(),
             },
-            AppError::AuthError(_) => AppErrorMessage {
+            AppError::AuthError(_) => AppErrorMessageResponse {
                 status: axum::http::StatusCode::UNAUTHORIZED,
                 message: self.to_string(),
             },

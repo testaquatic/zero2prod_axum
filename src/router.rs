@@ -12,6 +12,7 @@ use crate::{
     handler::{
         admin::{
             dashboard::{self, get_admin_dashboard},
+            idempotency_key::{self, get_idempotency_key},
             logout::{self, logout},
             newsletter::{self, publish_newsletter},
             password::{self, change_password},
@@ -48,6 +49,7 @@ pub fn get_protected_router(app_state: Arc<AppState>) -> axum::Router<Arc<AppSta
         .route("/admin/dashboard", routing::get(get_admin_dashboard))
         .route("/admin/password", routing::post(change_password))
         .route("/admin/logout", routing::post(logout))
+        .route("/admin/idempotency_key", routing::get(get_idempotency_key))
         .route_layer(auth_token_middleware(app_state))
 }
 
@@ -69,6 +71,7 @@ fn get_swagger_router() -> axum::Router {
     api.merge(dashboard::GetAdminDashboardOpenApiDoc::openapi());
     api.merge(password::ChangePasswordOpenApiDoc::openapi());
     api.merge(logout::LogoutOpenApiDoc::openapi());
+    api.merge(idempotency_key::IdempotencyKeyOpenApiDoc::openapi());
 
     SwaggerUi::new("/swagger-ui")
         .url("/apidoc/openapi.json", api)

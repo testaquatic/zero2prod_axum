@@ -97,13 +97,16 @@ impl TestApp {
         post_login(&self.configuration, body).await
     }
 
-    pub async fn get_admin_dashboard(&self, token: &str) -> reqwest::Response {
-        self.api_client
-            .get(&format!("{}/admin/dashboard", self.app_address()))
-            .bearer_auth(token)
-            .send()
-            .await
-            .expect("Failed to execute request.")
+    pub async fn get_admin_dashboard(&self, token: Option<&str>) -> reqwest::Response {
+        let mut builder = self
+            .api_client
+            .get(&format!("{}/admin/dashboard", self.app_address()));
+
+        if let Some(token) = token {
+            builder = builder.bearer_auth(token);
+        }
+
+        builder.send().await.expect("Failed to execute request.")
     }
 
     pub async fn post_change_password(
@@ -156,6 +159,28 @@ impl TestApp {
             .send()
             .await
             .expect("Failed to execute request.")
+    }
+
+    pub async fn get_idempotency_key(&self, token: Option<&str>) -> String {
+        let mut builder = self
+            .api_client
+            .get(&format!("{}/admin/idempotency_key", self.app_address()));
+
+        if let Some(token) = token {
+            builder = builder.bearer_auth(token);
+        }
+
+        builder
+            .bearer_auth(token.unwrap_or(&self.auth_token))
+            .send()
+            .await
+            .expect("Failed to execute request.")
+            .json::<serde_json::Value>()
+            .await
+            .expect("failed to get idempotency key")["idempotency_key"]
+            .as_str()
+            .unwrap()
+            .to_owned()
     }
 }
 

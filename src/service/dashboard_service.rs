@@ -3,7 +3,7 @@ use anyhow::Context;
 use crate::{
     app_state::AppState,
     database::postgres::users::get_user_info_by_user_id,
-    domain::{extractor::TokenData, response::UserInfo},
+    domain::{extractor::TokenData, response::UserInfoResponse},
     service::error::ServiceError,
 };
 
@@ -14,7 +14,7 @@ impl DashboardService {
         &self,
         app_stat: &AppState,
         token_data: &TokenData,
-    ) -> Result<UserInfo, ServiceError> {
+    ) -> Result<UserInfoResponse, ServiceError> {
         get_user_info_by_user_id(&app_stat.pg_pool, &token_data.user_id)
             .await?
             .context("Cannot find ueser")

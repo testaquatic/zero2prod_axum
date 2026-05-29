@@ -187,7 +187,7 @@ async fn changing_password_works() -> Result<(), anyhow::Error> {
         .to_string();
 
     // 새로운 토큰으로 관리자 대쉬보드를 불러온다
-    let response = app.get_admin_dashboard(&new_token).await;
+    let response = app.get_admin_dashboard(Some(&new_token)).await;
     assert_eq!(
         response.status(),
         StatusCode::OK,

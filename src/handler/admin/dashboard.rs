@@ -7,7 +7,7 @@ use crate::{
     app_state::AppState,
     domain::{
         extractor::TokenData,
-        response::{AppErrorMessage, UserInfo},
+        response::{AppErrorMessageResponse, UserInfoResponse},
     },
     error::AppError,
 };
@@ -17,17 +17,17 @@ use crate::{
     get,
     path = "/admin/dashboard",
     tag = "Admin",
-    summary = "관리자 화면",
-    description = "관리자 화면을 표시한다",
+    summary = "관리자 화면에서 필요한 정보",
+    description = "관리자 화면에서 필요한 정보를 전송한다.",
     params(
         ("Authorization" = String, Header, description = "Bearer authentication", example = "Bearer <token>"),
     ),
     responses(
-        (status = StatusCode::OK, description = "Dashboard info", body = UserInfo),
+        (status = StatusCode::OK, description = "Dashboard info", body = UserInfoResponse),
         (
             status = StatusCode::UNAUTHORIZED,
             description = "접근 권한이 없음",
-            body = AppErrorMessage,
+            body = AppErrorMessageResponse,
             example = json!({
                 "status": StatusCode::UNAUTHORIZED.to_string(),
                 "message": "인증 오류: 사용자 정보를 찾을 수 없습니다",
@@ -40,7 +40,7 @@ use crate::{
 pub async fn get_admin_dashboard(
     State(app_state): State<Arc<AppState>>,
     token_data: TokenData,
-) -> Result<Json<UserInfo>, AppError> {
+) -> Result<Json<UserInfoResponse>, AppError> {
     let user_info = app_state
         .dashboard_service
         .get_admin_dashboard(&app_state, &token_data)
