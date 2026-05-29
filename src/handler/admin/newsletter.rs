@@ -9,7 +9,9 @@ use axum::{
 
 use crate::{
     app_state::AppState,
-    domain::{extractor::TokenData, form_data::PostNewsletterFormData},
+    domain::{
+        extractor::TokenData, form_data::PostNewsletterFormData, idempotency::IdempotencyKey,
+    },
     error::AppError,
 };
 
@@ -47,12 +49,25 @@ pub async fn publish_newsletter(
         return Ok(saved_response.into_response());
     }
 
+    // 뉴스레터를 전송한다.
     app_state
         .newsletter_service
         .publish_newsletter(&app_state, &body)
         .await?;
 
-    Ok(http::StatusCode::OK.into_response())
+    // 응답을 저장한다.
+    let response = http::StatusCode::OK.into_response();
+    let response = app_state
+        .newsletter_service
+        .save_idempotency_response(
+            &app_state,
+            &IdempotencyKey(body.idempotency_key),
+            &token_data.user_id,
+            response,
+        )
+        .await?;
+
+    Ok(response.into_response())
 }
 
 #[derive(utoipa::OpenApi)]

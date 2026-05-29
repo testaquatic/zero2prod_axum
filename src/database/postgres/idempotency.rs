@@ -1,10 +1,9 @@
-use axum::http::{HeaderName, HeaderValue};
 use sqlx::PgExecutor;
 use uuid::Uuid;
 
-use crate::domain::idempotency::{IdempotencyKey, SavedIdempotencyResponse};
+use crate::domain::idempotency::{HeaderPairRecord, IdempotencyKey, SavedIdempotencyResponse};
 
-pub async fn get_idempotency_data(
+pub async fn get_idempotency_response(
     pg_excutor: impl PgExecutor<'_>,
     idempotency_key: &IdempotencyKey,
     user_id: &Uuid,
@@ -25,27 +24,38 @@ pub async fn get_idempotency_data(
     .await?
     .map(|row| SavedIdempotencyResponse {
         response_status_code: row.response_status_code,
-        response_headers: row
-            .response_headers
-            .into_iter()
-            .map(|header_pair| (header_pair.name, header_pair.value))
-            .collect(),
+        response_headers: row.response_headers,
         response_body: row.response_body,
     });
 
     Ok(saved_response)
 }
 
-#[derive(Debug, sqlx::Type)]
-#[sqlx(type_name = "header_pair")]
-struct HeaderPairRecord {
-    name: String,
-    value: Vec<u8>,
-}
-
-impl TryFrom<HeaderPairRecord> for (HeaderName, HeaderValue) {
-    type Error = anyhow::Error;
-    fn try_from(value: HeaderPairRecord) -> Result<Self, Self::Error> {
-        Ok((value.name.parse()?, HeaderValue::from_bytes(&value.value)?))
-    }
+pub async fn save_idempotency_response(
+    pg_excutor: impl PgExecutor<'_>,
+    idempotency_key: &IdempotencyKey,
+    user_id: &Uuid,
+    response: &SavedIdempotencyResponse,
+) -> Result<(), sqlx::Error> {
+    sqlx::query_unchecked!(
+        r#"
+        INSERT INTO idempotency (
+          user_id, 
+          idempotency_key, 
+          response_status_code, 
+          response_headers, 
+          response_body, 
+          created_at)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        "#,
+        user_id,
+        idempotency_key.0,
+        response.response_status_code,
+        response.response_headers,
+        response.response_body,
+        chrono::Utc::now(),
+    )
+    .execute(pg_excutor)
+    .await
+    .map(|_| ())
 }

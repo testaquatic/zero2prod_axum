@@ -1,7 +1,12 @@
+use anyhow::Context;
+use axum::response::Response;
+use uuid::Uuid;
+
 use crate::{
     app_state::AppState,
     database::postgres::{
-        idempotency::get_idempotency_data, subscriptions::get_confirmed_subscribers,
+        idempotency::{get_idempotency_response, save_idempotency_response},
+        subscriptions::get_confirmed_subscribers,
     },
     domain::{
         extractor::TokenData,
@@ -59,7 +64,32 @@ impl NewsletterService {
     ) -> Result<Option<SavedIdempotencyResponse>, ServiceError> {
         let idempotency_key = IdempotencyKey(email.idempotency_key);
         let saved_response =
-            get_idempotency_data(&app_state.pg_pool, &idempotency_key, &token_data.user_id).await?;
+            get_idempotency_response(&app_state.pg_pool, &idempotency_key, &token_data.user_id)
+                .await?;
+
+        Ok(saved_response)
+    }
+
+    /// 응답을 저장한다
+    pub async fn save_idempotency_response(
+        &self,
+        app_state: &AppState,
+        idempotency_key: &IdempotencyKey,
+        user_id: &Uuid,
+        response: Response,
+    ) -> Result<SavedIdempotencyResponse, ServiceError> {
+        let saved_response = SavedIdempotencyResponse::extract_response(response)
+            .await
+            .context("cannot convert Response to SavedIdempotencyResponse")
+            .map_err(ServiceError::UnexpectedError)?;
+
+        save_idempotency_response(
+            &app_state.pg_pool,
+            idempotency_key,
+            user_id,
+            &saved_response,
+        )
+        .await?;
 
         Ok(saved_response)
     }
