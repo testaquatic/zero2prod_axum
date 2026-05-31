@@ -1,0 +1,50 @@
+{
+  "db_name": "PostgreSQL",
+  "query": " \n        WITH queue AS (\n          SELECT newsletter_issue_id, subscriber_id\n          FROM issue_delivery_queue\n          FOR UPDATE SKIP LOCKED\n          LIMIT 1\n        ) \n         SELECT queue.newsletter_issue_id, queue.subscriber_id, email\n         FROM subscriptions\n         JOIN queue ON queue.subscriber_id = subscriptions.id\n         WHERE subscriptions.id = queue.subscriber_id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "newsletter_issue_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "issue_delivery_queue",
+            "name": "newsletter_issue_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "subscriber_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "issue_delivery_queue",
+            "name": "subscriber_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "email",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "subscriptions",
+            "name": "email"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "20125a35773e8910a2c8662db993cadd12eda846afc4fcc849e72cbc5983c609"
+}
