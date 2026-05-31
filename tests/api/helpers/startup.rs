@@ -8,7 +8,7 @@ use wiremock::MockServer;
 use zero2prod_axum::{
     configuration::{self, Settings},
     domain::response::TokenResponse,
-    startup::Application,
+    startup::{Application, email_worker_loop},
     telemetry,
 };
 
@@ -69,6 +69,11 @@ pub async fn spawn_app() -> TestApp {
 
     // 테스트 서버 실행
     let api_server_handle = tokio::spawn(application.run_until_stopped());
+    // 이메일 워커 실행
+    configuration.application.email_worker_interval_milliseconds = 100;
+    let email_worker_configuration = configuration.clone();
+    let email_worker = async move { email_worker_loop(&email_worker_configuration).await };
+    let email_worker_handle = tokio::spawn(email_worker);
 
     // 로그인 토큰을 얻는다
     let token_response = post_login(
@@ -95,6 +100,7 @@ pub async fn spawn_app() -> TestApp {
         test_user,
         auth_token: token.token.expose_secret().to_string(),
         _api_server_handle: api_server_handle,
+        _email_worker_handle: email_worker_handle,
         api_client,
     }
 }

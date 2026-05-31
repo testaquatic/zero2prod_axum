@@ -1,7 +1,7 @@
 use zero2prod_axum::{startup, telemetry};
 
 #[tokio::main]
-async fn main() -> Result<(), std::io::Error> {
+async fn main() -> Result<(), anyhow::Error> {
     let subscriber = telemetry::get_subscriber("info", std::io::stdout);
     telemetry::init_subscriber(subscriber);
 

@@ -5,8 +5,7 @@ use axum::{Json, extract::State};
 use crate::{
     app_state::AppState,
     domain::{
-        extractor::TokenData, form_data::PostNewsletterFormData,
-        idempotency::SavedIdempotencyResponse,
+        extractor::TokenData, form_data::PostNewsletterData, idempotency::SavedIdempotencyResponse,
     },
     error::AppError,
 };
@@ -25,7 +24,7 @@ use crate::{
     security(
         ("bearerAuth" = []),
     ),
-    request_body = PostNewsletterFormData,
+    request_body = PostNewsletterData,
     responses(
         (status = http::StatusCode::OK, description = "OK")
     ),
@@ -34,7 +33,7 @@ use crate::{
 pub async fn publish_newsletter(
     State(app_state): State<Arc<AppState>>,
     token_data: TokenData,
-    Json(body): Json<PostNewsletterFormData>,
+    Json(body): Json<PostNewsletterData>,
 ) -> Result<SavedIdempotencyResponse, AppError> {
     let response = app_state
         .newsletter_service

@@ -6,7 +6,7 @@ use wiremock::{Mock, ResponseTemplate, matchers};
 
 use crate::helpers::{
     startup::spawn_app,
-    test_app::{ConfirmationLinks, TestApp},
+    test_util::{create_confirmed_subscriber, create_unconfirmed_subscriber},
 };
 
 #[tokio::test]
@@ -108,44 +108,6 @@ async fn newsletters_returns_400_for_invalid_data() -> Result<(), anyhow::Error>
             error_message
         );
     }
-
-    Ok(())
-}
-
-/// 테스트 대상 애플리케이션의 퍼블릭 API를 사용해서 확인되지 않은 구독자를 생성한다.
-async fn create_unconfirmed_subscriber(app: &TestApp) -> Result<ConfirmationLinks, anyhow::Error> {
-    let body = serde_json::json!({
-        "name": "le guin",
-        "email": "ursula_le_guin@gmail.com",
-    });
-
-    let _mock_guard = Mock::given(matchers::path("/email"))
-        .and(matchers::method(Method::POST))
-        .respond_with(ResponseTemplate::new(StatusCode::OK))
-        .named("Create unconfirmed subscriber")
-        .expect(1)
-        .mount_as_scoped(&app.email_server)
-        .await;
-
-    app.post_subscriptions(&body).await.error_for_status()?;
-
-    let email_request = &app
-        .email_server
-        .received_requests()
-        .await
-        .unwrap()
-        .pop()
-        .unwrap();
-    let confirmation_links = app.get_confirmation_links(email_request);
-
-    Ok(confirmation_links)
-}
-
-async fn create_confirmed_subscriber(app: &TestApp) -> Result<(), anyhow::Error> {
-    let confirmation_link = create_unconfirmed_subscriber(app).await?;
-    reqwest::get(confirmation_link.html)
-        .await?
-        .error_for_status()?;
 
     Ok(())
 }

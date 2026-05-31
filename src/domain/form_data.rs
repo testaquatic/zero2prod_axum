@@ -4,7 +4,7 @@ use uuid::Uuid;
 use crate::domain::serializer::secret_string_to_string;
 
 #[derive(Debug, serde::Deserialize, utoipa::ToSchema, serde::Serialize)]
-pub struct LoginFormData {
+pub struct LoginData {
     #[schema(example = "username")]
     pub username: String,
     #[schema(value_type = String, example = "password")]
@@ -13,7 +13,7 @@ pub struct LoginFormData {
 }
 
 #[derive(serde::Deserialize, utoipa::ToSchema, Debug)]
-pub struct PostNewsletterFormData {
+pub struct PostNewsletterData {
     /// 제목
     #[schema(example = "제목")]
     pub title: String,
@@ -32,7 +32,7 @@ pub struct PostNewsletterFormData {
 
 /// 핸들러에 들어오는 가입 요청 데이터
 #[derive(serde::Deserialize, utoipa::ToSchema, Debug)]
-pub struct SubscriptionFormData {
+pub struct SubscriptionData {
     #[schema(example = "Le Guin")]
     pub name: String,
     #[schema(example = "ursula_le_guin@gmail.com")]
@@ -40,7 +40,7 @@ pub struct SubscriptionFormData {
 }
 
 #[derive(Debug, serde::Deserialize, utoipa::ToSchema)]
-pub struct ChangePasswordFormData {
+pub struct ChangePasswordData {
     #[schema(value_type = String, example = "password")]
     pub current_password: SecretString,
     #[schema(value_type = String, example = "new_password")]

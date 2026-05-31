@@ -32,6 +32,7 @@ pub struct ApplicationSettings {
     pub token_expiration_seconds: i64,
     pub token_secret_private_pem: SecretString,
     pub token_secret_public_pem: SecretString,
+    pub email_worker_interval_milliseconds: u64,
 }
 
 #[derive(serde::Deserialize, Clone)]

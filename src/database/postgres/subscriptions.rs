@@ -4,26 +4,6 @@ use uuid::Uuid;
 
 use crate::domain::new_subscriber::NewSubscriber;
 
-pub struct ConfirmedSubscriber {
-    pub email: String,
-}
-
-#[tracing::instrument(name = "Get confirmed subscribers", skip_all, err(Debug))]
-pub async fn get_confirmed_subscribers(
-    pg_executor: impl PgExecutor<'_>,
-) -> Result<Vec<ConfirmedSubscriber>, sqlx::Error> {
-    sqlx::query_as!(
-        ConfirmedSubscriber,
-        r#"
-        SELECT email
-        FROM subscriptions
-        WHERE status = 'confirmed'
-        "#,
-    )
-    .fetch_all(pg_executor)
-    .await
-}
-
 /// 구독자 데이터를 데이터베이스에 저장한다.
 /// 구독자의 `Uuid`를 반환한다.
 #[tracing::instrument(

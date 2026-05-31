@@ -5,7 +5,7 @@ use axum::{Json, extract::State};
 use crate::{
     app_state::AppState,
     domain::{
-        extractor::TokenData, form_data::ChangePasswordFormData, response::AppErrorMessageResponse,
+        extractor::TokenData, form_data::ChangePasswordData, response::AppErrorMessageResponse,
     },
     error::AppError,
 };
@@ -16,7 +16,7 @@ use crate::{
   summary = "비밀번호 변경",
   post,
   path = "/admin/password",
-  request_body(content = ChangePasswordFormData),
+  request_body(content = ChangePasswordData),
   responses(
     (status = http::StatusCode::OK, description = "OK"),
     (status = http::StatusCode::UNAUTHORIZED, body = AppErrorMessageResponse, description = "인증 오류: 접근 권한이 없음"),
@@ -29,7 +29,7 @@ use crate::{
 pub async fn change_password(
     State(app_state): State<Arc<AppState>>,
     token_data: TokenData,
-    Json(change_password_form_data): Json<ChangePasswordFormData>,
+    Json(change_password_form_data): Json<ChangePasswordData>,
 ) -> Result<(), AppError> {
     app_state
         .credential_service

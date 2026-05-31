@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use chrono::Utc;
 use secrecy::{ExposeSecret, SecretString};
 use uuid::Uuid;
@@ -18,6 +20,7 @@ pub struct TestApp {
     pub auth_token: String,
     pub api_client: reqwest::Client,
     pub _api_server_handle: tokio::task::JoinHandle<Result<(), std::io::Error>>,
+    pub _email_worker_handle: tokio::task::JoinHandle<Result<(), anyhow::Error>>,
 }
 
 impl TestApp {
@@ -87,10 +90,15 @@ impl TestApp {
             request_builder = request_builder.bearer_auth(token);
         }
 
-        request_builder
+        let response = request_builder
             .send()
             .await
-            .expect("Failed to execute request.")
+            .expect("Failed to execute request.");
+
+        // 이메일을 전송할 때까지 잠시 대기한다.
+        tokio::time::sleep(Duration::from_millis(150)).await;
+
+        response
     }
 
     pub async fn post_login<Body: serde::Serialize>(&self, body: &Body) -> reqwest::Response {

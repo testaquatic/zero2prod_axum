@@ -1,17 +1,22 @@
-use std::{io, time::Duration};
+use std::{
+    fmt::{Debug, Display},
+    io,
+    time::Duration,
+};
 
 use axum::Router;
 use moka::future::Cache;
 use secrecy::{ExposeSecret, SecretSlice};
 use sqlx::{PgPool, postgres::PgPoolOptions};
-use tokio::net::TcpListener;
+use tokio::{net::TcpListener, task::JoinError};
 use uuid::Uuid;
 
 use crate::{
-    app_state,
+    app_state::{self},
     configuration::{self, Settings},
-    email_client,
+    email_client::{self},
     router::get_app_router,
+    service::newsletter::NewsletterService,
 };
 
 pub fn get_connection_pool(configuration: &configuration::Settings) -> PgPool {
@@ -61,17 +66,55 @@ pub fn get_private_and_public_key_from_configuration(
     Ok((private_key, public_key))
 }
 
+pub async fn email_worker_loop(configuration: &Settings) -> Result<(), anyhow::Error> {
+    let pool = get_connection_pool(configuration);
+    let email_client = get_email_client(&configuration.email_client)
+        .map_err(|e| anyhow::anyhow!("Failed to get email client: {}", e))?;
+    loop {
+        match NewsletterService::try_execute_task(&NewsletterService, &email_client, &pool).await {
+            Ok(Some(_)) => (),
+            _ => {
+                tokio::time::sleep(Duration::from_millis(
+                    configuration.application.email_worker_interval_milliseconds,
+                ))
+                .await
+            }
+        }
+    }
+}
+
 /// 서버를 실행한다
-pub async fn run() -> Result<(), std::io::Error> {
+pub async fn run() -> Result<(), anyhow::Error> {
     // 설정을 읽는다
     let configuration = configuration::get_configuration().expect("failed to read configuration");
 
-    let application = Application::build(configuration)
+    let application = Application::build(configuration.clone())
         .await
         .expect("failed to build application");
+    let email_worker = async move { email_worker_loop(&configuration).await };
+
+    let application_task = tokio::spawn(application.run_until_stopped());
+    let worker_task = tokio::spawn(email_worker);
 
     // 서버 실행
-    application.run_until_stopped().await
+    tokio::select! {
+     result =  application_task => report_exit("API", result),
+     result = worker_task => report_exit("Background worker", result),
+    }
+
+    Ok(())
+}
+
+pub fn report_exit(task_name: &str, outcome: Result<Result<(), impl Display + Debug>, JoinError>) {
+    match outcome {
+        Ok(Ok(_)) => tracing::info!("{} has exited", task_name),
+        Ok(Err(e)) => {
+            tracing::error!(error.cause_chain = ?e, error.message = %e, "{} failed", task_name)
+        }
+        Err(e) => {
+            tracing::error!(error.cause_chain = ?e, error.message = %e, "{} task failed to complete", task_name)
+        }
+    }
 }
 
 // 서버 실행에 필요한 정보를 가지고 있는 구조체

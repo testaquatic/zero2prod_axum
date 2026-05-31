@@ -14,7 +14,7 @@ use crate::{
     domain::{
         credential::Claims,
         extractor::TokenData,
-        form_data::LoginFormData,
+        form_data::LoginData,
         response::{AppErrorMessageResponse, TokenResponse},
     },
     error::AppError,
@@ -27,7 +27,7 @@ use crate::{
   summary = "로그인",
   post,
   path = "/login",
-  request_body(content = inline(LoginFormData), content_type = "application/json"),
+  request_body(content = inline(LoginData), content_type = "application/json"),
   responses(
     (status = http::StatusCode::OK, description = "로그인에 성공하면 인증 토큰을 반환한다", body = TokenResponse),
     (status = http::StatusCode::UNPROCESSABLE_ENTITY, body = AppErrorMessageResponse, description = "누락되거나 유효하지 않은 필드가 있음"),
@@ -38,7 +38,7 @@ use crate::{
 )]
 pub async fn login(
     State(app_state): State<Arc<AppState>>,
-    Json(login_input): Json<LoginFormData>,
+    Json(login_input): Json<LoginData>,
 ) -> Result<Json<TokenResponse>, AppError> {
     let token = process_token_generation(&app_state, &login_input).await?;
 
@@ -51,7 +51,7 @@ pub async fn login(
 /// 토큰 생성과 관련한 절차를 수행한다.
 async fn process_token_generation(
     app_state: &AppState,
-    login_input: &LoginFormData,
+    login_input: &LoginData,
 ) -> Result<SecretString, ServiceError> {
     let user_id = app_state
         .credential_service

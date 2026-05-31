@@ -12,7 +12,7 @@ use crate::{
     },
     domain::{
         extractor::TokenData,
-        form_data::{ChangePasswordFormData, LoginFormData},
+        form_data::{ChangePasswordData, LoginData},
     },
     service::error::ServiceError,
 };
@@ -24,7 +24,7 @@ impl CredentialService {
     pub async fn validate_credentials(
         &self,
         app_state: &AppState,
-        username_password: &LoginFormData,
+        username_password: &LoginData,
     ) -> Result<uuid::Uuid, ServiceError> {
         let user_password_hash = get_user_id_password_hash_from_username(
             &app_state.pg_pool,
@@ -54,7 +54,7 @@ impl CredentialService {
         &self,
         app_state: &AppState,
         token_data: &TokenData,
-        change_password_form_data: &ChangePasswordFormData,
+        change_password_form_data: &ChangePasswordData,
     ) -> Result<(), ServiceError> {
         // 일단 길이부터 확인한다.
         if change_password_form_data.new_password.expose_secret().len() <= 12 {
@@ -84,7 +84,7 @@ impl CredentialService {
             .context("No user data!")
             .map_err(ServiceError::UnexpectedError)?;
 
-        let login_form_data = LoginFormData {
+        let login_form_data = LoginData {
             username: user_info.username,
             password: change_password_form_data.current_password.clone(),
         };

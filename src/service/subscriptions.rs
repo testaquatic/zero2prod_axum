@@ -7,7 +7,7 @@ use crate::{
         subscription_tokens::{get_subscriber_id_from_token, save_subscription_token},
         subscriptions::update_subscriber_confirmed,
     },
-    domain::{form_data::SubscriptionFormData, new_subscriber::NewSubscriber},
+    domain::{form_data::SubscriptionData, new_subscriber::NewSubscriber},
     email_client::{self},
     service::error::ServiceError,
 };
@@ -19,7 +19,7 @@ impl SubscriptionsService {
     pub async fn subscribe(
         &self,
         app_state: &AppState,
-        subscriber_form: SubscriptionFormData,
+        subscriber_form: SubscriptionData,
     ) -> Result<(), ServiceError> {
         let new_subscriber =
             NewSubscriber::try_from(subscriber_form).map_err(ServiceError::ValidationError)?;
